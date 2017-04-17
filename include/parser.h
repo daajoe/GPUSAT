@@ -10,13 +10,35 @@
 
 using namespace std;
 
-treedec parseTreeDecomp(basic_string<char> graph);
+/**
+ * generates a treedec from a given string
+ *
+ * @param graph the string representation of the tree decomposition
+ * @return the tree decomposition
+ */
+treedec parseTreeDecomp(string graph);
 
-void parseEdge(basic_string<char> item, queue<long> **edges);
+/**
+ *
+ * @param item
+ * @param edges
+ */
+void parseEdge(string item, queue<long> **edges);
 
-void parseStart(treedec &ret, basic_string<char> &item, queue<long> **&edges);
+/**
+ *
+ * @param ret
+ * @param item
+ * @param edges
+ */
+void parseStart(treedec &ret, string &item, queue<long> **&edges);
 
-void parseBag(treedec ret, basic_string<char> item);
+/**
+ *
+ * @param ret
+ * @param item
+ */
+void parseBag(treedec ret, string item);
 
 #include <queue>
 
