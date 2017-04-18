@@ -5,41 +5,42 @@
 #include <sstream>
 #include <unistd.h>
 #include <fstream>
-#include <utils.h>
+#include <queue>
 
 using namespace std;
 
 /// id of the vertex in the primal graph
-typedef long int vertexId;
+typedef long vertexIdType;
 /// id of the bag in the tree decomposition
-typedef long int bagId;
+typedef long bagIdType;
 /// type for variables in the sat clauses
-typedef long int varType;
+typedef long varType;
 
 /// type for a bag in the tree decomposition
-struct bag {
-    int numv = 0;
-    unsigned long long int nume = 0;
-    vertexId *vertices;
-    bagId *edges;
+struct bagType {
+    long numv = 0;
+    long nume = 0;
+    vertexIdType *vertices;
+    bagIdType *edges;
 };
 
 /// type for saving a tree decomposition
-struct treedec {
-    int numb;
-    bag *bags;
+struct treedecType {
+    long numb;
+    bagType *bags;
 };
 
 /// type for a clause in the sat formula
-struct clause {
-    long int numVars;
+struct clauseType {
+    long numVars;
     varType *var;
 };
 
 /// type for saving the sat formula
-struct satformula {
-    long int numclauses;
-    clause *clauses;
+struct satformulaType {
+    long numVars;
+    long numclauses;
+    clauseType *clauses;
 };
 
 /**
@@ -54,7 +55,13 @@ int numCharOcc(string str, char c);
  * function to print the tree decomposition in human readable form
  * @param decomp the tree decomposition to print
  */
-void printTreeD(treedec decomp);
+void printTreeD(treedecType decomp);
+
+/**
+ * function to print the tree decomposition in human readable form
+ * @param decomp the tree decomposition to print
+ */
+void printFormula(satformulaType formula);
 
 /**
  * function to read a file into the string

@@ -1,4 +1,6 @@
-#include <utils.h>
+#include <gpusatutils.h>
+
+using namespace std;
 
 int numCharOcc(string str, char c) {
     int numOcc = 0;
@@ -10,7 +12,7 @@ int numCharOcc(string str, char c) {
     return numOcc;
 }
 
-void printTreeD(treedec decomp) {
+void printTreeD(treedecType decomp) {
     int size = decomp.numb;
     for (int i = 0; i < size; i++) {
         cout << "\nbagnum: " << i + 1 << "\n";
@@ -24,6 +26,19 @@ void printTreeD(treedec decomp) {
         cout << "edges: ";
         for (int a = 0; a < esize; a++) {
             cout << decomp.bags[i].edges[a] + 1 << " ";
+        }
+        cout << "\n";
+    }
+}
+
+void printFormula(satformulaType formula) {
+    int size = formula.numclauses;
+    for (int i = 0; i < size; i++) {
+        cout << "\nclause: " << i + 1 << "\n";
+        int vsize = formula.clauses[i].numVars;
+        cout << "variables: ";
+        for (int a = 0; a < vsize; a++) {
+            cout << formula.clauses[i].var[a] << " ";
         }
         cout << "\n";
     }
