@@ -9,10 +9,10 @@
  * @param formula the string representation of the tree decomposition
  * @return the tree decomposition
  */
-satformulaType parseSatFormula(basic_string<char> formula);
+satformulaType parseSatFormula(string formula);
 
-void parseClauseLine(basic_string<char> item, queue<queue<long>> *clauses);
+void parseClauseLine(string item, queue<queue<varIdType>> *clauses);
 
-void parseProblemLine(satformulaType &satformula, basic_string<char> item, queue<queue<long>> *&clauses);
+void parseProblemLine(satformulaType &satformula, string item, queue<queue<varIdType>> *&clauses);
 
 #endif //GPUSAT_SATPARSER_H

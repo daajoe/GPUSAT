@@ -41,9 +41,9 @@ void printSolutions(treedecType decomp) {
         for (int a = 0; a < ns; a++) {
             cout << a << ": ";
             for (int b = 0; b < vsize; b++) {
-                cout << decomp.bags[i].solution[a].vars[b] << " ";
+                cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + b] << " ";
             }
-            cout << decomp.bags[i].solution[a].n << "\n";
+            cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + decomp.bags[i].numv] << "\n";
         }
         cout << "\n";
     }

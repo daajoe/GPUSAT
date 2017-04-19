@@ -2,10 +2,8 @@
 #include <satparser.h>
 #include <treeparser.h>
 #include <solver.h>
-#include <CL/cl.hpp>
 
 using namespace std;
-using namespace cl;
 
 int main(int argc, char *argv[]) {
     stringbuf treeD, sat;
@@ -61,8 +59,9 @@ int main(int argc, char *argv[]) {
     solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
     int solutions = 0;
     for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
-        solutions += treeDecomp.bags[0].solution[i].n;
+        solutions += treeDecomp.bags[0].solution[(treeDecomp.bags[0].numv + 1) * i + treeDecomp.bags[0].numv];
     }
     cout << "Solutions: " << solutions;
     printSolutions(treeDecomp);
+    int test = 0;
 }

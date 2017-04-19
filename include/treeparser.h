@@ -9,14 +9,14 @@
  * @param graph the string representation of the tree decomposition
  * @return the tree decomposition
  */
-treedecType parseTreeDecomp(basic_string<char> graph);
+treedecType parseTreeDecomp(string graph);
 
 /**
  *
  * @param item
  * @param edges
  */
-void parseEdgeLine(basic_string<char> item, queue<long> **edges);
+void parseEdgeLine(string item, queue<bagIdType> **edges);
 
 /**
  *
@@ -24,13 +24,13 @@ void parseEdgeLine(basic_string<char> item, queue<long> **edges);
  * @param item
  * @param edges
  */
-void parseStartLine(treedecType &ret, basic_string<char> &item, queue<long> **&edges);
+void parseStartLine(treedecType &ret, string &item, queue<bagIdType> **&edges);
 
 /**
  *
  * @param ret
  * @param item
  */
-void parseBagLine(treedecType ret, basic_string<char> item);
+void parseBagLine(treedecType ret, string item);
 
 #endif //GPUSAT_TREEPARSER_H

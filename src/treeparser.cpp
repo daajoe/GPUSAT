@@ -2,6 +2,8 @@
 #include <math.h>
 #include <regex>
 
+using namespace std;
+
 treedecType parseTreeDecomp(string graph) {
     treedecType ret = treedecType();
     stringstream ss(graph);
@@ -74,9 +76,8 @@ void parseBagLine(treedecType ret, string item) {
             std::sregex_iterator(item.begin(), item.end(), expression),
             std::sregex_iterator()));
 
-    ret.bags[bnum - 1].id = bnum;
     ret.bags[bnum - 1].vertices = new vertexIdType[match_count - 1];
-    ret.bags[bnum - 1].solution = new solutionType[(long) pow(2, match_count - 1)];
+    ret.bags[bnum - 1].solution = new varIdType[(long) pow(2, match_count - 1) * match_count];
     while (getline(sline, i, ' ')) //vertices
     {
         ret.bags[bnum - 1].vertices[a] = stoi(i);
@@ -84,7 +85,4 @@ void parseBagLine(treedecType ret, string item) {
     }
     ret.bags[bnum - 1].numv = match_count - 1;
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-    for (long b = 0; b < (long) pow(2, match_count - 1); b++) {
-        ret.bags[bnum - 1].solution[b].vars = new varIdType[match_count - 1];
-    }
 }

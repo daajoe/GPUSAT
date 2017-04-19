@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <fstream>
 #include <queue>
+//#include <CL/cl.hpp>
 
 using namespace std;
 
@@ -18,25 +19,14 @@ typedef long varIdType;
 /// type for variables in the sat clauses
 typedef long clauseIdType;
 
-enum nodeType {
-    JOIN, INTRODUCE, FORGET, LEAF
-};
-
-
-struct solutionType {
-    long n = 0;
-    varIdType *vars;
-};
-
 /// type for a bag in the tree decomposition
 struct bagType {
-    bagIdType id = 0;
     vertexIdType numv = 0;
     bagIdType nume = 0;
     long numSol = 0;
     vertexIdType *vertices;
     bagIdType *edges;
-    solutionType *solution;
+    varIdType *solution;
 };
 
 /// type for saving a tree decomposition
