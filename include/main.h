@@ -1,4 +1,4 @@
-#ifndef LOGICSEM_MAIN_H
-#define LOGICSEM_MAIN_H
+#ifndef GPUSAT_MAIN_H
+#define GPUSAT_MAIN_H
 
-#endif //LOGICSEM_MAIN_H
+#endif //GPUSAT_MAIN_H

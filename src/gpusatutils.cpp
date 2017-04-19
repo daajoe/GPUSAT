@@ -1,73 +1,64 @@
 #include <gpusatutils.h>
-
-using namespace std;
-
-int numCharOcc(string str, char c) {
-    int numOcc = 0;
-    for (unsigned long long int i = 0; i < str.length(); i++) {
-        if (str.at(i) == c) {
-            numOcc++;
-        }
-    }
-    return numOcc;
-}
+#include <iostream>
+#include <sstream>
+#include <fstream>
 
 void printTreeD(treedecType decomp) {
-    int size = decomp.numb;
+    cl_long size = decomp.numb;
     for (int i = 0; i < size; i++) {
-        cout << "\nbagnum: " << i + 1 << "\n";
-        int vsize = decomp.bags[i].numv;
-        cout << "vertices: ";
+        std::cout << "\nbagnum: " << i + 1 << "\n";
+        cl_long vsize = decomp.bags[i].numv;
+        std::cout << "vertices: ";
         for (int a = 0; a < vsize; a++) {
-            cout << decomp.bags[i].vertices[a] << " ";
+            std::cout << decomp.bags[i].vertices[a] << " ";
         }
-        cout << "\n";
-        unsigned long long int esize = decomp.bags[i].nume;
-        cout << "edges: ";
+        std::cout << "\n";
+        cl_long esize = decomp.bags[i].nume;
+        std::cout << "edges: ";
         for (int a = 0; a < esize; a++) {
-            cout << decomp.bags[i].edges[a] << " ";
+            std::cout << decomp.bags[i].edges[a] << " ";
         }
-        cout << "\n";
+        std::cout << "\n";
     }
 }
 
 void printSolutions(treedecType decomp) {
-    int size = decomp.numb;
+    cl_long size = decomp.numb;
     for (int i = 0; i < size; i++) {
-        cout << "\nbagnum: " << i + 1 << "\n";
-        int ns = decomp.bags[i].numSol;
-        int vsize = decomp.bags[i].numv;
-        cout << "solutions: \n";
+        std::cout << "\nbagnum: " << i + 1 << "\n";
+        cl_long ns = decomp.bags[i].numSol;
+        cl_long vsize = decomp.bags[i].numv;
+        std::cout << "solutions: \n";
         for (int a = 0; a < ns; a++) {
-            cout << a << ": ";
+            std::cout << a << ": ";
             for (int b = 0; b < vsize; b++) {
-                cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + b] << " ";
+                std::cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + b] << " ";
             }
-            cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + decomp.bags[i].numv] << "\n";
+            std::cout << decomp.bags[i].solution[(decomp.bags[i].numv + 1) * a + decomp.bags[i].numv] << "\n";
         }
-        cout << "\n";
+        std::cout << "\n";
     }
 }
 
 void printFormula(satformulaType formula) {
-    int size = formula.numclauses;
+    cl_long size = formula.numclauses;
     int numVar = 0;
     for (int i = 0; i < size; i++) {
-        cout << "\nclause: " << i + 1 << "\n";
-        int vsize = formula.numVarsC[i];
-        cout << "variables: ";
+        std::cout << "\nclause: " << i + 1 << "\n";
+        cl_long vsize = formula.numVarsC[i];
+        std::cout << "variables: ";
         for (int a = 0; a < vsize; a++) {
-            cout << formula.clauses[numVar + a] << " ";
+            std::cout << formula.clauses[numVar + a] << " ";
         }
         numVar += vsize;
-        cout << "\n";
+        std::cout << "\n";
     }
 }
 
-string readFile(string path) {
-    stringbuf treeD;
-    string inputLine;
-    ifstream fileIn(path);
+std::string readFile(std::string path) {
+    std::stringbuf treeD;
+    std::string inputLine;
+    std::ifstream fileIn(path);
     while (getline(fileIn, inputLine)) {
         treeD.sputn(inputLine.c_str(), inputLine.size());
         treeD.sputn("\n", 1);

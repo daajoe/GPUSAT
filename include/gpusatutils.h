@@ -1,61 +1,33 @@
 #ifndef LOGICSEM_UTILS_H
 #define LOGICSEM_UTILS_H
 
-#include <iostream>
-#include <sstream>
-#include <unistd.h>
-#include <fstream>
-#include <queue>
-//#include <CL/cl.hpp>
+#define alloca __builtin_alloca
 
-using namespace std;
-
-/// id of the vertex in the primal graph
-typedef long vertexIdType;
-/// id of the bag in the tree decomposition
-typedef long bagIdType;
-/// type for variables in the sat clauses
-typedef long varIdType;
-/// type for variables in the sat clauses
-typedef long clauseIdType;
+#include <CL/cl.hpp>
 
 /// type for a bag in the tree decomposition
 struct bagType {
-    vertexIdType numv = 0;
-    bagIdType nume = 0;
-    long numSol = 0;
-    vertexIdType *vertices;
-    bagIdType *edges;
-    varIdType *solution;
+    cl_long numv = 0;
+    cl_long nume = 0;
+    cl_long numSol = 0;
+    cl_long *vertices;
+    cl_long *edges;
+    cl_long *solution;
 };
 
 /// type for saving a tree decomposition
 struct treedecType {
-    bagIdType numb = 0;
+    cl_long numb = 0;
     bagType *bags;
-};
-
-/// type for a clause in the sat formula
-struct clauseType {
-    varIdType numVars = 0;
-    varIdType *var;
 };
 
 /// type for saving the sat formula
 struct satformulaType {
-    varIdType numVars = 0;
-    clauseIdType numclauses = 0;
-    varIdType *numVarsC;
-    varIdType *clauses;
+    cl_long numclauses = 0;
+    cl_long totalNumVar = 0;
+    cl_long *numVarsC;
+    cl_long *clauses;
 };
-
-/**
- * counts the occurences of a single character in a string
- * @param str the string to search
- * @param c the character to find
- * @return the number of occurences
- */
-int numCharOcc(string str, char c);
 
 /**
  * function to print the tree decomposition in human readable form
@@ -76,6 +48,6 @@ void printSolutions(treedecType decomp);
  * @param path the path to the file
  * @return the contents of the file
  */
-string readFile(string path);
+std::string readFile(std::string path);
 
 #endif //LOGICSEM_UTILS_H
