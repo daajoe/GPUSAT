@@ -45,7 +45,8 @@ struct clauseType {
 struct satformulaType {
     varIdType numVars = 0;
     clauseIdType numclauses = 0;
-    clauseType *clauses;
+    varIdType *numVarsC;
+    varIdType *clauses;
 };
 
 /**

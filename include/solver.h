@@ -33,15 +33,16 @@ solveJoin(long id, varIdType *solutions, long numV, long numE, vertexIdType *ver
 void solveForget(long id, varIdType *solutions,
                  long numV, varIdType *edge, long numVE, long numESol, vertexIdType *vertices);
 
-void solveLeaf(satformulaType *formula, long id, varIdType *solutions,
+void solveLeaf(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, varIdType *solutions,
                long numV, vertexIdType *vertices);
 
 void
-solveIntroduce(satformulaType *formula, long id, varIdType *solutions,
+solveIntroduce(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, varIdType *solutions,
                long numV, varIdType *edge, long numVE, long numESol, vertexIdType *vertices);
 
-int checkBag(satformulaType *formula, long id, long numV, vertexIdType *vertices);
+int
+checkBag(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, long numV, vertexIdType *vertices);
 
-int solveProblem(treedecType &decomp, satformulaType &formula, bagType &node);
+void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node);
 
 #endif //GPUSAT_SOLVER_H

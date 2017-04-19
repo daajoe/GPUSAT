@@ -4,7 +4,7 @@
 
 using namespace std;
 
-int solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
+void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
     for (int i = 0; i < node.nume; i++) {
         int edge = node.edges[i] - 1;
         solveProblem(decomp, formula, decomp.bags[edge]);
@@ -33,10 +33,12 @@ int solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
         } else {
             if (node.nume == 0) {
                 //leaf node
-                solveLeaf(&formula, id, node.solution, node.numv, node.vertices);
+                solveLeaf(formula.clauses, formula.numVarsC, formula.numclauses, id, node.solution, node.numv,
+                          node.vertices);
             } else if (node.nume == 1 && decomp.bags[node.edges[0] - 1].numv < node.numv) {
                 //introduce node
-                solveIntroduce(&formula, id, node.solution, node.numv, decomp.bags[node.edges[0] - 1].solution,
+                solveIntroduce(formula.clauses, formula.numVarsC, formula.numclauses, id, node.solution, node.numv,
+                               decomp.bags[node.edges[0] - 1].solution,
                                decomp.bags[node.edges[0] - 1].numv, decomp.bags[node.edges[0] - 1].numSol,
                                node.vertices);
             }
@@ -44,22 +46,23 @@ int solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
     }
 }
 
-int checkBag(satformulaType *formula, long id, long numV, vertexIdType *vertices) {
-    long i;
+int
+checkBag(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, long numV, vertexIdType *vertices) {
+    long i, varNum = 0;
     int unsat = 0;
     //check formula
-    for (i = 0; i < (*formula).numclauses && !unsat; i++) {
+    for (i = 0; i < numclauses && !unsat; i++) {
         int satC = 0;
         long a;
         //check clause
-        for (a = 0; a < (*formula).clauses[i].numVars && !satC; a++) {
+        for (a = 0; a < numVarsC[i] && !satC; a++) {
             int found = 0;
             long b;
             for (b = 0; b < numV && !satC; b++) {
-                if (((*formula).clauses[i].var[a] == vertices[b]) ||
-                    ((*formula).clauses[i].var[a] == -vertices[b])) {
+                if ((clauses[varNum + a] == vertices[b]) ||
+                    (clauses[varNum + a] == -vertices[b])) {
                     found = 1;
-                    if ((*formula).clauses[i].var[a] < 0) {
+                    if (clauses[varNum + a] < 0) {
                         if ((id & (1 << (numV - b - 1))) >> (numV - b - 1) == 0) {
                             satC = 1;
                         }
@@ -74,6 +77,7 @@ int checkBag(satformulaType *formula, long id, long numV, vertexIdType *vertices
                 satC = 1;
             }
         }
+        varNum += numVarsC[i];
         if (!satC) {
             unsat = 1;
         }
@@ -137,9 +141,9 @@ void solveForget(long id, varIdType *solutions,
     }
 }
 
-void solveLeaf(satformulaType *formula, long id, varIdType *solutions,
+void solveLeaf(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, varIdType *solutions,
                long numV, vertexIdType *vertices) {
-    int unsat = checkBag(formula, id, numV, vertices);
+    int unsat = checkBag(clauses, numVarsC, numclauses, id, numV, vertices);
     long i;
     solutions[(numV + 1) * id + numV] = !unsat;
     for (i = 0; i < numV; i++) {
@@ -152,9 +156,9 @@ void solveLeaf(satformulaType *formula, long id, varIdType *solutions,
 }
 
 void
-solveIntroduce(satformulaType *formula, long id, varIdType *solutions,
+solveIntroduce(varIdType *clauses, varIdType *numVarsC, clauseIdType numclauses, long id, varIdType *solutions,
                long numV, varIdType *edge, long numVE, long numESol, vertexIdType *vertices) {
-    int unsat = checkBag(formula, id, numV, vertices);
+    int unsat = checkBag(clauses, numVarsC, numclauses, id, numV, vertices);
     long i;
     for (i = 0; i < numV; i++) {
         vertexIdType vert = vertices[i];

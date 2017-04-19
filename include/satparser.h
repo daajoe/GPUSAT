@@ -11,7 +11,7 @@
  */
 satformulaType parseSatFormula(string formula);
 
-void parseClauseLine(string item, queue<queue<varIdType>> *clauses);
+void parseClauseLine(string item, queue<queue<varIdType>> *clauses, clauseIdType &clauseSize);
 
 void parseProblemLine(satformulaType &satformula, string item, queue<queue<varIdType>> *&clauses);
 

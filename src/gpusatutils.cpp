@@ -51,13 +51,15 @@ void printSolutions(treedecType decomp) {
 
 void printFormula(satformulaType formula) {
     int size = formula.numclauses;
+    int numVar = 0;
     for (int i = 0; i < size; i++) {
         cout << "\nclause: " << i + 1 << "\n";
-        int vsize = formula.clauses[i].numVars;
+        int vsize = formula.numVarsC[i];
         cout << "variables: ";
         for (int a = 0; a < vsize; a++) {
-            cout << formula.clauses[i].var[a] << " ";
+            cout << formula.clauses[numVar + a] << " ";
         }
+        numVar += vsize;
         cout << "\n";
     }
 }
