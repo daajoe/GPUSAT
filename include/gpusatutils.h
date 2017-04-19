@@ -14,32 +14,47 @@ typedef long vertexIdType;
 /// id of the bag in the tree decomposition
 typedef long bagIdType;
 /// type for variables in the sat clauses
-typedef long varType;
+typedef long varIdType;
+/// type for variables in the sat clauses
+typedef long clauseIdType;
+
+enum nodeType {
+    JOIN, INTRODUCE, FORGET, LEAF
+};
+
+
+struct solutionType {
+    long n = 0;
+    varIdType *vars;
+};
 
 /// type for a bag in the tree decomposition
 struct bagType {
-    long numv = 0;
-    long nume = 0;
+    bagIdType id = 0;
+    vertexIdType numv = 0;
+    bagIdType nume = 0;
+    long numSol = 0;
     vertexIdType *vertices;
     bagIdType *edges;
+    solutionType *solution;
 };
 
 /// type for saving a tree decomposition
 struct treedecType {
-    long numb;
+    bagIdType numb = 0;
     bagType *bags;
 };
 
 /// type for a clause in the sat formula
 struct clauseType {
-    long numVars;
-    varType *var;
+    varIdType numVars = 0;
+    varIdType *var;
 };
 
 /// type for saving the sat formula
 struct satformulaType {
-    long numVars;
-    long numclauses;
+    varIdType numVars = 0;
+    clauseIdType numclauses = 0;
     clauseType *clauses;
 };
 
@@ -62,6 +77,8 @@ void printTreeD(treedecType decomp);
  * @param decomp the tree decomposition to print
  */
 void printFormula(satformulaType formula);
+
+void printSolutions(treedecType decomp);
 
 /**
  * function to read a file into the string

@@ -1,4 +1,6 @@
 #include <treeparser.h>
+#include <math.h>
+#include <regex>
 
 treedecType parseTreeDecomp(string graph) {
     treedecType ret = treedecType();
@@ -43,8 +45,7 @@ void parseEdgeLine(string item, queue<bagIdType> **edges) {
     bagIdType start = stoi(i);
     getline(sline, i, ' '); //end
     bagIdType end = stoi(i);
-    edges[start - 1]->push(end - 1);
-    edges[end - 1]->push(start - 1);
+    edges[start - 1]->push(end);
 }
 
 void parseStartLine(treedecType &ret, string &item, queue<bagIdType> **&edges) {
@@ -68,11 +69,22 @@ void parseBagLine(treedecType ret, string item) {
     getline(sline, i, ' '); //bag number
     int bnum = stoi(i);
     int a = 0;
-    ret.bags[bnum - 1].vertices = new vertexIdType[numCharOcc(item, ' ') - 1];
+    regex const expression("[0123456789]+");
+    std::ptrdiff_t const match_count(std::distance(
+            std::sregex_iterator(item.begin(), item.end(), expression),
+            std::sregex_iterator()));
+
+    ret.bags[bnum - 1].id = bnum;
+    ret.bags[bnum - 1].vertices = new vertexIdType[match_count - 1];
+    ret.bags[bnum - 1].solution = new solutionType[(long) pow(2, match_count - 1)];
     while (getline(sline, i, ' ')) //vertices
     {
         ret.bags[bnum - 1].vertices[a] = stoi(i);
         a++;
-        ret.bags[bnum - 1].numv = a;
+    }
+    ret.bags[bnum - 1].numv = match_count - 1;
+    ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
+    for (long b = 0; b < (long) pow(2, match_count - 1); b++) {
+        ret.bags[bnum - 1].solution[b].vars = new varIdType[match_count - 1];
     }
 }

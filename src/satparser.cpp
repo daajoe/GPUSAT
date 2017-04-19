@@ -4,7 +4,7 @@ satformulaType parseSatFormula(string formula) {
     satformulaType ret = satformulaType();
     stringstream ss(formula);
     string item;
-    queue<queue<varType>> *clauses = NULL;
+    queue<queue<varIdType>> *clauses = NULL;
     while (getline(ss, item)) {
         char type = item.at(0);
         if (type == 'c') {
@@ -21,8 +21,8 @@ satformulaType parseSatFormula(string formula) {
     if (clauses != NULL) {
         int a = 0;
         while (!clauses->empty()) {
-            queue<varType> &clause = clauses->front();
-            ret.clauses[a].var = new varType[clause.size()];
+            queue<varIdType> &clause = clauses->front();
+            ret.clauses[a].var = new varIdType[clause.size()];
             ret.clauses[a].numVars = clause.size();
 
             int b = 0;
@@ -38,10 +38,10 @@ satformulaType parseSatFormula(string formula) {
     return ret;
 }
 
-void parseClauseLine(string item, queue<queue<varType>> *clauses) {
+void parseClauseLine(string item, queue<queue<varIdType>> *clauses) {
     stringstream sline(item);
     string i;
-    queue<varType> clause;
+    queue<varIdType> clause;
     getline(sline, i, ' ');
     while (!sline.eof()) {
         if (i.size() > 0) {
@@ -56,7 +56,7 @@ void parseClauseLine(string item, queue<queue<varType>> *clauses) {
     clauses->push(clause);
 }
 
-void parseProblemLine(satformulaType &satformula, string item, queue<queue<varType>> *&clauses) {
+void parseProblemLine(satformulaType &satformula, string item, queue<queue<varIdType>> *&clauses) {
     stringstream sline(item);
     string i;
     getline(sline, i, ' '); //p
@@ -66,5 +66,5 @@ void parseProblemLine(satformulaType &satformula, string item, queue<queue<varTy
     getline(sline, i, ' '); //num clauses
     satformula.numclauses = stoi(i);
     satformula.clauses = new clauseType[stoi(i)];
-    clauses = new queue<queue<varType>>();
+    clauses = new queue<queue<varIdType>>();
 }

@@ -25,7 +25,25 @@ void printTreeD(treedecType decomp) {
         unsigned long long int esize = decomp.bags[i].nume;
         cout << "edges: ";
         for (int a = 0; a < esize; a++) {
-            cout << decomp.bags[i].edges[a] + 1 << " ";
+            cout << decomp.bags[i].edges[a] << " ";
+        }
+        cout << "\n";
+    }
+}
+
+void printSolutions(treedecType decomp) {
+    int size = decomp.numb;
+    for (int i = 0; i < size; i++) {
+        cout << "\nbagnum: " << i + 1 << "\n";
+        int ns = decomp.bags[i].numSol;
+        int vsize = decomp.bags[i].numv;
+        cout << "solutions: \n";
+        for (int a = 0; a < ns; a++) {
+            cout << a << ": ";
+            for (int b = 0; b < vsize; b++) {
+                cout << decomp.bags[i].solution[a].vars[b] << " ";
+            }
+            cout << decomp.bags[i].solution[a].n << "\n";
         }
         cout << "\n";
     }

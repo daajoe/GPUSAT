@@ -1,14 +1,8 @@
-#ifdef __APPLE__
-#include <OpenCL/cl.hpp>
-#else
-
-#include <CL/cl.hpp>
-
-#endif
-
 #include <gpusatutils.h>
 #include <satparser.h>
 #include <treeparser.h>
+#include <solver.h>
+#include <CL/cl.hpp>
 
 using namespace std;
 using namespace cl;
@@ -64,4 +58,11 @@ int main(int argc, char *argv[]) {
     satformulaType satFormula = parseSatFormula(sat.str());
     printTreeD(treeDecomp);
     printFormula(satFormula);
+    solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
+    int solutions = 0;
+    for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
+        solutions += treeDecomp.bags[0].solution[i].n;
+    }
+    cout << "Solutions: " << solutions;
+    printSolutions(treeDecomp);
 }
