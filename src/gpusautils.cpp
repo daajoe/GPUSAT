@@ -1,7 +1,9 @@
-#include <gpusatutils.h>
-#include <iostream>
-#include <sstream>
+#include <math.h>
+#include <regex>
 #include <fstream>
+#include <iostream>
+#include <main.h>
+#include <gpusautils.h>
 
 void printTreeD(treedecType decomp) {
     cl_long size = decomp.numb;

@@ -1,8 +1,20 @@
-#ifndef GPUSAT_TREEPARSER_H
-#define GPUSAT_TREEPARSER_H
+#ifndef GPUSAT_PARSER_H
+#define GPUSAT_PARSER_H
 
-#include <gpusatutils.h>
 #include <queue>
+#include <main.h>
+
+/**
+ * generates a treedec from a given string
+ *
+ * @param formula the string representation of the tree decomposition
+ * @return the tree decomposition
+ */
+satformulaType parseSatFormula(std::string formula);
+
+void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses, cl_long &clauseSize);
+
+void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> *&clauses);
 
 /**
  * generates a treedec from a given string
@@ -34,4 +46,4 @@ void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&
  */
 void parseBagLine(treedecType ret, std::string item);
 
-#endif //GPUSAT_TREEPARSER_H
+#endif //GPUSAT_PARSER_H
