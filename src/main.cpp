@@ -10,7 +10,7 @@
 #include <gpusautils.h>
 #include <main.h>
 
-std::string kernelStr =
+std::string kernelStr = readFile("../kernel/kernel.cl");/*
         "__kernel void solveLeaf(const __global long *clauses, const __global long *numVarsC, long numclauses,\n"
                 "                        __global long *solutions, long numV, const __global long *vertices) {\n"
                 "    int i;\n"
@@ -18,7 +18,7 @@ std::string kernelStr =
                 "    for (i = 0; i < numV; i++) {\n"
                 "        solutions[(numV + 1) * id + i] = 5;\n"
                 "    }\n"
-                "}\n";
+                "}\n";*/
 std::vector<cl::Platform> platforms;
 cl::Context context;
 std::vector<cl::Device> devices;
@@ -109,6 +109,15 @@ int main(int argc, char *argv[]) {
         /////////////////////////////////////////////////////////////////
         // Create OpenCL memory buffers
         /////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////
+        // Load CL file, build CL program object, create CL kernel object
+        /////////////////////////////////////////////////////////////////
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
+                                                       kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
+/*
+        kernel = cl::Kernel(program, "solveLeaf");
         cl::Buffer bufSol = cl::Buffer(context,
                                        CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                        sizeof(cl_long) * (treeDecomp.bags[7].numSol * (treeDecomp.bags[7].numv + 1)),
@@ -125,14 +134,6 @@ int main(int argc, char *argv[]) {
                                             CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                             sizeof(cl_long) * (satFormula.numclauses),
                                             satFormula.numVarsC);
-        /////////////////////////////////////////////////////////////////
-        // Load CL file, build CL program object, create CL kernel object
-        /////////////////////////////////////////////////////////////////
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
-                                                       kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
-        kernel = cl::Kernel(program, "solveLeaf");
         /////////////////////////////////////////////////////////////////
         // Set the arguments that will be used for kernel execution
         /////////////////////////////////////////////////////////////////
@@ -154,9 +155,9 @@ int main(int argc, char *argv[]) {
         /////////////////////////////////////////////////////////////////
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0,
                                 sizeof(cl_long) * (treeDecomp.bags[7].numSol * (treeDecomp.bags[7].numv + 1)),
-                                treeDecomp.bags[7].solution);
+                                treeDecomp.bags[7].solution);*/
         //solve
-        //solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], my_context, my_program, my_queue);
+        solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
         int solutions = 0;
         for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
             solutions += treeDecomp.bags[0].solution[(treeDecomp.bags[0].numv + 1) * i + treeDecomp.bags[0].numv];
@@ -183,25 +184,21 @@ int main(int argc, char *argv[]) {
     int test = 0;
 }
 
-/*
 void
-solveProblem(treedecType decomp, satformulaType formula, bagType node, cl::Context &my_context,
-             cl::Program &my_program, cl::CommandQueue &my_queue) {
+solveProblem(treedecType decomp, satformulaType formula, bagType node) {
 
     for (int i = 0; i < node.nume; i++) {
         cl_long edge = node.edges[i] - 1;
-        solveProblem(decomp, formula, decomp.bags[edge], my_context, my_program,
-                     my_queue);
+        solveProblem(decomp, formula, decomp.bags[edge]);
     }
-    cl::Kernel my_kernel;
-    cl::Buffer bufSol = Buffer(my_context,
-                                   CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                   sizeof(cl_long) * (node.numSol * (node.numv + 1)),
-                               node.solution);
-    cl::Buffer bufVertices = Buffer(my_context,
-                                        CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                        sizeof(cl_long) * (node.numv),
-                                    node.vertices);
+    cl::Buffer bufSol(context,
+                      CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                      sizeof(cl_long) * (node.numSol * (node.numv + 1)),
+                      node.solution);
+    cl::Buffer bufVertices(context,
+                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                           sizeof(cl_long) * (node.numv),
+                           node.vertices);
     if (node.nume > 1) {
         //join node
         long size = 0;
@@ -216,34 +213,40 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node, cl::Conte
                       decomp.bags[node.edges[i] - 1].numSol * (decomp.bags[node.edges[i] - 1].numv + 1), solutions + s);
             s += decomp.bags[node.edges[i] - 1].numSol * (decomp.bags[node.edges[i] - 1].numv + 1);
         }
-        cl::Buffer bufSolOther = Buffer(my_context,
-                                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                            sizeof(cl_long) * (s),
-                                        solutions);
-        my_kernel = Kernel(my_program, "solveJoin");
-        my_kernel.setArg(0, bufSol);
-        my_kernel.setArg(1, node.numv);
-        my_kernel.setArg(2, node.nume);
-        my_kernel.setArg(3, bufVertices);
-        my_kernel.setArg(4, bufSolOther);
-        my_kernel.setArg(5, node.numSol);
+        cl::Buffer bufSolOther(context,
+                               CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                               sizeof(cl_long) * (s),
+                               solutions);
+        kernel = cl::Kernel(program, "solveJoin");
+        kernel.setArg(0, bufSol);
+        kernel.setArg(1, node.numv);
+        kernel.setArg(2, node.nume);
+        kernel.setArg(3, bufVertices);
+        kernel.setArg(4, bufSolOther);
+        kernel.setArg(5, node.numSol);
+        size_t numKernels = pow(2, node.numv);
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+        queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol * (node.numv + 1)), node.solution);
 
 //        solveJoin(node.solution, node.numv, node.nume, node.vertices, solutions, node.numSol);
 
     } else if (node.nume == 1 && decomp.bags[node.edges[0] - 1].numv > node.numv) {
         //forget node
-        cl::Buffer bufSolNext = Buffer(my_context,
-                                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                           sizeof(cl_long) * (decomp.bags[node.edges[0] - 1].numSol *
-                                                              (decomp.bags[node.edges[0] - 1].numv + 1)),
-                                       decomp.bags[node.edges[0] - 1].solution);
-        my_kernel = Kernel(my_program, "solveForget");
-        my_kernel.setArg(0, bufSol);
-        my_kernel.setArg(1, node.numv);
-        my_kernel.setArg(2, bufSolNext);
-        my_kernel.setArg(3, decomp.bags[node.edges[0] - 1].numv);
-        my_kernel.setArg(4, decomp.bags[node.edges[0] - 1].numSol);
-        my_kernel.setArg(5, bufVertices);
+        cl::Buffer bufSolNext(context,
+                              CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                              sizeof(cl_long) * (decomp.bags[node.edges[0] - 1].numSol *
+                                                 (decomp.bags[node.edges[0] - 1].numv + 1)),
+                              decomp.bags[node.edges[0] - 1].solution);
+        kernel = cl::Kernel(program, "solveForget");
+        kernel.setArg(0, bufSol);
+        kernel.setArg(1, node.numv);
+        kernel.setArg(2, bufSolNext);
+        kernel.setArg(3, decomp.bags[node.edges[0] - 1].numv);
+        kernel.setArg(4, decomp.bags[node.edges[0] - 1].numSol);
+        kernel.setArg(5, bufVertices);
+        size_t numKernels = pow(2, node.numv);
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+        queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol * (node.numv + 1)), node.solution);
 
 //        solveForget(node.solution, node.numv, decomp.bags[node.edges[0] - 1].solution,
 //                    decomp.bags[node.edges[0] - 1].numv, decomp.bags[node.edges[0] - 1].numSol, node.vertices);
@@ -251,59 +254,66 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node, cl::Conte
     } else {
         if (node.nume == 0) {
             //leaf node
-            cl::Buffer bufClauses = Buffer(my_context,
-                                               CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                               sizeof(cl_long) * (formula.totalNumVar),
-                                           formula.clauses);
-            cl::Buffer bufNumVarsC = Buffer(my_context,
-                                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                sizeof(cl_long) * (formula.numclauses),
-                                            formula.numVarsC);
-            my_kernel = Kernel(my_program, "solveLeaf");
-            my_kernel.setArg(0, bufClauses);
-            my_kernel.setArg(1, bufNumVarsC);
-            my_kernel.setArg(2, formula.numclauses);
-            my_kernel.setArg(3, bufSol);
-            my_kernel.setArg(4, node.numv);
-            my_kernel.setArg(5, bufVertices);
+            cl::Buffer bufClauses(context,
+                                  CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                  sizeof(cl_long) * (formula.totalNumVar),
+                                  formula.clauses);
+            cl::Buffer bufNumVarsC(context,
+                                   CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                   sizeof(cl_long) * (formula.numclauses),
+                                   formula.numVarsC);
+            kernel = cl::Kernel(program, "solveLeaf");
+            kernel.setArg(0, bufClauses);
+            kernel.setArg(1, bufNumVarsC);
+            kernel.setArg(2, formula.numclauses);
+            kernel.setArg(3, bufSol);
+            kernel.setArg(4, node.numv);
+            kernel.setArg(5, bufVertices);
+            size_t numKernels = pow(2, node.numv);
+            queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol * (node.numv + 1)),
+                                    node.solution);
 
 //            solveLeaf(formula.clauses, formula.numVarsC, formula.numclauses, node.solution, node.numv,
 //                      node.vertices);
 
         } else if (node.nume == 1 && decomp.bags[node.edges[0] - 1].numv < node.numv) {
             //introduce node
-            cl::Buffer bufClauses = Buffer(my_context,
-                                               CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                               sizeof(cl_long) * (formula.totalNumVar),
-                                           formula.clauses);
-            cl::Buffer bufNumVarsC = Buffer(my_context,
-                                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                sizeof(cl_long) * (formula.numclauses),
-                                            formula.numVarsC);
-            cl::Buffer bufSolNext = Buffer(my_context,
-                                               CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                               sizeof(cl_long) * (decomp.bags[node.edges[0] - 1].numSol *
-                                                                  (decomp.bags[node.edges[0] - 1].numv + 1)),
-                                           decomp.bags[node.edges[0] - 1].solution);
-            my_kernel = Kernel(my_program, "solveIntroduce");
-            my_kernel.setArg(0, bufClauses);
-            my_kernel.setArg(1, bufNumVarsC);
-            my_kernel.setArg(2, formula.numclauses);
-            my_kernel.setArg(3, bufSol);
-            my_kernel.setArg(4, node.numv);
-            my_kernel.setArg(5, bufSolNext);
-            my_kernel.setArg(6, decomp.bags[node.edges[0] - 1].numv);
-            my_kernel.setArg(7, decomp.bags[node.edges[0] - 1].numSol);
-            my_kernel.setArg(8, bufVertices);
+            cl::Buffer bufClauses(context,
+                                  CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                  sizeof(cl_long) * (formula.totalNumVar),
+                                  formula.clauses);
+            cl::Buffer bufNumVarsC(context,
+                                   CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                   sizeof(cl_long) * (formula.numclauses),
+                                   formula.numVarsC);
+            cl::Buffer bufSolNext(context,
+                                  CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                  sizeof(cl_long) * (decomp.bags[node.edges[0] - 1].numSol *
+                                                     (decomp.bags[node.edges[0] - 1].numv + 1)),
+                                  decomp.bags[node.edges[0] - 1].solution);
+            kernel = cl::Kernel(program, "solveIntroduce");
+            kernel.setArg(0, bufClauses);
+            kernel.setArg(1, bufNumVarsC);
+            kernel.setArg(2, formula.numclauses);
+            kernel.setArg(3, bufSol);
+            kernel.setArg(4, node.numv);
+            kernel.setArg(5, bufSolNext);
+            kernel.setArg(6, decomp.bags[node.edges[0] - 1].numv);
+            kernel.setArg(7, decomp.bags[node.edges[0] - 1].numSol);
+            kernel.setArg(8, bufVertices);
+            size_t numKernels = pow(2, node.numv);
+            queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol * (node.numv + 1)),
+                                    node.solution);
 
 //            solveIntroduce(formula.clauses, formula.numVarsC, formula.numclauses, node.solution, node.numv,
 //                           decomp.bags[node.edges[0] - 1].solution,
 //                           decomp.bags[node.edges[0] - 1].numv, decomp.bags[node.edges[0] - 1].numSol,
 //                           node.vertices);
 
+        } else {
+            return;
         }
     }
-    my_queue.enqueueNDRangeKernel(my_kernel, cl::NDRange(), cl::NDRange((size_t) pow(2, node.numv)),
-                                  cl::NDRange(64));
-    my_queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol * (node.numv + 1)), node.solution);
-}*/
+}

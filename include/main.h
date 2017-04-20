@@ -30,7 +30,6 @@ struct satformulaType {
 };
 
 
-void solveProblem(treedecType decomp, satformulaType formula, bagType node, cl::Context &context,
-                  cl::Program &program, cl::CommandQueue &commandQueue);
+void solveProblem(treedecType decomp, satformulaType formula, bagType node);
 
 #endif //GPUSAT_MAIN_H
