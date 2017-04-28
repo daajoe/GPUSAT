@@ -10,8 +10,8 @@ satformulaType parseSatFormula(std::string formula) {
     satformulaType ret = satformulaType();
     std::stringstream ss(formula);
     std::string item;
-    std::queue<std::queue<cl_long >> *clauses = NULL;
-    cl_long clauseSize = 0;
+    std::queue<std::queue<cl_int >> *clauses = NULL;
+    cl_int clauseSize = 0;
     while (getline(ss, item)) {
         char type = item.at(0);
         if (type == 'c') {
@@ -28,9 +28,9 @@ satformulaType parseSatFormula(std::string formula) {
     if (clauses != NULL) {
         int a = 0, s = 0;
         ret.totalNumVar = clauseSize;
-        ret.clauses = new cl_long[clauseSize];
+        ret.clauses = new cl_int[clauseSize];
         while (!clauses->empty()) {
-            std::queue<cl_long> &clause = clauses->front();
+            std::queue<cl_int> &clause = clauses->front();
             ret.numVarsC[a] = clause.size();
 
             int b = 0;
@@ -39,6 +39,7 @@ satformulaType parseSatFormula(std::string formula) {
                 clause.pop();
                 b++;
             }
+            std::sort(&ret.clauses[s], &ret.clauses[s + b]);
             clauses->pop();
             s += ret.numVarsC[a];
             a++;
@@ -47,10 +48,10 @@ satformulaType parseSatFormula(std::string formula) {
     return ret;
 }
 
-void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses, cl_long &clauseSize) {
+void parseClauseLine(std::string item, std::queue<std::queue<cl_int>> *clauses, cl_int &clauseSize) {
     std::stringstream sline(item);
     std::string i;
-    std::queue<cl_long> clause;
+    std::queue<cl_int> clause;
     getline(sline, i, ' ');
     std::regex const expression("[0123456789]+");
     std::ptrdiff_t const match_count(distance(
@@ -70,23 +71,24 @@ void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses,
     clauses->push(clause);
 }
 
-void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> *&clauses) {
+void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_int>> *&clauses) {
     std::stringstream sline(item);
     std::string i;
     getline(sline, i, ' '); //p
     getline(sline, i, ' '); //cnf
     getline(sline, i, ' '); //num vars
+    satformula.numVar = stoi(i);
     getline(sline, i, ' '); //num clauses
     satformula.numclauses = stoi(i);
-    satformula.numVarsC = new cl_long[satformula.numclauses];
-    clauses = new std::queue<std::queue<cl_long>>();
+    satformula.numVarsC = new cl_int[satformula.numclauses];
+    clauses = new std::queue<std::queue<cl_int>>();
 }
 
 treedecType parseTreeDecomp(std::string graph) {
     treedecType ret = treedecType();
     std::stringstream ss(graph);
     std::string item;
-    std::queue<cl_long> **edges = NULL;
+    std::queue<cl_int> **edges = NULL;
     while (getline(ss, item)) {
         char type = item.at(0);
         if (type == 'c') {
@@ -105,7 +107,7 @@ treedecType parseTreeDecomp(std::string graph) {
 
     if (edges != NULL) {
         for (int a = 0; a < ret.numb; a++) {
-            ret.bags[a].edges = new cl_long[edges[a]->size()];
+            ret.bags[a].edges = new cl_int[edges[a]->size()];
             ret.bags[a].nume = edges[a]->size();
             int b = 0;
             while (!edges[a]->empty()) {
@@ -118,17 +120,17 @@ treedecType parseTreeDecomp(std::string graph) {
     return ret;
 }
 
-void parseEdgeLine(std::string item, std::queue<cl_long> **edges) {
+void parseEdgeLine(std::string item, std::queue<cl_int> **edges) {
     std::stringstream sline(item);
     std::string i;
     getline(sline, i, ' '); //start
-    cl_long start = stoi(i);
+    cl_int start = stoi(i);
     getline(sline, i, ' '); //end
-    cl_long end = stoi(i);
+    cl_int end = stoi(i);
     edges[start - 1]->push(end);
 }
 
-void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&edges) {
+void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_int> **&edges) {
     std::stringstream sline(item);
     std::string i;
     getline(sline, i, ' '); //s
@@ -136,9 +138,9 @@ void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&
     getline(sline, i, ' '); //num bags
     ret.bags = new bagType[stoi(i)];
     ret.numb = stoi(i);
-    edges = new std::queue<cl_long> *[stoi(i)];
+    edges = new std::queue<cl_int> *[stoi(i)];
     for (int a = 0; a < stoi(i); a++) {
-        edges[a] = new std::queue<cl_long>();
+        edges[a] = new std::queue<cl_int>();
     }
 }
 
@@ -154,13 +156,14 @@ void parseBagLine(treedecType ret, std::string item) {
             std::sregex_iterator(item.begin(), item.end(), expression),
             std::sregex_iterator()));
 
-    ret.bags[bnum - 1].vertices = new cl_long[match_count - 1];
-    ret.bags[bnum - 1].solution = new cl_long[(long) pow(2, match_count - 1) * match_count];
+    ret.bags[bnum - 1].variables = new cl_int[match_count - 1];
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-    ret.bags[bnum - 1].numv = match_count - 1;
+    ret.bags[bnum - 1].solution = new cl_int[sizeof(cl_int) * (ret.bags[bnum - 1].numSol * 2)];
+    ret.bags[bnum - 1].numVars = match_count - 1;
     while (getline(sline, i, ' ')) //vertices
     {
-        ret.bags[bnum - 1].vertices[a] = stoi(i);
+        ret.bags[bnum - 1].variables[a] = stoi(i);
         a++;
     }
+    std::sort(ret.bags[bnum - 1].variables, &ret.bags[bnum - 1].variables[ret.bags[bnum - 1].numVars]);
 }
