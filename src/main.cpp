@@ -66,8 +66,6 @@ int main(int argc, char *argv[]) {
 
     treedecType treeDecomp = parseTreeDecomp(treeD.str());
     satformulaType satFormula = parseSatFormula(sat.str());
-    //printTreeD(treeDecomp);
-    //printFormula(satFormula);
 
     try {
         cl::Platform::get(&platforms);
@@ -91,17 +89,19 @@ int main(int argc, char *argv[]) {
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
         int solutions = 0;
         for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
-            solutions += treeDecomp.bags[0].solution[i * 2 + 1];
+            solutions += treeDecomp.bags[0].solution[i];
         }
         std::cout << "Solutions: " << solutions;
+        //printSolutions(treeDecomp);
         if (solutions > 0) {
             cl_int *solution = new cl_int[satFormula.numVar]();
-            //genSolution(treeDecomp, solution, treeDecomp.bags[0]);
-            /*std::cout << "\nSolution: ";
+            genSolution(treeDecomp, solution, treeDecomp.bags[0]);
+            std::cout << "\nModel: { ";
             for (int i = 0; i < satFormula.numVar; i++)
-                std::cout << " " << solution[i];*/
+                if (solution[i] > 0)
+                    std::cout << solution[i] << " ";
+            std::cout << "}";
         }
-        printSolutions(treeDecomp);
 
     }
     catch (cl::Error err) {
@@ -121,21 +121,21 @@ int main(int argc, char *argv[]) {
 void
 solveProblem(treedecType decomp, satformulaType formula, bagType node) {
 
-    for (int i = 0; i < node.nume; i++) {
+    for (int i = 0; i < node.numEdges; i++) {
         cl_int edge = node.edges[i] - 1;
         solveProblem(decomp, formula, decomp.bags[edge]);
     }
-    if (node.nume > 1) {
+    if (node.numEdges > 1) {
         //join node
         solveJoin(decomp, node);
-    } else if (node.nume == 1 && decomp.bags[node.edges[0] - 1].numVars > node.numVars) {
+    } else if (node.numEdges == 1 && decomp.bags[node.edges[0] - 1].numVars > node.numVars) {
         //forget node
         solveForget(decomp, node);
     } else {
-        if (node.nume == 0) {
+        if (node.numEdges == 0) {
             //leaf node
             solveLeaf(formula, node);
-        } else if (node.nume == 1 && decomp.bags[node.edges[0] - 1].numVars < node.numVars) {
+        } else if (node.numEdges == 1 && decomp.bags[node.edges[0] - 1].numVars < node.numVars) {
             //introduce node
             solveIntroduce(decomp, formula, node);
         }
@@ -145,7 +145,7 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node) {
 void solveIntroduce(treedecType &decomp, satformulaType &formula, bagType &node) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
-                      sizeof(cl_int) * (node.numSol * 2));
+                      sizeof(cl_int) * (node.numSol));
     cl::Buffer bufVertices(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(cl_int) * (node.numVars),
@@ -160,7 +160,7 @@ void solveIntroduce(treedecType &decomp, satformulaType &formula, bagType &node)
                            formula.numVarsC);
     cl::Buffer bufSolNext(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                          sizeof(cl_int) * (decomp.bags[node.edges[0] - 1].numSol * 2),
+                          sizeof(cl_int) * (decomp.bags[node.edges[0] - 1].numSol),
                           decomp.bags[node.edges[0] - 1].solution);
     cl::Buffer bufNextVars(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
@@ -178,14 +178,14 @@ void solveIntroduce(treedecType &decomp, satformulaType &formula, bagType &node)
     kernel.setArg(8, bufNextVars);
     size_t numKernels = node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol * 2),
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol),
                             node.solution);
 }
 
 void solveLeaf(satformulaType &formula, bagType &node) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
-                      sizeof(cl_int) * (node.numSol * 2));
+                      sizeof(cl_int) * (node.numSol));
     cl::Buffer bufVertices(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(cl_int) * (node.numVars),
@@ -207,21 +207,21 @@ void solveLeaf(satformulaType &formula, bagType &node) {
     kernel.setArg(5, bufVertices);
     size_t numKernels = node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol * 2),
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol),
                             node.solution);
 }
 
 void solveForget(treedecType &decomp, bagType &node) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
-                      sizeof(cl_int) * (node.numSol * 2));
+                      sizeof(cl_int) * (node.numSol));
     cl::Buffer bufVertices(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(cl_int) * (node.numVars),
                            node.variables);
     cl::Buffer bufNextSol(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                          sizeof(cl_int) * (decomp.bags[node.edges[0] - 1].numSol * 2),
+                          sizeof(cl_int) * (decomp.bags[node.edges[0] - 1].numSol),
                           decomp.bags[node.edges[0] - 1].solution);
     cl::Buffer bufSolVars(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
@@ -239,27 +239,27 @@ void solveForget(treedecType &decomp, bagType &node) {
     kernel.setArg(4, decomp.bags[node.edges[0] - 1].numVars);
     kernel.setArg(5, bufNextVars);
     size_t numKernels = decomp.bags[node.edges[0] - 1].numSol;
-    queue.enqueueFillBuffer(bufSol, 0, 0, sizeof(cl_int) * (node.numSol * 2));
+    queue.enqueueFillBuffer(bufSol, 0, 0, sizeof(cl_int) * (node.numSol));
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol * 2), node.solution);
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol), node.solution);
 }
 
 void solveJoin(treedecType &decomp, bagType &node) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
-                      sizeof(cl_int) * (node.numSol * 2));
+                      sizeof(cl_int) * (node.numSol));
     cl::Buffer bufVertices(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(cl_int) * (node.numVars),
                            node.variables);
-    cl_int *solutions = new cl_int[node.numSol * 4];
-    std::copy(decomp.bags[node.edges[0] - 1].solution, decomp.bags[node.edges[0] - 1].solution + node.numSol * 2,
+    cl_int *solutions = new cl_int[node.numSol * 2];
+    std::copy(decomp.bags[node.edges[0] - 1].solution, decomp.bags[node.edges[0] - 1].solution + node.numSol,
               solutions);
-    std::copy(decomp.bags[node.edges[1] - 1].solution, decomp.bags[node.edges[1] - 1].solution + node.numSol * 2,
-              &solutions[node.numSol * 2]);
+    std::copy(decomp.bags[node.edges[1] - 1].solution, decomp.bags[node.edges[1] - 1].solution + node.numSol,
+              &solutions[node.numSol]);
     cl::Buffer bufSolOther(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (node.numSol * 4),
+                           sizeof(cl_int) * (node.numSol * 2),
                            solutions);
     kernel = cl::Kernel(program, "solveJoin");
     kernel.setArg(0, bufSol);
@@ -267,25 +267,69 @@ void solveJoin(treedecType &decomp, bagType &node) {
     kernel.setArg(2, node.numSol);
     size_t numKernels = node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol * 2), node.solution);
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol), node.solution);
 }
 
 void genSolution(treedecType decomp, cl_int *solution, bagType node) {
+    cl_int id = -1;
+    cl_int numSol = 0;
+    bool finished = false;
     for (int i = 0; i < node.numSol; i++) {
-        int a = 0;
-        for (a = 0; a < node.numVars; a++) {
-            if (solution[abs(node.solution[i * (node.numVars + 1) + a])] != 0 &&
-                node.solution[i * (node.numVars + 1) + a] != solution[abs(node.solution[i * (node.numVars + 1) + a])]) {
-                break;
-            }
-        }
-        if (a == node.numVars) {
-            for (a = 0; a < node.numVars; a++) {
-                solution[abs(node.solution[i * (node.numVars + 1) + a])] = node.solution[i * (node.numVars + 1) + a];
-            }
+        if (node.solution[i] > 0) {
+            id = i;
+            break;
         }
     }
-    for (int i = 0; i < node.nume; i++) {
-        genSolution(decomp, solution, decomp.bags[node.edges[i] - 1]);
+    //no solution found.
+    if (id < 0) {
+        return;
+    }
+    cl_int otherId = 0;
+    bagType nextNode;
+    while (!finished) {
+        if (node.numEdges == 0) {
+            finished = true;
+        }
+        for (int i = 0; i < node.numEdges; i++) {
+            if (decomp.bags[node.edges[i] - 1].solution[otherId] > 0) {
+                nextNode = decomp.bags[node.edges[i] - 1];
+            }
+        }
+
+        if (node.numVars > nextNode.numVars) {
+            int a = 0, b = 0;
+            for (b = 0; b < nextNode.numVars && a < node.numVars; b++) {
+                int var1 = node.variables[a], var2 = nextNode.variables[b];
+                while ((var1 != var2)) {
+                    a++;
+                    var1 = node.variables[a];
+                }
+                otherId = otherId | (((id & (1 << (node.numVars - a - 1))) >> (node.numVars - a - 1))
+                        << (nextNode.numVars - b - 1));
+                a++;
+            };
+
+
+        } else if (node.numVars < nextNode.numVars) {
+            if (nextNode.solution[id] > 0) {
+                int a = 0, b = 0;
+                for (a = 0; a < node.numVars; a++) {
+                    int var1 = node.variables[a], var2 = nextNode.variables[b];
+                    while ((var1 != var2)) {
+                        b++;
+                        var2 = nextNode.variables[b];
+                    }
+                    otherId = otherId | (((id & (1 << (nextNode.numVars - b - 1))) >> (nextNode.numVars - b - 1))
+                            << (node.numVars - a - 1));
+                }
+            }
+        }
+        for (int a = 0; a < node.numVars; a++) {
+            solution[node.variables[a]] = node.variables[a] *
+                                          (((id & (1 << (node.numVars - a - 1))) >> (node.numVars - a - 1)) == 0 ? -1
+                                                                                                                 : 1);
+        }
+        id = otherId;
+        node = nextNode;
     }
 }

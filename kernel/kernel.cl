@@ -39,16 +39,16 @@ int checkBag(__global int *clauses, __global int *numVarsC, int numclauses, int 
 
 __kernel void solveJoin(__global int *solutions, __global int *edges, int numSol) {
     int id = get_global_id(0);
-    solutions[2 * id + 0] = id;
-    int n1 = edges[2 * id + 1];
-    int n2 = edges[2 * numSol + 2 * id + 1];
-    solutions[2 * id + 1] = n1 * n2;
+    solutions[id] = id;
+    int n1 = edges[id];
+    int n2 = edges[numSol + id];
+    solutions[id] = n1 * n2;
 }
 
 __kernel void solveForget(__global int *solutions, int numV, __global int *variables, __global int *edge, int numVE,
                           __global int *edgeVariables) {
     int id = get_global_id(0);
-    if (edge[2 * id + 1] > 0) {
+    if (edge[id] > 0) {
         int a = 0, b = 0;
         int otherId = 0;
         for (a = 0; a < numV; a++) {
@@ -59,9 +59,7 @@ __kernel void solveForget(__global int *solutions, int numV, __global int *varia
             }
             otherId = otherId | (((id & (1 << (numVE - b - 1))) >> (numVE - b - 1)) << (numV - a - 1));
         }
-        solutions[2 * otherId + 0] = id;
-        //printf("add: from: %i, to: %i, value: %i \n", id, otherId, edge[2 * id + 1]);
-        atomic_add(&(solutions[2 * otherId + 1]), edge[2 * id + 1]);
+        atomic_add(&(solutions[otherId]), edge[id]);
     }
 }
 
@@ -69,16 +67,14 @@ __kernel void solveLeaf(__global int *clauses, __global int *numVarsC, int numcl
                         __global int *solutions, int numV, __global int *variables) {
     int id = get_global_id(0);
     int unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
-    solutions[2 * id + 0] = id;
-    solutions[2 * id + 1] = !unsat;
+    solutions[id] = !unsat;
 }
 
 __kernel void solveIntroduce(__global int *clauses, __global int *numVarsC, int numclauses,
                              __global int *solutions, int numV, __global int *edge, int numVE,
                              __global int *variables, __global int *edgeVariables) {
     int id = get_global_id(0);
-    solutions[2 * id + 0] = id;
-    solutions[2 * id + 1] = 0;
+    solutions[id] = 0;
     int a = 0, b = 0;
     int otherId = 0;
     for (b = 0; b < numVE && a < numV; b++) {
@@ -90,8 +86,8 @@ __kernel void solveIntroduce(__global int *clauses, __global int *numVarsC, int 
         otherId = otherId | (((id & (1 << (numV - a - 1))) >> (numV - a - 1)) << (numVE - b - 1));
         a++;
     };
-    if (edge[2 * otherId + 1] > 0) {
+    if (edge[otherId] > 0) {
         int unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
-        solutions[2 * id + 1] = !unsat * edge[2 * otherId + 1];
+        solutions[id] = !unsat * edge[otherId];
     }
 }

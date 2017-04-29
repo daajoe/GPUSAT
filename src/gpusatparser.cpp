@@ -108,7 +108,7 @@ treedecType parseTreeDecomp(std::string graph) {
     if (edges != NULL) {
         for (int a = 0; a < ret.numb; a++) {
             ret.bags[a].edges = new cl_int[edges[a]->size()];
-            ret.bags[a].nume = edges[a]->size();
+            ret.bags[a].numEdges = edges[a]->size();
             int b = 0;
             while (!edges[a]->empty()) {
                 ret.bags[a].edges[b] = edges[a]->front();
@@ -158,7 +158,7 @@ void parseBagLine(treedecType ret, std::string item) {
 
     ret.bags[bnum - 1].variables = new cl_int[match_count - 1];
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-    ret.bags[bnum - 1].solution = new cl_int[sizeof(cl_int) * (ret.bags[bnum - 1].numSol * 2)];
+    ret.bags[bnum - 1].solution = new cl_int[sizeof(cl_int) * (ret.bags[bnum - 1].numSol)];
     ret.bags[bnum - 1].numVars = match_count - 1;
     while (getline(sline, i, ' ')) //vertices
     {

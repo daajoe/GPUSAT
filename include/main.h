@@ -7,7 +7,7 @@
 /// type for a bag in the tree decomposition
 struct bagType {
     cl_int numVars = 0;
-    cl_int nume = 0;
+    cl_int numEdges = 0;
     cl_int numSol = 0;
     cl_int *variables;
     cl_int *edges;

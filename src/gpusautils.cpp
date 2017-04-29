@@ -15,7 +15,7 @@ void printTreeD(treedecType decomp) {
             std::cout << decomp.bags[i].variables[a] << " ";
         }
         std::cout << "\n";
-        cl_int esize = decomp.bags[i].nume;
+        cl_int esize = decomp.bags[i].numEdges;
         std::cout << "edges: ";
         for (int a = 0; a < esize; a++) {
             std::cout << decomp.bags[i].edges[a] << " ";
@@ -38,7 +38,7 @@ void printSolutions(treedecType decomp) {
                 std::cout << vars[b] * ((a & (1 << (numVariables - b - 1))) >> (numVariables - b - 1) == 0 ? -1 : 1)
                           << " ";
             }
-            std::cout << decomp.bags[i].solution[2 * a + 1] << "\n";
+            std::cout << decomp.bags[i].solution[a] << "\n";
         }
         std::cout << "\n";
     }
