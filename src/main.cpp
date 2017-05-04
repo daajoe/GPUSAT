@@ -81,19 +81,21 @@ int main(int argc, char *argv[]) {
         context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         queue = cl::CommandQueue(context, devices[0]);
-        std::string kernelStr = readFile("./kernel/kernel.cl");
+        std::string kernelStr = readFile("./kernel/minSAT.cl");
         cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
                                                        kernelStr.length()));
         program = cl::Program(context, sources);
         program.build(devices);
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
-        int solutions = 0;
-        for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
-            solutions += treeDecomp.bags[0].solution[i];
-        }
-        std::cout << "Solutions: " << solutions;
         //printSolutions(treeDecomp);
-        if (solutions > 0) {
+        int solutions = -1;
+        for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
+            if (treeDecomp.bags[0].solution[i] >= 0)
+                solutions = treeDecomp.bags[0].solution[i] < solutions || solutions < 0 ? treeDecomp.bags[0].solution[i]
+                                                                                        : solutions;
+        }
+        std::cout << "Model Size: " << solutions;
+        /*if (solutions > 0) {
             cl_int *solution = new cl_int[satFormula.numVar]();
             genSolution(treeDecomp, solution, treeDecomp.bags[0]);
             std::cout << "\nModel: { ";
@@ -101,7 +103,9 @@ int main(int argc, char *argv[]) {
                 if (solution[i] > 0)
                     std::cout << solution[i] << " ";
             std::cout << "}";
-        }
+        } else if (solutions == 0) {
+            std::cout << "\nModel : {}";
+        }*/
 
     }
     catch (cl::Error err) {
@@ -239,7 +243,7 @@ void solveForget(treedecType &decomp, bagType &node) {
     kernel.setArg(4, decomp.bags[node.edges[0] - 1].numVars);
     kernel.setArg(5, bufNextVars);
     size_t numKernels = decomp.bags[node.edges[0] - 1].numSol;
-    queue.enqueueFillBuffer(bufSol, 0, 0, sizeof(cl_int) * (node.numSol));
+    queue.enqueueFillBuffer(bufSol, -2, 0, sizeof(cl_int) * (node.numSol));
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol), node.solution);
 }
@@ -275,7 +279,7 @@ void genSolution(treedecType decomp, cl_int *solution, bagType node) {
     cl_int numSol = 0;
     bool finished = false;
     for (int i = 0; i < node.numSol; i++) {
-        if (node.solution[i] > 0) {
+        if (node.solution[i] >= 0) {
             id = i;
             break;
         }
@@ -291,7 +295,7 @@ void genSolution(treedecType decomp, cl_int *solution, bagType node) {
             finished = true;
         }
         for (int i = 0; i < node.numEdges; i++) {
-            if (decomp.bags[node.edges[i] - 1].solution[otherId] > 0) {
+            if (decomp.bags[node.edges[i] - 1].solution[otherId] >= 0) {
                 nextNode = decomp.bags[node.edges[i] - 1];
             }
         }
@@ -309,9 +313,8 @@ void genSolution(treedecType decomp, cl_int *solution, bagType node) {
                 a++;
             };
 
-
         } else if (node.numVars < nextNode.numVars) {
-            if (nextNode.solution[id] > 0) {
+            if (nextNode.solution[id] >= 0) {
                 int a = 0, b = 0;
                 for (a = 0; a < node.numVars; a++) {
                     int var1 = node.variables[a], var2 = nextNode.variables[b];
@@ -324,6 +327,7 @@ void genSolution(treedecType decomp, cl_int *solution, bagType node) {
                 }
             }
         }
+
         for (int a = 0; a < node.numVars; a++) {
             solution[node.variables[a]] = node.variables[a] *
                                           (((id & (1 << (node.numVars - a - 1))) >> (node.numVars - a - 1)) == 0 ? -1
