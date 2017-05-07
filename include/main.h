@@ -35,12 +35,12 @@ void solveProblem(treedecType decomp, satformulaType formula, bagType node);
 
 void genSolution(treedecType decomp, cl_int *solution, bagType node);
 
-void solveJoin(treedecType &decomp, bagType &node);
+void solveJoin(bagType &node, bagType &edge1, bagType &edge2);
 
-void solveForget(treedecType &decomp, bagType &node);
+void solveForget(bagType &node, bagType &edge);
 
 void solveLeaf(satformulaType &formula, bagType &node);
 
-void solveIntroduce(treedecType &decomp, satformulaType &formula, bagType &node);
+void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
 #endif //GPUSAT_MAIN_H

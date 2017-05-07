@@ -5,22 +5,20 @@ int checkBag(__global int *clauses, __global int *numVarsC, int numclauses, int 
     for (i = 0; i < numclauses && !unsat; i++) {
         int satC = 0;
         int a;
+        int b;
         for (a = 0; a < numVarsC[i] && !satC; a++) {
             int found = 0;
-            int b;
             for (b = 0; b < numV && !satC; b++) {
                 if ((clauses[varNum + a] == variables[b]) ||
                     (clauses[varNum + a] == -variables[b])) {
                     found = 1;
                     if (clauses[varNum + a] < 0) {
-                        if ((id & (1 << (numV - b - 1))) >> (numV - b - 1) == 0) {
+                        if ((id & (1 << (numV - b - 1))) == 0) {
                             satC = 1;
-                            break;
                         }
                     } else {
-                        if ((id & (1 << (numV - b - 1))) >> (numV - b - 1) == 1) {
+                        if ((id & (1 << (numV - b - 1))) > 0) {
                             satC = 1;
-                            break;
                         }
                     }
                 }
