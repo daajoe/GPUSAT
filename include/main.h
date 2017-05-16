@@ -43,4 +43,6 @@ void solveLeaf(satformulaType &formula, bagType &node);
 
 void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
+void genSolEdge(treedecType decomp, cl_int *solution, bagType lastNode, cl_int lastId, int edge);
+
 #endif //GPUSAT_MAIN_H

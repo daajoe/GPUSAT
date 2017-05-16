@@ -95,17 +95,19 @@ int main(int argc, char *argv[]) {
             solutions += treeDecomp.bags[0].solution[i];
         }
         std::cout << "Model Count: " << solutions;
-        /*if (solutions > 0) {
-            cl_int *solution = new cl_int[satFormula.numVar]();
+        if (solutions > 0) {
+            cl_int *solution = new cl_int[satFormula.numVar + 1]();
             genSolution(treeDecomp, solution, treeDecomp.bags[0]);
             std::cout << "\nModel: { ";
-            for (int i = 0; i < satFormula.numVar; i++)
+            for (int i = 0; i <= satFormula.numVar; i++) {
+                cl_int assignment = solution[i];
                 if (solution[i] > 0)
                     std::cout << solution[i] << " ";
+            }
             std::cout << "}";
         } else if (solutions == 0) {
-            std::cout << "\nModel : {}";
-        }*/
+            std::cout << "\nUnsat";
+        }
 
     }
     catch (cl::Error err) {
@@ -322,10 +324,8 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
 
 void genSolution(treedecType decomp, cl_int *solution, bagType node) {
     cl_int id = -1;
-    cl_int numSol = 0;
-    bool finished = false;
     for (int i = 0; i < node.numSol; i++) {
-        if (node.solution[i] >= 0) {
+        if (node.solution[i] > 0) {
             id = i;
             break;
         }
@@ -334,52 +334,90 @@ void genSolution(treedecType decomp, cl_int *solution, bagType node) {
     if (id < 0) {
         return;
     }
-    cl_int otherId = 0;
-    bagType nextNode;
-    while (!finished) {
-        if (node.numEdges == 0) {
-            finished = true;
-        }
-        for (int i = 0; i < node.numEdges; i++) {
-            if (decomp.bags[node.edges[i] - 1].solution[otherId] >= 0) {
-                nextNode = decomp.bags[node.edges[i] - 1];
+    for (int b = 0; b < node.numVars; b++) {
+        cl_int assignment = (id & (1 << node.numVars - b - 1)) > 0 ? node.variables[b] : -node.variables[b];
+        solution[node.variables[b]] = assignment;
+    }
+    for (int a = 0; a < node.numEdges; a++) {
+        genSolEdge(decomp, solution, node, id, a);
+    }
+}
+
+void genSolEdge(treedecType decomp, cl_int *solution, bagType lastNode, cl_int lastId, int edge) {
+    bagType nextNode = decomp.bags[lastNode.edges[edge] - 1];
+    cl_int nextId = 0;
+    do {
+        std::vector<cl_int> intersect_vars(nextNode.numVars + lastNode.numVars);
+        std::vector<cl_int>::iterator it;
+        it = set_intersection(nextNode.variables, nextNode.variables + nextNode.numVars, lastNode.variables,
+                              lastNode.variables + lastNode.numVars, intersect_vars.begin());
+        intersect_vars.resize(it - intersect_vars.begin());
+
+        std::vector<cl_int> new_vars(nextNode.numVars + lastNode.numVars);
+        it = set_difference(nextNode.variables,
+                            nextNode.variables + nextNode.numVars, lastNode.variables,
+                            lastNode.variables + lastNode.numVars, new_vars.begin());
+        new_vars.resize(it - new_vars.begin());
+
+        cl_int positionCurrent[intersect_vars.size()], positionNext[intersect_vars.size()], new_vars_position[new_vars.size()];
+
+        for (int a = 0, b = 0; a < lastNode.numVars; a++) {
+            if (lastNode.variables[a] == intersect_vars[b]) {
+                positionCurrent[b] = lastNode.numVars - a - 1;
+                b++;
             }
         }
-        //introduce
-        if (node.numVars > nextNode.numVars) {
-            int a = 0, b = 0;
-            for (b = 0; b < nextNode.numVars && a < node.numVars; b++) {
-                int var1 = node.variables[a], var2 = nextNode.variables[b];
-                while ((var1 != var2)) {
-                    a++;
-                    var1 = node.variables[a];
+        for (int a = 0, b = 0, c = 0; a < nextNode.numVars; a++) {
+            if (nextNode.variables[a] == intersect_vars[b]) {
+                positionNext[b] = nextNode.numVars - a - 1;
+                b++;
+            }
+            if (nextNode.variables[a] == new_vars[c]) {
+                new_vars_position[c] = nextNode.numVars - a - 1;
+                c++;
+            }
+        }
+
+        cl_int template_id = 0;
+        for (int a = 0; a < intersect_vars.size(); a++) {
+            template_id = template_id | ((lastId & (1 << positionCurrent[a])) >> positionCurrent[a] << positionNext[a]);
+        }
+
+        nextId = template_id;
+        if (new_vars.size() == 0) {
+            for (int b = 0; b < nextNode.numVars; b++) {
+                solution[nextNode.variables[b]] =
+                        (nextId & (1 << nextNode.numVars - b - 1)) > 0 ? nextNode.variables[b]
+                                                                       : -nextNode.variables[b];
+            }
+        } else {
+            for (int a = 0; a < pow(2, new_vars.size()); a++) {
+                nextId = template_id;
+                for (int b = 0; b < new_vars.size(); b++) {
+                    nextId = nextId | ((a & (1 << (new_vars.size() - b - 1))) >> (new_vars.size() - b - 1)
+                                                                              << new_vars_position[b]);
                 }
-                otherId = otherId | (((id & (1 << (node.numVars - a - 1))) >> (node.numVars - a - 1))
-                        << (nextNode.numVars - b - 1));
-                a++;
-            };
-            //forget
-        } else if (node.numVars < nextNode.numVars) {
-            if (nextNode.solution[id] >= 0) {
-                int a = 0, b = 0;
-                for (a = 0; a < node.numVars; a++) {
-                    int var1 = node.variables[a], var2 = nextNode.variables[b];
-                    while ((var1 != var2)) {
-                        b++;
-                        var2 = nextNode.variables[b];
+                if (nextNode.solution[nextId] > 0) {
+                    for (int b = 0; b < nextNode.numVars; b++) {
+                        solution[nextNode.variables[b]] =
+                                (nextId & (1 << nextNode.numVars - b - 1)) > 0 ? nextNode.variables[b]
+                                                                               : -nextNode.variables[b];
                     }
-                    otherId = otherId | (((id & (1 << (nextNode.numVars - b - 1))) >> (nextNode.numVars - b - 1))
-                            << (node.numVars - a - 1));
+                    break;
                 }
             }
         }
 
-        for (int a = 0; a < node.numVars; a++) {
-            solution[node.variables[a]] = node.variables[a] *
-                                          (((id & (1 << (node.numVars - a - 1))) >> (node.numVars - a - 1)) == 0 ? -1
-                                                                                                                 : 1);
+        lastNode = nextNode;
+        lastId = nextId;
+        if (lastNode.numEdges > 1) {
+            for (int i = 1; i < lastNode.numEdges; i++) {
+                genSolEdge(decomp, solution, lastNode, lastId, i);
+            }
         }
-        id = otherId;
-        node = nextNode;
-    }
+        if (lastNode.numEdges > 0) {
+            nextNode = decomp.bags[lastNode.edges[0] - 1];
+        }
+    } while (lastNode.numEdges != 0);
 }
+

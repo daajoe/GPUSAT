@@ -1,10 +1,10 @@
 #include <math.h>
-#include <regex>
 #include <fstream>
 #include <sstream>
 #include <iostream>
 #include <main.h>
 #include <gpusatparser.h>
+#include <algorithm>
 
 satformulaType parseSatFormula(std::string formula) {
     satformulaType ret = satformulaType();
@@ -53,10 +53,13 @@ void parseClauseLine(std::string item, std::queue<std::queue<cl_int>> *clauses, 
     std::string i;
     std::queue<cl_int> clause;
     getline(sline, i, ' ');
-    std::regex const expression("[0123456789]+");
-    std::ptrdiff_t const match_count(distance(
-            std::sregex_iterator(item.begin(), item.end(), expression),
-            std::sregex_iterator()));
+    cl_int match_count = 1;
+    __gnu_cxx::__normal_iterator<char *, std::basic_string<char, std::char_traits<char>, std::allocator<char>>> it;
+    for (it = item.begin(); it != item.end(); it++) {
+        if ((*it) == ' ') {
+            match_count++;
+        }
+    }
     clauseSize += match_count - 1;
     while (!sline.eof()) {
         if (i.size() > 0) {
@@ -151,10 +154,13 @@ void parseBagLine(treedecType ret, std::string item) {
     getline(sline, i, ' '); //bag number
     int bnum = stoi(i);
     int a = 0;
-    std::regex const expression("[0123456789]+");
-    std::ptrdiff_t const match_count(distance(
-            std::sregex_iterator(item.begin(), item.end(), expression),
-            std::sregex_iterator()));
+    cl_int match_count = 0;
+    __gnu_cxx::__normal_iterator<char *, std::basic_string<char, std::char_traits<char>, std::allocator<char>>> it;
+    for (it = item.begin(); it != item.end(); it++) {
+        if ((*it) == ' ') {
+            match_count++;
+        }
+    }
 
     ret.bags[bnum - 1].variables = new cl_int[match_count - 1];
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
