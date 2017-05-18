@@ -94,20 +94,22 @@ int main(int argc, char *argv[]) {
         for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
             solutions += treeDecomp.bags[0].solution[i];
         }
-        std::cout << "Model Count: " << solutions;
+        std::cout << "{\n    \"Model Count\": " << solutions << ",";
         if (solutions > 0) {
             cl_int *solution = new cl_int[satFormula.numVar + 1]();
             genSolution(treeDecomp, solution, treeDecomp.bags[0]);
-            std::cout << "\nModel: { ";
-            for (int i = 0; i <= satFormula.numVar; i++) {
+            std::cout << "\n    \"Model\": \"";
+            int i;
+            for (i = 1; i <= satFormula.numVar - 1; i++) {
                 cl_int assignment = solution[i];
-                if (solution[i] > 0)
-                    std::cout << solution[i] << " ";
+                std::cout << solution[i] << ", ";
             }
-            std::cout << "}";
+            cl_int assignment = solution[i];
+            std::cout << solution[i] << "\"";
         } else if (solutions == 0) {
-            std::cout << "\nUnsat";
+            std::cout << "\n    \"Model\": \"UNSATISFIABLE\"";
         }
+        std::cout << "\n}";
 
     }
     catch (cl::Error err) {
@@ -195,39 +197,59 @@ void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
 }
 
 void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
+    kernel = cl::Kernel(program, "solveIntroduce");
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_int) * (node.numSol));
-    cl::Buffer bufVertices(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (node.numVars),
-                           node.variables);
-    cl::Buffer bufClauses(context,
-                          CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                          sizeof(cl_int) * (formula.totalNumVar),
-                          formula.clauses);
-    cl::Buffer bufNumVarsC(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (formula.numclauses),
-                           formula.numVarsC);
+    cl::Buffer bufVertices;
+    if (node.numVars > 0) {
+        bufVertices = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * (node.numVars),
+                                 node.variables);
+        kernel.setArg(7, bufVertices);
+    } else {
+        kernel.setArg(7, NULL);
+    }
+    cl::Buffer bufClauses;
+    if (formula.totalNumVar > 0) {
+        bufClauses = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_int) * (formula.totalNumVar),
+                                formula.clauses);
+        kernel.setArg(0, bufClauses);
+    } else {
+        kernel.setArg(0, NULL);
+    }
+    cl::Buffer bufNumVarsC;
+    if (formula.numclauses > 0) {
+        bufNumVarsC = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * (formula.numclauses),
+                                 formula.numVarsC);
+        kernel.setArg(1, bufNumVarsC);
+    } else {
+        kernel.setArg(1, NULL);
+    }
     cl::Buffer bufSolNext(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                           sizeof(cl_int) * (edge.numSol),
                           edge.solution);
-    cl::Buffer bufNextVars(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (edge.numVars),
-                           edge.variables);
-    kernel = cl::Kernel(program, "solveIntroduce");
-    kernel.setArg(0, bufClauses);
-    kernel.setArg(1, bufNumVarsC);
+    cl::Buffer bufNextVars;
+    if (edge.numVars > 0) {
+        bufNextVars = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * (edge.numVars),
+                                 edge.variables);
+        kernel.setArg(8, bufNextVars);
+    } else {
+        kernel.setArg(8, NULL);
+    }
     kernel.setArg(2, formula.numclauses);
     kernel.setArg(3, bufSol);
     kernel.setArg(4, node.numVars);
     kernel.setArg(5, bufSolNext);
     kernel.setArg(6, edge.numVars);
-    kernel.setArg(7, bufVertices);
-    kernel.setArg(8, bufNextVars);
     size_t numKernels = node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol),
@@ -235,28 +257,43 @@ void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
 }
 
 void solveLeaf(satformulaType &formula, bagType &node) {
+    kernel = cl::Kernel(program, "solveLeaf");
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_int) * (node.numSol));
-    cl::Buffer bufVertices(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (node.numVars),
-                           node.variables);
-    cl::Buffer bufClauses(context,
-                          CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                          sizeof(cl_int) * (formula.totalNumVar),
-                          formula.clauses);
-    cl::Buffer bufNumVarsC(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (formula.numclauses),
-                           formula.numVarsC);
-    kernel = cl::Kernel(program, "solveLeaf");
-    kernel.setArg(0, bufClauses);
-    kernel.setArg(1, bufNumVarsC);
+    cl::Buffer bufVertices;
+    if (node.numVars > 0) {
+        bufVertices = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * (node.numVars),
+                                 node.variables);
+        kernel.setArg(5, bufVertices);
+    } else {
+        kernel.setArg(5, NULL);
+    }
+    cl::Buffer bufClauses;
+    if (formula.totalNumVar > 0) {
+        bufClauses = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_int) * (formula.totalNumVar),
+                                formula.clauses);
+        kernel.setArg(0, bufClauses);
+    } else {
+        kernel.setArg(0, NULL);
+    }
+    cl::Buffer bufNumVarsC;
+    if (formula.numclauses > 0) {
+        bufNumVarsC = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * (formula.numclauses),
+                                 formula.numVarsC);
+        kernel.setArg(1, bufNumVarsC);
+    } else {
+        kernel.setArg(1, NULL);
+    }
     kernel.setArg(2, formula.numclauses);
     kernel.setArg(3, bufSol);
     kernel.setArg(4, node.numVars);
-    kernel.setArg(5, bufVertices);
     size_t numKernels = node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_int) * (node.numSol),
@@ -264,32 +301,38 @@ void solveLeaf(satformulaType &formula, bagType &node) {
 }
 
 void solveForget(bagType &node, bagType &edge) {
+    kernel = cl::Kernel(program, "solveForget");
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_int) * (node.numSol));
-    cl::Buffer bufVertices(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (node.numVars),
-                           node.variables);
     cl::Buffer bufNextSol(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                           sizeof(cl_int) * (edge.numSol),
                           edge.solution);
-    cl::Buffer bufSolVars(context,
-                          CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                          sizeof(cl_int) * node.numVars,
-                          node.variables);
-    cl::Buffer bufNextVars(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * edge.numVars,
-                           edge.variables);
-    kernel = cl::Kernel(program, "solveForget");
+    cl::Buffer bufSolVars;
+    if (node.numVars > 0) {
+        bufSolVars = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_int) * node.numVars,
+                                node.variables);
+        kernel.setArg(2, bufSolVars);
+    } else {
+        kernel.setArg(2, NULL);
+    }
+    cl::Buffer bufNextVars;
+    if (edge.numVars > 0) {
+        bufNextVars = cl::Buffer(context,
+                                 CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                 sizeof(cl_int) * edge.numVars,
+                                 edge.variables);
+        kernel.setArg(5, bufNextVars);
+    } else {
+        kernel.setArg(5, NULL);
+    }
     kernel.setArg(0, bufSol);
     kernel.setArg(1, node.numVars);
-    kernel.setArg(2, bufSolVars);
     kernel.setArg(3, bufNextSol);
     kernel.setArg(4, edge.numVars);
-    kernel.setArg(5, bufNextVars);
     size_t numKernels = edge.numSol;
     queue.enqueueFillBuffer(bufSol, 0, 0, sizeof(cl_int) * (node.numSol));
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
@@ -297,13 +340,10 @@ void solveForget(bagType &node, bagType &edge) {
 }
 
 void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
+    kernel = cl::Kernel(program, "solveJoin");
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_int) * (node.numSol));
-    cl::Buffer bufVertices(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_int) * (node.numVars),
-                           node.variables);
     cl_int *solutions = new cl_int[node.numSol * 2];
     std::copy(edge1.solution, edge1.solution + node.numSol,
               solutions);
@@ -313,7 +353,6 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(cl_int) * (node.numSol * 2),
                            solutions);
-    kernel = cl::Kernel(program, "solveJoin");
     kernel.setArg(0, bufSol);
     kernel.setArg(1, bufSolOther);
     kernel.setArg(2, node.numSol);

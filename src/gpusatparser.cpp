@@ -54,9 +54,12 @@ void parseClauseLine(std::string item, std::queue<std::queue<cl_int>> *clauses, 
     std::queue<cl_int> clause;
     getline(sline, i, ' ');
     cl_int match_count = 1;
-    __gnu_cxx::__normal_iterator<char *, std::basic_string<char, std::char_traits<char>, std::allocator<char>>> it;
-    for (it = item.begin(); it != item.end(); it++) {
-        if ((*it) == ' ') {
+    std::istringstream ss(item);
+    std::string word;
+    while (ss >> word) {
+        std::istringstream maybenumber(word);
+        int number = 0;
+        if (maybenumber >> number) {
             match_count++;
         }
     }
@@ -155,12 +158,16 @@ void parseBagLine(treedecType ret, std::string item) {
     int bnum = stoi(i);
     int a = 0;
     cl_int match_count = 0;
-    __gnu_cxx::__normal_iterator<char *, std::basic_string<char, std::char_traits<char>, std::allocator<char>>> it;
-    for (it = item.begin(); it != item.end(); it++) {
-        if ((*it) == ' ') {
+    std::istringstream ss(item);
+    std::string word;
+    while (ss >> word) {
+        std::istringstream maybenumber(word);
+        int number = 0;
+        if (maybenumber >> number) {
             match_count++;
         }
     }
+
 
     ret.bags[bnum - 1].variables = new cl_int[match_count - 1];
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
