@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.5)
 project(gpusat)
 
 include_directories("C:/Program Files (x86)/AMD APP SDK/3.0/include" "C:/Users/Markus/AMD APP SDK/3.0/include")
