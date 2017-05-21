@@ -20,6 +20,7 @@ cl::Kernel kernel;
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
 int main(int argc, char *argv[]) {
+    clock_t time_total = clock();
     std::stringbuf treeD, sat;
     std::string inputLine;
     bool file = false, formula = false;
@@ -66,8 +67,10 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    clock_t time_parsing = clock();
     treedecType treeDecomp = parseTreeDecomp(treeD.str());
     satformulaType satFormula = parseSatFormula(sat.str());
+    time_parsing = clock() - time_parsing;
 
     try {
         cl::Platform::get(&platforms);
@@ -88,17 +91,21 @@ int main(int argc, char *argv[]) {
                                                        kernelStr.length()));
         program = cl::Program(context, sources);
         program.build(devices);
+
+        clock_t time_solving = clock();
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
+        time_solving = clock() - time_solving;
         //printSolutions(treeDecomp);
+        clock_t time_genModel;
         int solutions = 0;
         for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
             solutions += treeDecomp.bags[0].solution[i];
         }
-        std::cout << "{\n    \"Model Count\": " << solutions << ",";
+        std::cout << "{\n    \"Model Count\": " << solutions;
         if (solutions > 0) {
             cl_int *solution = new cl_int[satFormula.numVar + 1]();
             genSolution(treeDecomp, solution, treeDecomp.bags[0]);
-            std::cout << "\n    \"Model\": \"";
+            std::cout << "\n    ,\"Model\": \"";
             int i;
             for (i = 1; i <= satFormula.numVar - 1; i++) {
                 cl_int assignment = solution[i];
@@ -107,8 +114,14 @@ int main(int argc, char *argv[]) {
             cl_int assignment = solution[i];
             std::cout << solution[i] << "\"";
         } else if (solutions == 0) {
-            std::cout << "\n    \"Model\": \"UNSATISFIABLE\"";
+            std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
         }
+        time_genModel = clock() - time_genModel;
+        time_total = clock() - time_total;
+        std::cout << "\n    ,\"Time_Solving\": " << ((float) time_solving) / CLOCKS_PER_SEC;
+        std::cout << "\n    ,\"Time_Parsing\": " << ((float) time_parsing) / CLOCKS_PER_SEC;
+        std::cout << "\n    ,\"Time_Total\": " << ((float) time_total) / CLOCKS_PER_SEC;
+        std::cout << "\n    ,\"Time_Generate_Model\": " << ((float) time_total) / CLOCKS_PER_SEC;
         std::cout << "\n}";
 
     }
