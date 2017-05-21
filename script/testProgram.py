@@ -41,13 +41,14 @@ for testcase in listdir(dirReference):
                     summaryFile.write("    Model: ")
                     mod = str(d['Model'])
                     res = str(referenceFile.read())
-                    referenceJSON = json.loads(referenceFile.read())
-                    if check_model(mod, res.splitlines()[-1]):
-                        summaryFile.write("OK\n")
-                        print("    Model: OK")
-                    else:
-                        summaryFile.write("Failure\n")
-                        print("    Model: Failure")
+                    referenceJSON = json.loads(res)
+                    with open(dirFormula + "/" + testcase + ".cnf", "r") as formulaFile:
+                        if not check_model(mod, formulaFile.read().splitlines()[1:]):
+                            summaryFile.write("OK\n")
+                            print("    Model: OK")
+                        else:
+                            summaryFile.write("Failure\n")
+                            print("    Model: Failure")
                     summaryFile.write("    ModelCount: ")
                     if d['Model Count'] == referenceJSON['Models']['Number']:
                         summaryFile.write("OK\n")
@@ -55,7 +56,7 @@ for testcase in listdir(dirReference):
                     else:
                         summaryFile.write("Failure\n")
                         print("    ModelCount: Failure")
-                    print("    Time:" + d['Time_Total'] + " Time Clasp:" + referenceJSON['Time']['Total'])
+                    print("    Time: " + str(d['Time_Total']) + " Time Clasp: " + str(referenceJSON['Time']['Total']))
                 except ValueError:
                     summaryFile.write("    Error\n")
                     print("    Error")

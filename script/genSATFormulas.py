@@ -88,7 +88,7 @@ def genTreeDecomp(graph, decompFile):
 def genFormula():
     numTry = 0
     while numTry < numTestCases:
-        print "file: " + str(1 + numTry) + "/" + str(numTestCases)
+        print prefix + str(1 + numTry) + "/" + str(numTestCases)
         numClauses = random.randint(minNumClauses, maxNumClauses)
         numVars = random.randint(minNumVariables, maxNumVariables)
         formula = "p cnf " + str(numVars) + " " + str(numClauses - 1) + "\n"
@@ -204,7 +204,7 @@ minNumVariables = 25
 maxNumVariables = 35
 
 # number of test cases to generate
-numTestCases = 200
+numTestCases = 20
 
 # prefix of the test cases
 prefix = "3_test_"
