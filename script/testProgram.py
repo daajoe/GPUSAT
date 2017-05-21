@@ -10,6 +10,19 @@ dirReference = "./problems/reference"
 
 numElements = len(listdir(dirReference))
 currentElement = 1
+
+
+def check_model(model, clauses):
+    for line in clauses:
+        sat = False
+        for var in line:
+            if var in model:
+                sat = True
+                break
+        if not sat:
+            return False
+
+
 for testcase in listdir(dirReference):
     # generate output
     with open(join(dirResults, testcase), "w") as resultFile:
@@ -28,19 +41,21 @@ for testcase in listdir(dirReference):
                     summaryFile.write("    Model: ")
                     mod = str(d['Model'])
                     res = str(referenceFile.read())
-                    if (mod in res):
+                    referenceJSON = json.loads(referenceFile.read())
+                    if check_model(mod, res.splitlines()[-1]):
                         summaryFile.write("OK\n")
                         print("    Model: OK")
                     else:
                         summaryFile.write("Failure\n")
                         print("    Model: Failure")
                     summaryFile.write("    ModelCount: ")
-                    if (("\"Number\": " + str(d['Model Count'])) in res):
+                    if d['Model Count'] == referenceJSON['Models']['Number']:
                         summaryFile.write("OK\n")
                         print("    ModelCount: OK")
                     else:
                         summaryFile.write("Failure\n")
                         print("    ModelCount: Failure")
+                    print("    Time:" + d['Time_Total'] + " Time Clasp:" + referenceJSON['Time']['Total'])
                 except ValueError:
                     summaryFile.write("    Error\n")
                     print("    Error")

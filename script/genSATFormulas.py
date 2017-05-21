@@ -2,18 +2,20 @@ import random
 import subprocess
 from sets import Set
 from os.path import join, isdir
+from numpy.random import choice
 
 from os import makedirs
 
-# todo minimal size of a clause
+# minimal size of a clause
 minClauseSize = 0
-# todo maximal size of a clause
+# maximal size of a clause
 maxClauseSize = 0
 
-# todo ratio between positive and negative variables
+# ratio between positive and negative variables
 positiveRatio = 0.5
 
-# todo maximal tree widht
+# minimal and maximal tree width
+minTreeWidth = 18
 maxTreeWidth = 18
 
 # minimal and maximal number of clauses
@@ -48,11 +50,13 @@ if not isdir(dirResults):
 
 # check formula
 def checkFormula(formula, resultFile):
-    subprocess.call(["clasp", "--outf=2", "-n", "0", formula], stdout=resultFile)
+    print "    check Formula"
+    subprocess.call(["clasp", "--outf=2", "-q", "-n", "0", formula], stdout=resultFile)
 
 
 # generate graph
 def genPrimalGraph(formula, resultFile, numVariables):
+    print "    gen primal graph"
     graphEdges = ""
     graph = {}
     for i in range(1, numVariables + 1):
@@ -76,28 +80,133 @@ def genPrimalGraph(formula, resultFile, numVariables):
 
 # generate tree decomposition
 def genTreeDecomp(graph, decompFile):
+    print "    gen Tree Decomp"
     subprocess.call(["htd_main", "-s", "1234", "--opt", "width", "--instance", graph], stdout=decompFile)
 
 
 # generate formula
-for numTry in range(0, numTestCases):
-    numClauses = random.randint(minNumClauses, maxNumClauses)
-    numVars = random.randint(minNumVariables, maxNumVariables)
-    formula = "p cnf " + str(numVars) + " " + str(numClauses - 1) + "\n"
-    for clause in range(1, numClauses):
-        clauseSize = random.randint(1, numVars)
-        varList = range(1, numVars + 1)
-        random.shuffle(varList)
-        formula = formula + str(varList[0] * random.choice([1, -1]))
-        for var in range(1, clauseSize):
-            formula = formula + " " + str(varList[var] * random.choice([1, -1]))
-        formula = formula + " 0\n"
-    print "file: " + str(numTry)
-    with open(join(dirFormula, prefix + str(numTry) + ".cnf"), "w") as formulaFile:
-        formulaFile.write(formula)
-    with open(join(dirReference, prefix + str(numTry) + ""), "w") as resultFile:
-        checkFormula(join(dirFormula, prefix + str(numTry) + ".cnf"), resultFile)
-    with open(join(dirGraphs, prefix + str(numTry) + ".gr"), "w") as graphFile:
-        genPrimalGraph(formula, graphFile, numVars)
-    with open(join(dirDecomp, prefix + str(numTry) + ".td"), "w") as decompFile:
-        genTreeDecomp(join(dirGraphs, prefix + str(numTry) + ".gr"), decompFile)
+def genFormula():
+    numTry = 0
+    while numTry < numTestCases:
+        print "file: " + str(1 + numTry) + "/" + str(numTestCases)
+        numClauses = random.randint(minNumClauses, maxNumClauses)
+        numVars = random.randint(minNumVariables, maxNumVariables)
+        formula = "p cnf " + str(numVars) + " " + str(numClauses - 1) + "\n"
+        for clause in range(1, numClauses):
+            clauseSize = random.randint(minClauseSize, numVars if (numVars < maxClauseSize) else maxClauseSize)
+            varList = range(1, numVars + 1)
+            random.shuffle(varList)
+            formula = formula + str(varList[0] * choice([1, -1], p=[positiveRatio, 1 - positiveRatio]))
+            for var in range(1, clauseSize):
+                formula = formula + " " + str(varList[var] * choice([1, -1]))
+            formula = formula + " 0\n"
+        with open(join(dirFormula, prefix + str(numTry) + ".cnf"), "w") as formulaFile:
+            formulaFile.write(formula)
+        with open(join(dirGraphs, prefix + str(numTry) + ".gr"), "w") as graphFile:
+            genPrimalGraph(formula, graphFile, numVars)
+        with open(join(dirDecomp, prefix + str(numTry) + ".td"), "w") as decompFile:
+            genTreeDecomp(join(dirGraphs, prefix + str(numTry) + ".gr"), decompFile)
+        with open(join(dirDecomp, prefix + str(numTry) + ".td"), "r") as decompFile:
+            line = decompFile.readline()
+            if int(line.split(" ")[3]) < minTreeWidth | int(line.split(" ")[3]) > maxTreeWidth:
+                continue
+        with open(join(dirReference, prefix + str(numTry) + ""), "w") as resultFile:
+            checkFormula(join(dirFormula, prefix + str(numTry) + ".cnf"), resultFile)
+        numTry += 1
+
+
+#################
+##   Tests 1   ##
+#################
+
+# minimal size of a clause
+minClauseSize = 1
+# maximal size of a clause
+maxClauseSize = 18
+
+# ratio between positive and negative variables
+positiveRatio = 0.5
+
+# minimal and maximal tree widht
+minTreeWidth = 1
+maxTreeWidth = 18
+
+# minimal and maximal number of clauses
+minNumClauses = 1
+maxNumClauses = 12
+
+# minimal and maximal number of variables
+minNumVariables = 2
+maxNumVariables = 18
+
+# number of test cases to generate
+numTestCases = 2000
+
+# prefix of the test cases
+prefix = "1_test_"
+
+genFormula()
+
+#################
+##   Tests 2   ##
+#################
+
+# minimal size of a clause
+minClauseSize = 3
+# maximal size of a clause
+maxClauseSize = 20
+
+# ratio between positive and negative variables
+positiveRatio = 0.5
+
+# minimal and maximal tree widht
+minTreeWidth = 10
+maxTreeWidth = 20
+
+# minimal and maximal number of clauses
+minNumClauses = 5
+maxNumClauses = 20
+
+# minimal and maximal number of variables
+minNumVariables = 16
+maxNumVariables = 25
+
+# number of test cases to generate
+numTestCases = 200
+
+# prefix of the test cases
+prefix = "2_test_"
+
+genFormula()
+
+#################
+##   Tests 3   ##
+#################
+
+# minimal size of a clause
+minClauseSize = 3
+# maximal size of a clause
+maxClauseSize = 20
+
+# ratio between positive and negative variables
+positiveRatio = 0.5
+
+# minimal and maximal tree widht
+minTreeWidth = 10
+maxTreeWidth = 20
+
+# minimal and maximal number of clauses
+minNumClauses = 5
+maxNumClauses = 20
+
+# minimal and maximal number of variables
+minNumVariables = 25
+maxNumVariables = 35
+
+# number of test cases to generate
+numTestCases = 200
+
+# prefix of the test cases
+prefix = "3_test_"
+
+genFormula()
