@@ -2,7 +2,6 @@ import random
 import subprocess
 from sets import Set
 from os.path import join, isdir
-from numpy.random import choice
 
 from os import makedirs
 
@@ -51,7 +50,8 @@ if not isdir(dirResults):
 # check formula
 def checkFormula(formula, resultFile):
     print "    check Formula"
-    subprocess.call(["clasp", "--outf=2", "-q", "-n", "0", formula], stdout=resultFile)
+    # subprocess.call(["clasp", "--outf=2", "-n", "0", "-q", formula], stdout=resultFile)
+    subprocess.call(["./sharpSAT", formula], stdout=resultFile)
 
 
 # generate graph
@@ -96,9 +96,9 @@ def genFormula():
             clauseSize = random.randint(minClauseSize, numVars if (numVars < maxClauseSize) else maxClauseSize)
             varList = range(1, numVars + 1)
             random.shuffle(varList)
-            formula = formula + str(varList[0] * choice([1, -1], p=[positiveRatio, 1 - positiveRatio]))
+            formula = formula + str(varList[0] * random.choice([1, -1]))
             for var in range(1, clauseSize):
-                formula = formula + " " + str(varList[var] * choice([1, -1]))
+                formula = formula + " " + str(varList[var] * random.choice([1, -1]))
             formula = formula + " 0\n"
         with open(join(dirFormula, prefix + str(numTry) + ".cnf"), "w") as formulaFile:
             formulaFile.write(formula)
@@ -108,7 +108,7 @@ def genFormula():
             genTreeDecomp(join(dirGraphs, prefix + str(numTry) + ".gr"), decompFile)
         with open(join(dirDecomp, prefix + str(numTry) + ".td"), "r") as decompFile:
             line = decompFile.readline()
-            if int(line.split(" ")[3]) < minTreeWidth | int(line.split(" ")[3]) > maxTreeWidth:
+            if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
                 continue
         with open(join(dirReference, prefix + str(numTry) + ""), "w") as resultFile:
             checkFormula(join(dirFormula, prefix + str(numTry) + ".cnf"), resultFile)
@@ -120,7 +120,7 @@ def genFormula():
 #################
 
 # minimal size of a clause
-minClauseSize = 1
+minClauseSize = 2
 # maximal size of a clause
 maxClauseSize = 18
 
@@ -129,18 +129,18 @@ positiveRatio = 0.5
 
 # minimal and maximal tree widht
 minTreeWidth = 1
-maxTreeWidth = 18
+maxTreeWidth = 20
 
 # minimal and maximal number of clauses
-minNumClauses = 1
-maxNumClauses = 12
+minNumClauses = 4
+maxNumClauses = 90
 
 # minimal and maximal number of variables
 minNumVariables = 2
-maxNumVariables = 18
+maxNumVariables = 30
 
 # number of test cases to generate
-numTestCases = 2000
+numTestCases = 1000
 
 # prefix of the test cases
 prefix = "1_test_"
@@ -154,7 +154,7 @@ genFormula()
 # minimal size of a clause
 minClauseSize = 3
 # maximal size of a clause
-maxClauseSize = 20
+maxClauseSize = 10
 
 # ratio between positive and negative variables
 positiveRatio = 0.5
@@ -165,7 +165,7 @@ maxTreeWidth = 20
 
 # minimal and maximal number of clauses
 minNumClauses = 5
-maxNumClauses = 20
+maxNumClauses = 15
 
 # minimal and maximal number of variables
 minNumVariables = 16
@@ -184,9 +184,9 @@ genFormula()
 #################
 
 # minimal size of a clause
-minClauseSize = 3
+minClauseSize = 5
 # maximal size of a clause
-maxClauseSize = 20
+maxClauseSize = 15
 
 # ratio between positive and negative variables
 positiveRatio = 0.5
@@ -196,17 +196,49 @@ minTreeWidth = 10
 maxTreeWidth = 20
 
 # minimal and maximal number of clauses
-minNumClauses = 5
+minNumClauses = 10
 maxNumClauses = 20
 
 # minimal and maximal number of variables
-minNumVariables = 25
-maxNumVariables = 35
+minNumVariables = 20
+maxNumVariables = 30
 
 # number of test cases to generate
-numTestCases = 20
+numTestCases = 200
 
 # prefix of the test cases
 prefix = "3_test_"
+
+genFormula()
+
+#################
+##   Tests 4   ##
+#################
+
+# minimal size of a clause
+minClauseSize = 5
+# maximal size of a clause
+maxClauseSize = 15
+
+# ratio between positive and negative variables
+positiveRatio = 0.5
+
+# minimal and maximal tree widht
+minTreeWidth = 10
+maxTreeWidth = 20
+
+# minimal and maximal number of clauses
+minNumClauses = 30
+maxNumClauses = 80
+
+# minimal and maximal number of variables
+minNumVariables = 20
+maxNumVariables = 30
+
+# number of test cases to generate
+numTestCases = 200
+
+# prefix of the test cases
+prefix = "4_test_"
 
 genFormula()
