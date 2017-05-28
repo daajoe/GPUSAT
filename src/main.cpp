@@ -9,6 +9,7 @@
 #include <gpusatparser.h>
 #include <gpusautils.h>
 #include <main.h>
+#include <chrono>
 
 std::vector<cl::Platform> platforms;
 cl::Context context;
@@ -20,7 +21,9 @@ cl::Kernel kernel;
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
 int main(int argc, char *argv[]) {
-    clock_t time_total = clock();
+    long time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+    ).count();
     std::stringbuf treeD, sat;
     std::string inputLine;
     bool file = false, formula = false;
@@ -67,12 +70,19 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    clock_t time_parsing = clock();
+    long time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+    ).count();
     treedecType treeDecomp = parseTreeDecomp(treeD.str());
     satformulaType satFormula = parseSatFormula(sat.str());
-    time_parsing = clock() - time_parsing;
+    time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+    ).count() - time_parsing;
 
     try {
+        long time_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count();
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
@@ -91,13 +101,22 @@ int main(int argc, char *argv[]) {
                                                        kernelStr.length()));
         program = cl::Program(context, sources);
         program.build(devices);
+        time_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count() - time_kernel;
 
-        clock_t time_solving = clock();
+        long time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count();
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
-        time_solving = clock() - time_solving;
+        time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count() - time_solving;
         //printSolutions(treeDecomp);
-        clock_t time_genModel;
-        int solutions = 0;
+        long time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+        long solutions = 0;
         for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
             solutions += treeDecomp.bags[0].solution[i];
         }
@@ -116,12 +135,19 @@ int main(int argc, char *argv[]) {
         } else if (solutions == 0) {
             std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
         }
-        time_genModel = clock() - time_genModel;
-        time_total = clock() - time_total;
-        std::cout << "\n    ,\"Time_Solving\": " << ((float) time_solving) / CLOCKS_PER_SEC;
-        std::cout << "\n    ,\"Time_Parsing\": " << ((float) time_parsing) / CLOCKS_PER_SEC;
-        std::cout << "\n    ,\"Time_Total\": " << ((float) time_total) / CLOCKS_PER_SEC;
-        std::cout << "\n    ,\"Time_Generate_Model\": " << ((float) time_total) / CLOCKS_PER_SEC;
+        time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count() - time_model;
+        time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count() - time_total;
+        std::cout << "\n    ,\"Time\":{";
+        std::cout << "\n        \"Solving\": " << ((float) time_solving) / CLOCKS_PER_SEC;
+        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / CLOCKS_PER_SEC;
+        std::cout << "\n        ,\"Build_Kernel\": " << ((float) time_kernel) / CLOCKS_PER_SEC;
+        std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / CLOCKS_PER_SEC;
+        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        std::cout << "\n    }";
         std::cout << "\n}";
 
     }
