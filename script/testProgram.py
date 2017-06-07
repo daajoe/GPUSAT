@@ -1,8 +1,8 @@
 import json
 from os import listdir
 import subprocess
-from os.path import join
-
+from os.path import join, isdir
+from os import makedirs
 import datetime
 
 dirFormula = "./problems/formula"
@@ -13,6 +13,8 @@ dirReference = "./problems/reference"
 numElements = len(listdir(dirReference))
 currentElement = 0
 
+if not isdir(dirResults):
+    makedirs(dirResults)
 
 def getTime(sol):
     if sol[0] == "{":
@@ -62,7 +64,7 @@ for testcase in listdir(dirReference):
             # generate output
             with open(join(dirResults, testcase), "w") as resultFile:
                 subprocess.call(
-                    ["gpusat.exe", "-f", dirDecomp + "/" + testcase + ".td", "-s",
+                    ["./gpusat", "-f", dirDecomp + "/" + testcase + ".td", "-s",
                      dirFormula + "/" + testcase + ".cnf"],
                     stdout=resultFile, stderr=resultFile)
             # check results
