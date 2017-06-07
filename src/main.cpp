@@ -86,8 +86,8 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (!strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(),
-                        "Advanced Micro Devices, Inc.")) {
+            if (!strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.") ||
+                !strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Mesa")) {
                 break;
             }
         }
@@ -142,10 +142,10 @@ int main(int argc, char *argv[]) {
                 std::chrono::system_clock::now().time_since_epoch()
         ).count() - time_total;
         std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Solving\": " << ((float) time_solving) / CLOCKS_PER_SEC;
-        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / CLOCKS_PER_SEC;
-        std::cout << "\n        ,\"Build_Kernel\": " << ((float) time_kernel) / CLOCKS_PER_SEC;
-        std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / CLOCKS_PER_SEC;
+        std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
+        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
+        std::cout << "\n        ,\"Build_Kernel\": " << ((float) time_kernel) / 1000;
+        std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / 1000;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
@@ -190,7 +190,7 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node) {
             edge.numVars = node.numVars;
             edge.edges = node.edges;
             edge.variables = node.variables;
-            edge.solution = new cl_int[node.numSol];
+            edge.solution = new cl_int[node.numSol]();
             bagType &next = decomp.bags[node.edges[i] - 1];
             solveForgIntroduce(formula, edge, next);
             //join
@@ -228,7 +228,7 @@ void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
         edge.numVars = vect.size();
         edge.variables = &vect[0];
         edge.numSol = pow(2, vect.size());
-        edge.solution = new cl_int[edge.numSol];
+        edge.solution = new cl_int[edge.numSol]();
 
         solveForget(edge, next);
         solveIntroduce(formula, node, edge);
@@ -342,8 +342,9 @@ void solveLeaf(satformulaType &formula, bagType &node) {
 void solveForget(bagType &node, bagType &edge) {
     kernel = cl::Kernel(program, "solveForget");
     cl::Buffer bufSol(context,
-                      CL_MEM_READ_WRITE,
-                      sizeof(cl_int) * (node.numSol));
+                      CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                      sizeof(cl_int) * (node.numSol),
+                      node.solution);
     cl::Buffer bufNextSol(context,
                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                           sizeof(cl_int) * (edge.numSol),
@@ -383,7 +384,7 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_int) * (node.numSol));
-    cl_int *solutions = new cl_int[node.numSol * 2];
+    cl_int *solutions = new cl_int[node.numSol * 2]();
     std::copy(edge1.solution, edge1.solution + node.numSol,
               solutions);
     std::copy(edge2.solution, edge2.solution + node.numSol,

@@ -28,7 +28,7 @@ satformulaType parseSatFormula(std::string formula) {
     if (clauses != NULL) {
         int a = 0, s = 0;
         ret.totalNumVar = clauseSize;
-        ret.clauses = new cl_int[clauseSize];
+        ret.clauses = new cl_int[clauseSize]();
         while (!clauses->empty()) {
             std::queue<cl_int> &clause = clauses->front();
             ret.numVarsC[a] = clause.size();
@@ -86,7 +86,7 @@ void parseProblemLine(satformulaType &satformula, std::string item, std::queue<s
     satformula.numVar = stoi(i);
     getline(sline, i, ' '); //num clauses
     satformula.numclauses = stoi(i);
-    satformula.numVarsC = new cl_int[satformula.numclauses];
+    satformula.numVarsC = new cl_int[satformula.numclauses]();
     clauses = new std::queue<std::queue<cl_int>>();
 }
 
@@ -113,7 +113,7 @@ treedecType parseTreeDecomp(std::string graph) {
 
     if (edges != NULL) {
         for (int a = 0; a < ret.numb; a++) {
-            ret.bags[a].edges = new cl_int[edges[a]->size()];
+            ret.bags[a].edges = new cl_int[edges[a]->size()]();
             ret.bags[a].numEdges = edges[a]->size();
             int b = 0;
             while (!edges[a]->empty()) {
@@ -169,9 +169,9 @@ void parseBagLine(treedecType ret, std::string item) {
     }
 
 
-    ret.bags[bnum - 1].variables = new cl_int[match_count - 1];
+    ret.bags[bnum - 1].variables = new cl_int[match_count - 1]();
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-    ret.bags[bnum - 1].solution = new cl_int[sizeof(cl_int) * (ret.bags[bnum - 1].numSol)];
+    ret.bags[bnum - 1].solution = new cl_int[sizeof(cl_int) * (ret.bags[bnum - 1].numSol)]();
     ret.bags[bnum - 1].numVars = match_count - 1;
     while (getline(sline, i, ' ')) //vertices
     {
