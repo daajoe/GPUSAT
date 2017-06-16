@@ -10,6 +10,10 @@
  */
 void printTreeD(treedecType decomp);
 
+/**
+ *
+ * @param decomp
+ */
 void printSolutions(treedecType decomp);
 
 /**

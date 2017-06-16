@@ -12,9 +12,21 @@
  */
 satformulaType parseSatFormula(std::string formula);
 
-void parseClauseLine(std::string item, std::queue<std::queue<cl_int>> *clauses, cl_int &clauseSize);
+/**
+ *
+ * @param item
+ * @param clauses
+ * @param clauseSize
+ */
+void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses, cl_long &clauseSize);
 
-void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_int>> *&clauses);
+/**
+ *
+ * @param satformula
+ * @param item
+ * @param clauses
+ */
+void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> *&clauses);
 
 /**
  * generates a treedec from a given string
@@ -29,7 +41,7 @@ treedecType parseTreeDecomp(std::string graph);
  * @param item
  * @param edges
  */
-void parseEdgeLine(std::string item, std::queue<cl_int> **edges);
+void parseEdgeLine(std::string item, std::queue<cl_long> **edges);
 
 /**
  *
@@ -37,7 +49,7 @@ void parseEdgeLine(std::string item, std::queue<cl_int> **edges);
  * @param item
  * @param edges
  */
-void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_int> **&edges);
+void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&edges);
 
 /**
  *
