@@ -30,66 +30,75 @@ struct satformulaType {
 };
 
 /**
+ * function to solve the sat problem
  *
  * @param decomp
+ *      the tree decomposition
  * @param formula
+ *      the sat formula
  * @param node
- */
-void solveProblemCPU(treedecType decomp, satformulaType formula, bagType node);
-
-/**
- *
- * @param decomp
- * @param formula
- * @param node
+ *      the node to start from in the tree decompostion
  */
 void solveProblem(treedecType decomp, satformulaType formula, bagType node);
 
 /**
- *
- * @param decomp
- * @param solution
- * @param node
- */
-void genSolution(treedecType decomp, cl_long *solution, bagType node);
-
-/**
+ * function to solve a join node
  *
  * @param node
+ *      the node to save the solutions in
  * @param edge1
+ *      the first edge
  * @param edge2
+ *      the second edge
  */
 void solveJoin(bagType &node, bagType &edge1, bagType &edge2);
 
 /**
+ * function to solve a forget node
  *
  * @param node
+ *      the node to save the solutions in
  * @param edge
+ *      the next node
  */
 void solveForget(bagType &node, bagType &edge);
 
 /**
+ * function to solve a leaf node
  *
  * @param formula
+ *      the sat formula
  * @param node
+ *      the node to save the solutions in
  */
 void solveLeaf(satformulaType &formula, bagType &node);
 
 /**
+ * function to solve a introduce node
  *
  * @param formula
+ *      the sat formula
  * @param node
+ *      the node to save the solutions in
  * @param edge
+ *      the next node
  */
 void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
 /**
+ * searches for a satisfying assingment in the solutions array
  *
  * @param decomp
+ *      the tree decomposition
  * @param solution
- * @param lastNode
- * @param lastId
- * @param edge
+ *      array to save the assigment
+ * @param node
+ *      the root of the tree decomposition
+ */
+void genSolution(treedecType decomp, cl_long *solution, bagType node);
+
+/**
+ * function used by gen Solution
  */
 void genSolEdge(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge);
 

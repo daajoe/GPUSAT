@@ -5,6 +5,7 @@
 #include <main.h>
 #include <gpusautils.h>
 
+
 void printTreeD(treedecType decomp) {
     cl_long size = decomp.numb;
     for (int i = 0; i < size; i++) {
@@ -31,16 +32,21 @@ void printSolutions(treedecType decomp) {
         cl_long numS = decomp.bags[i].numSol;
         cl_long numVariables = decomp.bags[i].numVars;
         cl_long *vars = decomp.bags[i].variables;
-        std::cout << "solutions: \n";
-        for (int a = 0; a < numS; a++) {
-            std::cout << a << ": ";
-            for (int b = 0; b < numVariables; b++) {
-                std::cout << ((a & (1 << (numVariables - b - 1))) >> (numVariables - b - 1) == 0 ? "-" : " ") << vars[b]
-                          << " ";
-            }
-            std::cout << decomp.bags[i].solution[a] << "\n";
-        }
+        cl_long *sol = decomp.bags[i].solution;
+        printSol(numS, numVariables, vars, sol);
         std::cout << "\n";
+    }
+}
+
+void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_long *sol) {
+    std::cout << "solutions: \n";
+    for (int a = 0; a < numS; a++) {
+        std::cout << a << ": ";
+        for (int b = 0; b < numVariables; b++) {
+            std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
+                      << " ";
+        }
+        printf("%.2f\n", sol[a]);
     }
 }
 

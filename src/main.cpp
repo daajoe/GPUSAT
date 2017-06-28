@@ -86,8 +86,7 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (!strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.") ||
-                !strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Mesa")) {
+            if (!strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.")) {
                 break;
             }
         }
@@ -375,7 +374,6 @@ void solveForget(bagType &node, bagType &edge) {
     kernel.setArg(5, (cl_long) pow(2, edge.numVars - node.numVars));
     kernel.setArg(6, node.numVars);
     size_t numKernels = edge.numSol;
-    queue.enqueueFillBuffer(bufSol, 0, 0, sizeof(cl_long) * (node.numSol));
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
