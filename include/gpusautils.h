@@ -51,4 +51,8 @@ std::string readFile(std::string path);
  */
 void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_long *sol);
 
+std::string readBinary(std::string path);
+
+void writeBinary(char *data, size_t size, std::string path);
+
 #endif //GPUSAT_GPUSAUTILS_H

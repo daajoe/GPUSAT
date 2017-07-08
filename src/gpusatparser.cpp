@@ -2,9 +2,9 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <main.h>
 #include <gpusatparser.h>
-#include <algorithm>
 
 satformulaType parseSatFormula(std::string formula) {
     satformulaType ret = satformulaType();

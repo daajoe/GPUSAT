@@ -6,10 +6,12 @@
 #include <getopt.h>
 #include <regex>
 #include <math.h>
+#include <chrono>
 #include <gpusatparser.h>
 #include <gpusautils.h>
 #include <main.h>
-#include <chrono>
+#include <sys/stat.h>
+#include <numeric>
 
 std::vector<cl::Platform> platforms;
 cl::Context context;
@@ -21,7 +23,7 @@ cl::Kernel kernel;
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
 int main(int argc, char *argv[]) {
-    long time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
+    long long int time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
     ).count();
     std::stringbuf treeD, sat;
@@ -70,7 +72,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    long time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
+    long long int time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
     ).count();
     treedecType treeDecomp = parseTreeDecomp(treeD.str());
@@ -80,7 +82,7 @@ int main(int argc, char *argv[]) {
     ).count() - time_parsing;
 
     try {
-        long time_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+        long long int time_init_opencl = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
         ).count();
         cl::Platform::get(&platforms);
@@ -95,16 +97,52 @@ int main(int argc, char *argv[]) {
         context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         queue = cl::CommandQueue(context, devices[0]);
-        std::string kernelStr = readFile("./kernel/SAT.cl");
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
-                                                       kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
-        time_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+        time_init_opencl = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_kernel;
+        ).count() - time_init_opencl;
 
-        long time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
+        long long int time_build_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count();
+        struct stat buffer;
+        if (stat("./kernel/SAT.clbin", &buffer) != 0) {
+
+            std::string kernelStr = readFile("./kernel/SAT.cl");
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
+                                                           kernelStr.length()));
+            program = cl::Program(context, sources);
+            program.build(devices);
+
+            // Allocate some memory for all the kernel binary data
+            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+            std::vector<char> binData(std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            char *binChunk = &binData[0];
+
+            //A list of pointers to the binary data
+            std::vector<char *> binaries;
+            for (unsigned int i = 0; i < binSizes.size(); ++i) {
+                binaries.push_back(binChunk);
+                binChunk += binSizes[i];
+            }
+
+            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+            std::ofstream binaryfile("./kernel/SAT.clbin", std::ios::binary);
+            for (unsigned int i = 0; i < binaries.size(); ++i)
+                binaryfile.write(binaries[i], binSizes[i]);
+            binaryfile.close();
+        } else {
+            long size = 0;
+            cl_int err;
+            std::string kernelStr = readBinary("./kernel/SAT.clbin");
+            cl::Program::Binaries bins(1, std::make_pair((const void *) kernelStr.data(), kernelStr.size()));
+            program = cl::Program(context, devices, bins, NULL, &err);
+            program.build(devices);
+        }
+        time_build_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch()
+        ).count() - time_build_kernel;
+
+        long long int time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
         ).count();
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
@@ -112,7 +150,7 @@ int main(int argc, char *argv[]) {
                 std::chrono::system_clock::now().time_since_epoch()
         ).count() - time_solving;
         //printSolutions(treeDecomp);
-        long time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
+        long long int time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
                 std::chrono::system_clock::now().time_since_epoch()
         ).count();
         cl_long solutions = 0;
@@ -143,14 +181,16 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
         std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
-        std::cout << "\n        ,\"Build_Kernel\": " << ((float) time_kernel) / 1000;
+        std::cout << "\n        ,\"Build_Kernel\": " << ((float) time_build_kernel) / 1000;
         std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / 1000;
+        std::cout << "\n        ,\"Init_OpenCL\": " << ((float) time_init_opencl) / 1000;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
 
     }
-    catch (cl::Error err) {
+    catch (cl::Error
+           err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
                   std::endl;
         if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
@@ -159,7 +199,8 @@ int main(int argc, char *argv[]) {
             std::cout << "Program Info: " << str << std::endl;
         }
     }
-    catch (std::string msg) {
+    catch (std::string
+           msg) {
         std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
 }
@@ -288,14 +329,15 @@ void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
     kernel.setArg(4, node.numVars);
     kernel.setArg(5, bufSolNext);
     kernel.setArg(6, edge.numVars);
-    size_t numKernels = node.numSol;
-    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+    queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol),
                             node.solution);
 }
 
 void solveLeaf(satformulaType &formula, bagType &node) {
-    kernel = cl::Kernel(program, "solveLeaf");
+    cl_int err;
+    kernel = cl::Kernel(program, "solveLeaf", &err);
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_long) * (node.numSol));
@@ -332,8 +374,8 @@ void solveLeaf(satformulaType &formula, bagType &node) {
     kernel.setArg(2, formula.numclauses);
     kernel.setArg(3, bufSol);
     kernel.setArg(4, node.numVars);
-    size_t numKernels = node.numSol;
-    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+    queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol),
                             node.solution);
 }
@@ -373,8 +415,8 @@ void solveForget(bagType &node, bagType &edge) {
     kernel.setArg(3, edge.numVars);
     kernel.setArg(5, (cl_long) pow(2, edge.numVars - node.numVars));
     kernel.setArg(6, node.numVars);
-    size_t numKernels = edge.numSol;
-    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(edge.numSol));
+    queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
 
@@ -395,8 +437,9 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
     kernel.setArg(0, bufSol);
     kernel.setArg(1, bufSolOther);
     kernel.setArg(2, node.numSol);
-    size_t numKernels = node.numSol;
+    size_t numKernels = (size_t) node.numSol;
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+    queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
 
@@ -458,7 +501,8 @@ void genSolEdge(treedecType decomp, cl_long *solution, bagType lastNode, cl_long
 
         cl_long template_id = 0;
         for (int a = 0; a < intersect_vars.size(); a++) {
-            template_id = template_id | ((lastId & (1 << positionCurrent[a])) >> positionCurrent[a] << positionNext[a]);
+            template_id =
+                    template_id | ((lastId & (1 << positionCurrent[a])) >> positionCurrent[a] << positionNext[a]);
         }
 
         nextId = template_id;

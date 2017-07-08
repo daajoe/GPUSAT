@@ -4,6 +4,7 @@
 #include <iostream>
 #include <main.h>
 #include <gpusautils.h>
+#include  <stdio.h>
 
 
 void printTreeD(treedecType decomp) {
@@ -74,4 +75,23 @@ std::string readFile(std::string path) {
         treeD.sputn("\n", 1);
     }
     return treeD.str();
+}
+
+std::string readBinary(std::string path) {
+    FILE *input = fopen(path.c_str(), "rb");
+    fseek(input, 0L, SEEK_END);
+    size_t size = ftell(input);
+    char *binary = (char *) malloc(size);
+    rewind(input);
+    fread(binary, sizeof(char), size, input);
+    fclose(input);
+    std::string buffer;
+    buffer.assign(binary, size);
+    free(binary);
+    return buffer;
+}
+
+void writeBinary(char *data, size_t size, std::string path) {
+    std::ofstream fileOut(path, std::ios::binary);
+    fileOut.write(data, size);
 }
