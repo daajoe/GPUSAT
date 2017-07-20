@@ -19,18 +19,20 @@ std::vector<cl::Device> devices;
 cl::CommandQueue queue;
 cl::Program program;
 cl::Kernel kernel;
+cl_long isSat = 1;
 
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
+long long int getTime();
+
 int main(int argc, char *argv[]) {
-    long long int time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+    long long int time_total = getTime();
     std::stringbuf treeD, sat;
     std::string inputLine;
     bool file = false, formula = false;
     int opt;
-    while ((opt = getopt(argc, argv, "f:s:")) != -1) {
+    std::string kernelPath = "./kernel/";
+    while ((opt = getopt(argc, argv, "f:s:c:")) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -52,6 +54,10 @@ int main(int argc, char *argv[]) {
                 }
                 break;
             }
+            case 'c': {
+                kernelPath = std::string(optarg);
+                break;
+            }
             default:
                 fprintf(stderr, "Usage: %s [-f treedecomp] -s formula \n", argv[0]);
                 exit(EXIT_FAILURE);
@@ -68,23 +74,17 @@ int main(int argc, char *argv[]) {
 
     // error no sat formula given
     if (!formula) {
-        fprintf(stderr, "Usage: %s [-f treedecomp] -s formula \n", argv[0]);
+        fprintf(stderr, "Usage: %s [-f treedecomp] -s formula [-c kerneldir] \n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
-    long long int time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+    long long int time_parsing = getTime();
     treedecType treeDecomp = parseTreeDecomp(treeD.str());
     satformulaType satFormula = parseSatFormula(sat.str());
-    time_parsing = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-    ).count() - time_parsing;
+    time_parsing = getTime() - time_parsing;
 
     try {
-        long long int time_init_opencl = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count();
+        long long int time_init_opencl = getTime();
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
@@ -97,28 +97,26 @@ int main(int argc, char *argv[]) {
         context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         queue = cl::CommandQueue(context, devices[0]);
-        time_init_opencl = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_init_opencl;
+        time_init_opencl = getTime() - time_init_opencl;
 
-        long long int time_build_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count();
+        long long int time_build_kernel = getTime();
         struct stat buffer;
-        if (stat("./kernel/SAT.clbin", &buffer) != 0) {
 
-            std::string kernelStr = readFile("./kernel/SAT.cl");
+        std::string binPath(kernelPath + "SAT.clbin");
+        if (stat(binPath.c_str(), &buffer) != 0) {
+            //create kernel binary if it doesn't exist
+
+            std::string sourcePath(kernelPath + "SAT.cl");
+            std::string kernelStr = readFile(sourcePath.c_str());
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
                                                            kernelStr.length()));
             program = cl::Program(context, sources);
             program.build(devices);
 
-            // Allocate some memory for all the kernel binary data
             const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData(std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
             char *binChunk = &binData[0];
 
-            //A list of pointers to the binary data
             std::vector<char *> binaries;
             for (unsigned int i = 0; i < binSizes.size(); ++i) {
                 binaries.push_back(binChunk);
@@ -126,58 +124,53 @@ int main(int argc, char *argv[]) {
             }
 
             program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile("./kernel/SAT.clbin", std::ios::binary);
+            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
             for (unsigned int i = 0; i < binaries.size(); ++i)
                 binaryfile.write(binaries[i], binSizes[i]);
             binaryfile.close();
         } else {
+            //load kernel binary
+
             long size = 0;
             cl_int err;
-            std::string kernelStr = readBinary("./kernel/SAT.clbin");
+            std::string kernelStr = readBinary(binPath.c_str());
             cl::Program::Binaries bins(1, std::make_pair((const void *) kernelStr.data(), kernelStr.size()));
             program = cl::Program(context, devices, bins, NULL, &err);
             program.build(devices);
         }
-        time_build_kernel = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_build_kernel;
+        time_build_kernel = getTime() - time_build_kernel;
 
-        long long int time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count();
+        long long int time_solving = getTime();
         solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
-        time_solving = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_solving;
-        //printSolutions(treeDecomp);
-        long long int time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count();
-        cl_long solutions = 0;
-        for (int i = 0; i < treeDecomp.bags[0].numSol; i++) {
-            solutions += treeDecomp.bags[0].solution[i];
-        }
-        std::cout << "{\n    \"Model Count\": " << solutions;
-        if (solutions > 0) {
-            cl_long *solution = new cl_long[satFormula.numVar + 1]();
-            genSolution(treeDecomp, solution, treeDecomp.bags[0]);
-            std::cout << "\n    ,\"Model\": \"";
-            int i;
-            for (i = 1; i <= satFormula.numVar - 1; i++) {
-                cl_long assignment = solution[i];
-                std::cout << solution[i] << ", ";
+        time_solving = getTime() - time_solving;
+
+        long long int time_model = getTime();
+        if (isSat > 0) {
+            cl_long solutions = 0;
+            for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
+                solutions += treeDecomp.bags[0].solution[i];
             }
-            cl_long assignment = solution[i];
-            std::cout << solution[i] << "\"";
-        } else if (solutions == 0) {
+            std::cout << "{\n    \"Model Count\": " << solutions;
+            if (solutions > 0) {
+                cl_long *solution = new cl_long[satFormula.numVar + 1]();
+                searchAssignment(treeDecomp, solution, treeDecomp.bags[0]);
+                std::cout << "\n    ,\"Model\": \"";
+                int i;
+                for (i = 1; i <= satFormula.numVar - 1; i++) {
+                    cl_long assignment = solution[i];
+                    std::cout << solution[i] << ", ";
+                }
+                cl_long assignment = solution[i];
+                std::cout << solution[i] << "\"";
+            } else if (solutions == 0) {
+                std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
+            }
+        } else {
+            std::cout << "{\n    \"Model Count\": " << 0;
             std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
         }
-        time_model = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_model;
-        time_total = std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()
-        ).count() - time_total;
+        time_model = getTime() - time_model;
+        time_total = getTime() - time_total;
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
         std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
@@ -205,6 +198,12 @@ int main(int argc, char *argv[]) {
     }
 }
 
+long long int getTime() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+}
+
 void
 solveProblem(treedecType decomp, satformulaType formula, bagType node) {
 
@@ -213,28 +212,30 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node) {
         solveProblem(decomp, formula, decomp.bags[edge]);
     }
 
-    if (node.numEdges == 0) {
-        //leaf node
-        solveLeaf(formula, node);
-    } else if (node.numEdges == 1) {
-        bagType &next = decomp.bags[node.edges[0] - 1];
-        solveForgIntroduce(formula, node, next);
+    if (isSat > 0) {
+        if (node.numEdges == 0) {
+            //leaf node
+            solveLeaf(formula, node);
+        } else if (node.numEdges == 1) {
+            bagType &next = decomp.bags[node.edges[0] - 1];
+            solveForgIntroduce(formula, node, next);
 
-    } else if (node.numEdges > 1) {
-        bagType &next = decomp.bags[node.edges[0] - 1];
-        solveForgIntroduce(formula, node, next);
-        for (int i = 1; i < node.numEdges; i++) {
-            bagType edge;
-            edge.numEdges = node.numEdges;
-            edge.numSol = node.numSol;
-            edge.numVars = node.numVars;
-            edge.edges = node.edges;
-            edge.variables = node.variables;
-            edge.solution = new cl_long[node.numSol]();
-            bagType &next = decomp.bags[node.edges[i] - 1];
-            solveForgIntroduce(formula, edge, next);
-            //join
-            solveJoin(node, node, edge);
+        } else if (node.numEdges > 1) {
+            bagType &next = decomp.bags[node.edges[0] - 1];
+            solveForgIntroduce(formula, node, next);
+            for (int i = 1; i < node.numEdges; i++) {
+                bagType edge;
+                edge.numEdges = node.numEdges;
+                edge.numSol = node.numSol;
+                edge.numVars = node.numVars;
+                edge.edges = node.edges;
+                edge.variables = node.variables;
+                edge.solution = new cl_long[node.numSol]();
+                bagType &next = decomp.bags[node.edges[i] - 1];
+                solveForgIntroduce(formula, edge, next);
+                //join
+                solveJoin(node, node, edge);
+            }
         }
     }
 }
@@ -324,15 +325,18 @@ void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
     } else {
         kernel.setArg(8, NULL);
     }
+    isSat = 0;
+    cl::Buffer bufSAT(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &isSat);
     kernel.setArg(2, formula.numclauses);
     kernel.setArg(3, bufSol);
     kernel.setArg(4, node.numVars);
     kernel.setArg(5, bufSolNext);
     kernel.setArg(6, edge.numVars);
+    kernel.setArg(9, bufSAT);
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
     queue.finish();
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol),
-                            node.solution);
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
+    queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
 }
 
 void solveLeaf(satformulaType &formula, bagType &node) {
@@ -371,13 +375,16 @@ void solveLeaf(satformulaType &formula, bagType &node) {
     } else {
         kernel.setArg(1, NULL);
     }
+    isSat = 0;
+    cl::Buffer bufSAT(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &isSat);
     kernel.setArg(2, formula.numclauses);
     kernel.setArg(3, bufSol);
     kernel.setArg(4, node.numVars);
+    kernel.setArg(6, bufSAT);
     queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
     queue.finish();
-    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol),
-                            node.solution);
+    queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
+    queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
 }
 
 void solveForget(bagType &node, bagType &edge) {
@@ -443,7 +450,7 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
 
-void genSolution(treedecType decomp, cl_long *solution, bagType node) {
+void searchAssignment(treedecType decomp, cl_long *solution, bagType node) {
     cl_long id = -1;
     for (int i = 0; i < node.numSol; i++) {
         if (node.solution[i] > 0) {
@@ -460,11 +467,11 @@ void genSolution(treedecType decomp, cl_long *solution, bagType node) {
         solution[node.variables[b]] = assignment;
     }
     for (int a = 0; a < node.numEdges; a++) {
-        genSolEdge(decomp, solution, node, id, a);
+        SearchAssignmentNode(decomp, solution, node, id, a);
     }
 }
 
-void genSolEdge(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge) {
+void SearchAssignmentNode(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge) {
     bagType nextNode = decomp.bags[lastNode.edges[edge] - 1];
     cl_long nextId = 0;
     do {
@@ -534,7 +541,7 @@ void genSolEdge(treedecType decomp, cl_long *solution, bagType lastNode, cl_long
         lastId = nextId;
         if (lastNode.numEdges > 1) {
             for (int i = 1; i < lastNode.numEdges; i++) {
-                genSolEdge(decomp, solution, lastNode, lastId, i);
+                SearchAssignmentNode(decomp, solution, lastNode, lastId, i);
             }
         }
         if (lastNode.numEdges > 0) {

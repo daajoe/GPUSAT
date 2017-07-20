@@ -4,7 +4,7 @@
 #include <iostream>
 #include <main.h>
 #include <gpusautils.h>
-#include  <stdio.h>
+#include <stdio.h>
 
 
 void printTreeD(treedecType decomp) {
@@ -87,7 +87,6 @@ std::string readBinary(std::string path) {
     fclose(input);
     std::string buffer;
     buffer.assign(binary, size);
-    free(binary);
     return buffer;
 }
 

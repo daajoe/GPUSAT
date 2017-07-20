@@ -123,10 +123,13 @@ solveForget(__global long *solutions, __global long *variablesCurrent, __global 
  *      array containing the ids of the variables in the bag
  */
 __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses,
-                        __global long *solutions, long numV, __global long *variables) {
+                        __global long *solutions, long numV, __global long *variables, __global long *models) {
     long id = get_global_id(0);
     long unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     solutions[id] = !unsat;
+    if(solutions[id]>0){
+        (*models) = 1;
+    }
 }
 
 /**
@@ -153,7 +156,7 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
  */
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
                              __global long *solutions, long numV, __global long *edge, long numVE,
-                             __global long *variables, __global long *edgeVariables) {
+                             __global long *variables, __global long *edgeVariables, __global long *models) {
     long id = get_global_id(0);
     long a = 0, b = 0;
     long otherId = 0;
@@ -166,6 +169,9 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
     };
     if (edge[otherId] > 0) {
         solutions[id] = !checkBag(clauses, numVarsC, numclauses, id, numV, variables) * edge[otherId];
+        if(solutions[id]>0){
+            (*models) = 1;
+        }
     } else {
         solutions[id] = 0;
     }

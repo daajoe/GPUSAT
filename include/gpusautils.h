@@ -51,8 +51,26 @@ std::string readFile(std::string path);
  */
 void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_long *sol);
 
+/**
+ * reads a binary file from @path and retuns the contents in a string
+ *
+ * @param path
+ *      path to the file
+ * @return
+ *      the file contents
+ */
 std::string readBinary(std::string path);
 
+/**
+ * writes data into a file in binary format
+ *
+ * @param path
+ *      path to the fil
+ * @param data
+ *      the data to write
+ * @param size
+ *      the size of the data
+ */
 void writeBinary(char *data, size_t size, std::string path);
 
 #endif //GPUSAT_GPUSAUTILS_H

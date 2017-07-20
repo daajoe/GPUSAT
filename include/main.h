@@ -95,11 +95,11 @@ void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
  * @param node
  *      the root of the tree decomposition
  */
-void genSolution(treedecType decomp, cl_long *solution, bagType node);
+void searchAssignment(treedecType decomp, cl_long *solution, bagType node);
 
 /**
- * function used by gen Solution
+ * function used by searchAssignment
  */
-void genSolEdge(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge);
+void SearchAssignmentNode(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge);
 
 #endif //GPUSAT_MAIN_H
