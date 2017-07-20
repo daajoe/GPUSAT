@@ -170,7 +170,7 @@ void parseBagLine(treedecType ret, std::string item) {
 
     ret.bags[bnum - 1].variables = new cl_long[match_count - 1]();
     ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-    ret.bags[bnum - 1].solution = new cl_long[ret.bags[bnum - 1].numSol]();
+    //ret.bags[bnum - 1].solution = new cl_long[ret.bags[bnum - 1].numSol]();
     ret.bags[bnum - 1].numVars = match_count - 1;
     while (getline(sline, i, ' ')) //vertices
     {

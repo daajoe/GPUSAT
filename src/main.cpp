@@ -12,6 +12,7 @@
 #include <main.h>
 #include <sys/stat.h>
 #include <numeric>
+#include <cstdlib>
 
 std::vector<cl::Platform> platforms;
 cl::Context context;
@@ -148,26 +149,12 @@ int main(int argc, char *argv[]) {
         if (isSat > 0) {
             cl_long solutions = 0;
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
+                bagType &n = treeDecomp.bags[0];
                 solutions += treeDecomp.bags[0].solution[i];
             }
             std::cout << "{\n    \"Model Count\": " << solutions;
-            if (solutions > 0) {
-                cl_long *solution = new cl_long[satFormula.numVar + 1]();
-                searchAssignment(treeDecomp, solution, treeDecomp.bags[0]);
-                std::cout << "\n    ,\"Model\": \"";
-                int i;
-                for (i = 1; i <= satFormula.numVar - 1; i++) {
-                    cl_long assignment = solution[i];
-                    std::cout << solution[i] << ", ";
-                }
-                cl_long assignment = solution[i];
-                std::cout << solution[i] << "\"";
-            } else if (solutions == 0) {
-                std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
-            }
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
-            std::cout << "\n    ,\"Model\": \"UNSATISFIABLE\"";
         }
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
@@ -205,7 +192,7 @@ long long int getTime() {
 }
 
 void
-solveProblem(treedecType decomp, satformulaType formula, bagType node) {
+solveProblem(treedecType& decomp, satformulaType& formula, bagType& node) {
 
     for (int i = 0; i < node.numEdges; i++) {
         cl_long edge = node.edges[i] - 1;
@@ -213,6 +200,7 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node) {
     }
 
     if (isSat > 0) {
+        node.solution = new cl_long[node.numSol]();
         if (node.numEdges == 0) {
             //leaf node
             solveLeaf(formula, node);
@@ -238,6 +226,11 @@ solveProblem(treedecType decomp, satformulaType formula, bagType node) {
             }
         }
     }
+    /*for (int i = 0; i < node.numEdges; i++) {
+        delete[] decomp.bags[node.edges[i]-1].edges;
+        delete[] decomp.bags[node.edges[i]-1].solution;
+        delete[] decomp.bags[node.edges[i]-1].variables;
+    }*/
 }
 
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
@@ -449,104 +442,3 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
     queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
-
-void searchAssignment(treedecType decomp, cl_long *solution, bagType node) {
-    cl_long id = -1;
-    for (int i = 0; i < node.numSol; i++) {
-        if (node.solution[i] > 0) {
-            id = i;
-            break;
-        }
-    }
-    //no solution found.
-    if (id < 0) {
-        return;
-    }
-    for (int b = 0; b < node.numVars; b++) {
-        cl_long assignment = (id & (1 << node.numVars - b - 1)) > 0 ? node.variables[b] : -node.variables[b];
-        solution[node.variables[b]] = assignment;
-    }
-    for (int a = 0; a < node.numEdges; a++) {
-        SearchAssignmentNode(decomp, solution, node, id, a);
-    }
-}
-
-void SearchAssignmentNode(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge) {
-    bagType nextNode = decomp.bags[lastNode.edges[edge] - 1];
-    cl_long nextId = 0;
-    do {
-        std::vector<cl_long> intersect_vars(nextNode.numVars + lastNode.numVars);
-        std::vector<cl_long>::iterator it;
-        it = set_intersection(nextNode.variables, nextNode.variables + nextNode.numVars, lastNode.variables,
-                              lastNode.variables + lastNode.numVars, intersect_vars.begin());
-        intersect_vars.resize(it - intersect_vars.begin());
-
-        std::vector<cl_long> new_vars(nextNode.numVars + lastNode.numVars);
-        it = set_difference(nextNode.variables,
-                            nextNode.variables + nextNode.numVars, lastNode.variables,
-                            lastNode.variables + lastNode.numVars, new_vars.begin());
-        new_vars.resize(it - new_vars.begin());
-
-        cl_long positionCurrent[intersect_vars.size()], positionNext[intersect_vars.size()], new_vars_position[new_vars.size()];
-
-        for (int a = 0, b = 0; a < lastNode.numVars; a++) {
-            if (lastNode.variables[a] == intersect_vars[b]) {
-                positionCurrent[b] = lastNode.numVars - a - 1;
-                b++;
-            }
-        }
-        for (int a = 0, b = 0, c = 0; a < nextNode.numVars; a++) {
-            if (nextNode.variables[a] == intersect_vars[b]) {
-                positionNext[b] = nextNode.numVars - a - 1;
-                b++;
-            }
-            if (nextNode.variables[a] == new_vars[c]) {
-                new_vars_position[c] = nextNode.numVars - a - 1;
-                c++;
-            }
-        }
-
-        cl_long template_id = 0;
-        for (int a = 0; a < intersect_vars.size(); a++) {
-            template_id =
-                    template_id | ((lastId & (1 << positionCurrent[a])) >> positionCurrent[a] << positionNext[a]);
-        }
-
-        nextId = template_id;
-        if (new_vars.size() == 0) {
-            for (int b = 0; b < nextNode.numVars; b++) {
-                solution[nextNode.variables[b]] =
-                        (nextId & (1 << nextNode.numVars - b - 1)) > 0 ? nextNode.variables[b]
-                                                                       : -nextNode.variables[b];
-            }
-        } else {
-            for (int a = 0; a < pow(2, new_vars.size()); a++) {
-                nextId = template_id;
-                for (int b = 0; b < new_vars.size(); b++) {
-                    nextId = nextId | ((a & (1 << (new_vars.size() - b - 1))) >> (new_vars.size() - b - 1)
-                                                                              << new_vars_position[b]);
-                }
-                if (nextNode.solution[nextId] > 0) {
-                    for (int b = 0; b < nextNode.numVars; b++) {
-                        solution[nextNode.variables[b]] =
-                                (nextId & (1 << nextNode.numVars - b - 1)) > 0 ? nextNode.variables[b]
-                                                                               : -nextNode.variables[b];
-                    }
-                    break;
-                }
-            }
-        }
-
-        lastNode = nextNode;
-        lastId = nextId;
-        if (lastNode.numEdges > 1) {
-            for (int i = 1; i < lastNode.numEdges; i++) {
-                SearchAssignmentNode(decomp, solution, lastNode, lastId, i);
-            }
-        }
-        if (lastNode.numEdges > 0) {
-            nextNode = decomp.bags[lastNode.edges[0] - 1];
-        }
-    } while (lastNode.numEdges != 0);
-}
-

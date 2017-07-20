@@ -39,7 +39,7 @@ struct satformulaType {
  * @param node
  *      the node to start from in the tree decompostion
  */
-void solveProblem(treedecType decomp, satformulaType formula, bagType node);
+void solveProblem(treedecType& decomp, satformulaType& formula, bagType& node);
 
 /**
  * function to solve a join node
@@ -84,22 +84,5 @@ void solveLeaf(satformulaType &formula, bagType &node);
  *      the next node
  */
 void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
-
-/**
- * searches for a satisfying assingment in the solutions array
- *
- * @param decomp
- *      the tree decomposition
- * @param solution
- *      array to save the assigment
- * @param node
- *      the root of the tree decomposition
- */
-void searchAssignment(treedecType decomp, cl_long *solution, bagType node);
-
-/**
- * function used by searchAssignment
- */
-void SearchAssignmentNode(treedecType decomp, cl_long *solution, bagType lastNode, cl_long lastId, int edge);
 
 #endif //GPUSAT_MAIN_H
