@@ -49,7 +49,7 @@ std::string readFile(std::string path);
  * @param sol
  *      array ontaining the number of models for each assignment
  */
-void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_long *sol);
+void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const solType *sol);
 
 /**
  * reads a binary file from @path and retuns the contents in a string

@@ -33,13 +33,13 @@ void printSolutions(treedecType decomp) {
         cl_long numS = decomp.bags[i].numSol;
         cl_long numVariables = decomp.bags[i].numVars;
         cl_long *vars = decomp.bags[i].variables;
-        cl_long *sol = decomp.bags[i].solution;
+        solType *sol = decomp.bags[i].solution;
         printSol(numS, numVariables, vars, sol);
         std::cout << "\n";
     }
 }
 
-void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_long *sol) {
+void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const solType *sol) {
     std::cout << "solutions: \n";
     for (int a = 0; a < numS; a++) {
         std::cout << a << ": ";

@@ -4,6 +4,8 @@
 
 #include <CL/cl.hpp>
 
+#define solType cl_double
+
 /// type for a bag in the tree decomposition
 struct bagType {
     cl_long numVars = 0;
@@ -11,7 +13,7 @@ struct bagType {
     cl_long numSol = 0;
     cl_long *variables;
     cl_long *edges;
-    cl_long *solution;
+    solType *solution;
 };
 
 /// type for saving a tree decomposition
