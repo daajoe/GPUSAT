@@ -206,9 +206,10 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
         } else if (node.numEdges == 1) {
             bagType &next = decomp.bags[node.edges[0] - 1];
             solveForgIntroduce(formula, node, next);
+            delete [] next.solution;
 
         } else if (node.numEdges > 1) {
-            bagType tmp,edge2_,edge1_, edge1 = decomp.bags[node.edges[0] - 1];
+            bagType tmp,edge2_,edge1_, &edge1 = decomp.bags[node.edges[0] - 1];
             std::vector<cl_long> v1(edge1.numVars+node.numVars);
             std::vector<cl_long>::iterator it1 = std::set_intersection(node.variables, node.variables + node.numVars,
                                                                   edge1.variables, edge1.variables + edge1.numVars,v1.begin());
@@ -218,9 +219,10 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
             edge1_.numSol=pow(2, edge1_.numVars);
             edge1_.solution = new cl_long[edge1_.numSol]();
             solveForget(edge1_,edge1);
+            delete[] edge1.solution;
 
             for (int i = 1; i < node.numEdges; i++) {
-                bagType edge2 = decomp.bags[node.edges[i] - 1];
+                bagType &edge2 = decomp.bags[node.edges[i] - 1];
                 std::vector<cl_long> v2(edge2.numVars + node.numVars);
                 std::vector<cl_long>::iterator it2 = std::set_intersection(node.variables,
                                                                            node.variables + node.numVars,
@@ -232,6 +234,7 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
                 edge2_.numSol = pow(2, edge2_.numVars);
                 edge2_.solution = new cl_long[edge2_.numSol]();
                 solveForget(edge2_, edge2);
+                delete[]edge2.solution;
 
                 std::vector<cl_long> vt(edge1_.numVars + edge2_.numVars);
                 std::vector<cl_long>::iterator itt = std::set_union(edge1_.variables, edge1_.variables + edge1_.numVars,
@@ -245,6 +248,8 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
                 tmp.solution = new cl_long[tmp.numSol]();
                 solveJoin(tmp, edge1_, edge2_);
 
+                delete[]edge1_.solution;
+                delete[]edge2_.solution;
                 edge1_ = tmp;
 
                 if(i == node.numEdges-1){
@@ -253,11 +258,6 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
             }
         }
     }
-    /*for (int i = 0; i < node.numEdges; i++) {
-        delete[] decomp.bags[node.edges[i]-1].edges;
-        delete[] decomp.bags[node.edges[i]-1].solution;
-        delete[] decomp.bags[node.edges[i]-1].variables;
-    }*/
 }
 
 void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
@@ -293,6 +293,7 @@ void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
 
         solveForget(edge, next);
         solveIntroduce(formula, node, edge);
+        delete[]edge.solution;
     }
 }
 
