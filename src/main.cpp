@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     satformulaType satFormula = parseSatFormula(sat.str());
     time_parsing = getTime() - time_parsing;
 
-    try {
+    //try {
         long long int time_init_opencl = getTime();
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
@@ -168,7 +168,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    }";
         std::cout << "\n}";
 
-    }
+    /*}
     catch (cl::Error
            err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
     catch (std::string
            msg) {
         std::cerr << "Exception caught in main(): " << msg << std::endl;
-    }
+    }*/
 }
 
 long long int getTime() {
@@ -192,7 +192,7 @@ long long int getTime() {
 }
 
 void
-solveProblem(treedecType& decomp, satformulaType& formula, bagType& node) {
+solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
 
     for (int i = 0; i < node.numEdges; i++) {
         cl_long edge = node.edges[i] - 1;
@@ -202,27 +202,54 @@ solveProblem(treedecType& decomp, satformulaType& formula, bagType& node) {
     if (isSat > 0) {
         node.solution = new cl_long[node.numSol]();
         if (node.numEdges == 0) {
-            //leaf node
             solveLeaf(formula, node);
         } else if (node.numEdges == 1) {
             bagType &next = decomp.bags[node.edges[0] - 1];
             solveForgIntroduce(formula, node, next);
 
         } else if (node.numEdges > 1) {
-            bagType &next = decomp.bags[node.edges[0] - 1];
-            solveForgIntroduce(formula, node, next);
+            bagType tmp,edge2_,edge1_, edge1 = decomp.bags[node.edges[0] - 1];
+            std::vector<cl_long> v1(edge1.numVars+node.numVars);
+            std::vector<cl_long>::iterator it1 = std::set_intersection(node.variables, node.variables + node.numVars,
+                                                                  edge1.variables, edge1.variables + edge1.numVars,v1.begin());
+            v1.resize(it1-v1.begin());
+            edge1_.variables = &v1[0];
+            edge1_.numVars = v1.size();
+            edge1_.numSol=pow(2, edge1_.numVars);
+            edge1_.solution = new cl_long[edge1_.numSol]();
+            solveForget(edge1_,edge1);
+
             for (int i = 1; i < node.numEdges; i++) {
-                bagType edge;
-                edge.numEdges = node.numEdges;
-                edge.numSol = node.numSol;
-                edge.numVars = node.numVars;
-                edge.edges = node.edges;
-                edge.variables = node.variables;
-                edge.solution = new cl_long[node.numSol]();
-                bagType &next = decomp.bags[node.edges[i] - 1];
-                solveForgIntroduce(formula, edge, next);
-                //join
-                solveJoin(node, node, edge);
+                bagType edge2 = decomp.bags[node.edges[i] - 1];
+                std::vector<cl_long> v2(edge2.numVars + node.numVars);
+                std::vector<cl_long>::iterator it2 = std::set_intersection(node.variables,
+                                                                           node.variables + node.numVars,
+                                                                           edge2.variables,
+                                                                           edge2.variables + edge2.numVars, v2.begin());
+                v2.resize(it2 - v2.begin());
+                edge2_.variables = &v2[0];
+                edge2_.numVars = v2.size();
+                edge2_.numSol = pow(2, edge2_.numVars);
+                edge2_.solution = new cl_long[edge2_.numSol]();
+                solveForget(edge2_, edge2);
+
+                std::vector<cl_long> vt(edge1_.numVars + edge2_.numVars);
+                std::vector<cl_long>::iterator itt = std::set_union(edge1_.variables, edge1_.variables + edge1_.numVars,
+                                                                    edge2_.variables, edge2_.variables + edge2_.numVars,
+                                                                    vt.begin());
+                vt.resize(itt - vt.begin());
+                tmp.variables = new cl_long[vt.size()];
+                memcpy(tmp.variables,&vt[0],vt.size()*sizeof(cl_long));
+                tmp.numVars = vt.size();
+                tmp.numSol = pow(2, tmp.numVars);
+                tmp.solution = new cl_long[tmp.numSol]();
+                solveJoin(tmp, edge1_, edge2_);
+
+                edge1_ = tmp;
+
+                if(i == node.numEdges-1){
+                    solveIntroduce(formula,node,tmp);
+                }
             }
         }
     }
@@ -425,20 +452,51 @@ void solveJoin(bagType &node, bagType &edge1, bagType &edge2) {
     cl::Buffer bufSol(context,
                       CL_MEM_READ_WRITE,
                       sizeof(cl_long) * (node.numSol));
-    cl_long *solutions = new cl_long[node.numSol * 2]();
-    std::copy(edge1.solution, edge1.solution + node.numSol,
-              solutions);
-    std::copy(edge2.solution, edge2.solution + node.numSol,
-              &solutions[node.numSol]);
-    cl::Buffer bufSolOther(context,
-                           CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                           sizeof(cl_long) * (node.numSol * 2),
-                           solutions);
+    cl::Buffer bufSol1(context,
+                       CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                       sizeof(cl_long) * (edge1.numSol),
+                       edge1.solution);
+    cl::Buffer bufSol2(context,
+                       CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                       sizeof(cl_long) * (edge2.numSol),
+                       edge2.solution);
+    cl::Buffer bufSolVars;
+    if (node.numVars > 0) {
+        bufSolVars = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_long) * node.numVars,
+                                node.variables);
+        kernel.setArg(3, bufSolVars);
+    } else {
+        kernel.setArg(3, NULL);
+    }
+    cl::Buffer bufSolVars1;
+    if (edge1.numVars > 0) {
+        bufSolVars1 = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_long) * edge1.numVars,
+                                edge1.variables);
+        kernel.setArg(4, bufSolVars1);
+    } else {
+        kernel.setArg(4, NULL);
+    }
+    cl::Buffer bufSolVars2;
+    if (edge2.numVars > 0) {
+        bufSolVars2 = cl::Buffer(context,
+                                CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                sizeof(cl_long) * edge2.numVars,
+                                edge2.variables);
+        kernel.setArg(5, bufSolVars2);
+    } else {
+        kernel.setArg(5, NULL);
+    }
     kernel.setArg(0, bufSol);
-    kernel.setArg(1, bufSolOther);
-    kernel.setArg(2, node.numSol);
-    size_t numKernels = (size_t) node.numSol;
-    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(numKernels));
+    kernel.setArg(1, bufSol1);
+    kernel.setArg(2, bufSol2);
+    kernel.setArg(6, node.numVars);
+    kernel.setArg(7, edge1.numVars);
+    kernel.setArg(8, edge2.numVars);
+    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
     queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }

@@ -47,7 +47,7 @@ void printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const cl_
             std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
                       << " ";
         }
-        printf("%.2f\n", sol[a]);
+        printf("%i\n", sol[a]);
     }
 }
 

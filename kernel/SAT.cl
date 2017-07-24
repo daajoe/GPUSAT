@@ -1,4 +1,42 @@
 /**
+ *
+ * @param solutions
+ * @param numV
+ * @param edge
+ * @param numVE
+ * @param variables
+ * @param edgeVariables
+ */
+void solveIntroduce_(__global long *solutions, long numV, __global long *edge, long numVE,
+                     __global long *variables, __global long *edgeVariables) {
+    long id = get_global_id(0);
+    long a = 0, b = 0;
+    long otherId = 0;
+    for (b = 0; b < numVE && a < numV; b++) {
+        while ((variables[a] != edgeVariables[b])) {
+            a++;
+        }
+        otherId = otherId | (((id >> a) & 1) << b);
+        a++;
+    };
+    solutions[id] = edge[otherId];
+}
+void solveIntroduce_Join(__global long *solutions, long numV, __global long *edge, long numVE,
+                     __global long *variables, __global long *edgeVariables) {
+    long id = get_global_id(0);
+    long a = 0, b = 0;
+    long otherId = 0;
+    for (b = 0; b < numVE && a < numV; b++) {
+        while ((variables[a] != edgeVariables[b])) {
+            a++;
+        }
+        otherId = otherId | (((id >> a) & 1) << b);
+        a++;
+    };
+    solutions[id] = solutions[id]*edge[otherId];
+}
+
+/**
  * Operation to check if an assignment satisfies the clauses of a SAT formula.
  *
  * @param clauses
@@ -54,15 +92,29 @@ long checkBag(__global long *clauses, __global long *numVarsC, long numclauses, 
  * Operation to solve a Join node in the decomposition.
  *
  * @param solutions
- *      array for saving the number of models for each assignment
- * @param edges
- *      array containing the solutions of the nodes in the join
- * @param numSol
- *      number of solutions in the edge nodes
+ *      array to save the number of solutions of the join
+ * @param edge1
+ *      array containing the number of solutions in the first edge
+ * @param edge2
+ *      array containing the number of solutions in the second edge
+ * @param variables
+ *      the variables in the join bag
+ * @param edgeVariables1
+ *      the variables in the bag of the first edge
+ * @param edgeVariables2
+ *      the variables in the bag of the second edge
+ * @param numV
+ *      the number of variables in the join bag
+ * @param numVE1
+ *      the number of variables in the first edge
+ * @param numVE2
+ *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global long *solutions, __global long *edges, long numSol) {
-    long id = get_global_id(0);
-    solutions[id] = edges[id] * edges[numSol + id];
+__kernel void solveJoin(__global long *solutions, __global long *edge1, __global long *edge2,
+                        __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
+                        long numV, long numVE1, long numVE2) {
+    solveIntroduce_(solutions, numV, edge1, numVE1, variables, edgeVariables1);
+    solveIntroduce_Join(solutions, numV, edge2, numVE2, variables, edgeVariables2);
 }
 
 /**
@@ -127,7 +179,7 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
     long id = get_global_id(0);
     long unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     solutions[id] = !unsat;
-    if(solutions[id]>0){
+    if (solutions[id] > 0) {
         (*models) = 1;
     }
 }
@@ -157,22 +209,12 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
                              __global long *solutions, long numV, __global long *edge, long numVE,
                              __global long *variables, __global long *edgeVariables, __global long *models) {
+    solveIntroduce_(solutions, numV, edge, numVE, variables, edgeVariables);
     long id = get_global_id(0);
-    long a = 0, b = 0;
-    long otherId = 0;
-    for (b = 0; b < numVE && a < numV; b++) {
-        while ((variables[a] != edgeVariables[b])) {
-            a++;
-        }
-        otherId = otherId | (((id >> a) & 1) << b);
-        a++;
-    };
-    if (edge[otherId] > 0) {
-        solutions[id] = !checkBag(clauses, numVarsC, numclauses, id, numV, variables) * edge[otherId];
-        if(solutions[id]>0){
+    if (solutions[id] > 0) {
+        solutions[id] = solutions[id]*!checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+        if (solutions[id] > 0) {
             (*models) = 1;
         }
-    } else {
-        solutions[id] = 0;
     }
 }
