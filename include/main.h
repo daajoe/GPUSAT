@@ -41,7 +41,7 @@ struct satformulaType {
  * @param node
  *      the node to start from in the tree decompostion
  */
-void solveProblem(treedecType& decomp, satformulaType& formula, bagType& node);
+void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node);
 
 /**
  * function to solve a join node

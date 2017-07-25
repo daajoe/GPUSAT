@@ -194,21 +194,26 @@ long long int getTime() {
 void
 solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
 
-    for (int i = 0; i < node.numEdges; i++) {
-        cl_long edge = node.edges[i] - 1;
-        solveProblem(decomp, formula, decomp.bags[edge]);
-    }
-
     if (isSat > 0) {
         node.solution = new solType[node.numSol]();
         if (node.numEdges == 0) {
             solveLeaf(formula, node);
         } else if (node.numEdges == 1) {
+            cl_long edge = node.edges[0] - 1;
+            solveProblem(decomp, formula, decomp.bags[edge]);
+            if (isSat <= 0) {
+                return;
+            }
             bagType &next = decomp.bags[node.edges[0] - 1];
             solveForgIntroduce(formula, node, next);
             delete[] next.solution;
 
         } else if (node.numEdges > 1) {
+            cl_long edge = node.edges[0] - 1;
+            solveProblem(decomp, formula, decomp.bags[edge]);
+            if (isSat <= 0) {
+                return;
+            }
             bagType tmp, edge2_, edge1_, &edge1 = decomp.bags[node.edges[0] - 1];
             std::vector<cl_long> v1(edge1.numVars + node.numVars);
             std::vector<cl_long>::iterator it1 = std::set_intersection(node.variables, node.variables + node.numVars,
@@ -223,6 +228,11 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
             delete[] edge1.solution;
 
             for (int i = 1; i < node.numEdges; i++) {
+                cl_long edge = node.edges[i] - 1;
+                solveProblem(decomp, formula, decomp.bags[edge]);
+                if (isSat <= 0) {
+                    return;
+                }
                 bagType &edge2 = decomp.bags[node.edges[i] - 1];
                 std::vector<cl_long> v2(edge2.numVars + node.numVars);
                 std::vector<cl_long>::iterator it2 = std::set_intersection(node.variables,

@@ -1,3 +1,5 @@
+#define solType double
+
 /**
  *
  * @param solutions
@@ -7,7 +9,7 @@
  * @param variables
  * @param edgeVariables
  */
-void solveIntroduce_(__global long *solutions, long numV, __global long *edge, long numVE,
+void solveIntroduce_(__global solType *solutions, long numV, __global solType *edge, long numVE,
                      __global long *variables, __global long *edgeVariables) {
     long id = get_global_id(0);
     long a = 0, b = 0;
@@ -21,8 +23,9 @@ void solveIntroduce_(__global long *solutions, long numV, __global long *edge, l
     };
     solutions[id] = edge[otherId];
 }
-void solveIntroduce_Join(__global long *solutions, long numV, __global long *edge, long numVE,
-                     __global long *variables, __global long *edgeVariables) {
+
+void solveIntroduce_Join(__global solType *solutions, long numV, __global solType *edge, long numVE,
+                         __global long *variables, __global long *edgeVariables) {
     long id = get_global_id(0);
     long a = 0, b = 0;
     long otherId = 0;
@@ -33,7 +36,7 @@ void solveIntroduce_Join(__global long *solutions, long numV, __global long *edg
         otherId = otherId | (((id >> a) & 1) << b);
         a++;
     };
-    solutions[id] = solutions[id]*edge[otherId];
+    solutions[id] = solutions[id] * edge[otherId];
 }
 
 /**
@@ -55,8 +58,8 @@ void solveIntroduce_Join(__global long *solutions, long numV, __global long *edg
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-long checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV,
-              __global long *variables) {
+solType checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV,
+                 __global long *variables) {
     long i, varNum = 0;
     for (i = 0; i < numclauses; i++) {
         long satC = 0, a, b;
@@ -82,10 +85,10 @@ long checkBag(__global long *clauses, __global long *numVarsC, long numclauses, 
         }
         varNum += numVarsC[i];
         if (!satC) {
-            return 1;
+            return 1.0;
         }
     }
-    return 0;
+    return 0.0;
 }
 
 /**
@@ -110,7 +113,7 @@ long checkBag(__global long *clauses, __global long *numVarsC, long numclauses, 
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global long *solutions, __global long *edge1, __global long *edge2,
+__kernel void solveJoin(__global solType *solutions, __global solType *edge1, __global solType *edge2,
                         __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
                         long numV, long numVE1, long numVE2) {
     solveIntroduce_(solutions, numV, edge1, numVE1, variables, edgeVariables1);
@@ -136,7 +139,7 @@ __kernel void solveJoin(__global long *solutions, __global long *edge1, __global
  *      number of variables in the current bag
  */
 __kernel void
-solveForget(__global long *solutions, __global long *variablesCurrent, __global long *edge, long numVarsEdge,
+solveForget(__global solType *solutions, __global long *variablesCurrent, __global solType *edge, long numVarsEdge,
             __global long *variablesEdge, long combinations, long numVarsCurrent) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
@@ -175,9 +178,9 @@ solveForget(__global long *solutions, __global long *variablesCurrent, __global 
  *      array containing the ids of the variables in the bag
  */
 __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses,
-                        __global long *solutions, long numV, __global long *variables, __global long *models) {
+                        __global solType *solutions, long numV, __global long *variables, __global long *models) {
     long id = get_global_id(0);
-    long unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+    solType unsat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     solutions[id] = !unsat;
     if (solutions[id] > 0) {
         (*models) = 1;
@@ -207,12 +210,12 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
  *      the ids of the variables in the next bag
  */
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
-                             __global long *solutions, long numV, __global long *edge, long numVE,
+                             __global solType *solutions, long numV, __global solType *edge, long numVE,
                              __global long *variables, __global long *edgeVariables, __global long *models) {
     solveIntroduce_(solutions, numV, edge, numVE, variables, edgeVariables);
     long id = get_global_id(0);
     if (solutions[id] > 0) {
-        solutions[id] = solutions[id]*!checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+        solutions[id] = solutions[id] * !checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (solutions[id] > 0) {
             (*models) = 1;
         }
