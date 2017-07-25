@@ -15,9 +15,10 @@ A SAT solver based on dynamic programming running on the GPU.
 For compilation use `cmake` and then `make`.
 
 ##Usage
-`./gpusat [-f <treedecomp>] -s <formula>`
+`./gpusat [-f <treedecomp>] -s <formula> [-c <path to kernel>]`
 
 The treedecomposition can eather be provided via file or piped into the program.
 
 * `-f <treedecomp>`: read the treedecomposition from the <treedecomp> file in td format
 * `-s <formula>`: read the sat formula from the <formula> file in cnf format
+* `-c <path to kernel>`: the path to the kernel
