@@ -3,7 +3,6 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
-#include <main.h>
 #include <gpusatparser.h>
 
 namespace gpusat {

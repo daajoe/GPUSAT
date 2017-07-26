@@ -2,7 +2,7 @@
 #define GPUSAT_PARSER_H
 
 #include <queue>
-#include <main.h>
+#include <types.h>
 
 namespace gpusat {
     class CNFParser {

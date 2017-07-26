@@ -1,37 +1,10 @@
-#ifndef GPUSAT_MAIN_H
-#define GPUSAT_MAIN_H
-#define alloca __builtin_alloca
+#ifndef GPUSAT_SOLVER_H
+#define GPUSAT_SOLVER_H
 
 #include <CL/cl.hpp>
-
-#define solType cl_float
+#include <types.h>
 
 namespace gpusat {
-
-    /// type for a bag in the tree decomposition
-    struct bagType {
-        cl_long numVars = 0;
-        cl_long numEdges = 0;
-        cl_long numSol = 0;
-        cl_long *variables = nullptr;
-        cl_long *edges = nullptr;
-        solType *solution = nullptr;
-    };
-
-    /// type for saving a tree decomposition
-    struct treedecType {
-        cl_long numb = 0;
-        bagType *bags = nullptr;
-    };
-
-    /// type for saving the sat formula
-    struct satformulaType {
-        cl_long numclauses = 0;
-        cl_long totalNumVar = 0;
-        cl_long *numVarsC = nullptr;
-        cl_long *clauses = nullptr;
-    };
-
     class Solver {
     private:
         std::vector<cl::Platform> &platforms;
@@ -44,6 +17,7 @@ namespace gpusat {
         void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
     public:
+        cl_long isSat = 1;
 
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_,
                cl::CommandQueue &queue_, cl::Program &program_, cl::Kernel &kernel_) : platforms(platforms_),
@@ -112,4 +86,5 @@ namespace gpusat {
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
     };
 }
-#endif //GPUSAT_MAIN_H
+
+#endif //GPUSAT_SOLVER_H

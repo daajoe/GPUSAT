@@ -2,7 +2,6 @@
 #include <regex>
 #include <fstream>
 #include <iostream>
-#include <main.h>
 #include <gpusautils.h>
 #include <stdio.h>
 
