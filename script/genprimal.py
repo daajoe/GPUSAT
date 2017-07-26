@@ -5,11 +5,13 @@ with open(sys.argv[1]) as formulaFile:
     formula = formulaFile.read()
     graphEdges = ""
     graph = {}
-    numVariables = int(formula.splitlines()[0].split()[2])
+    for line in formula.splitlines():
+        if line[0] == 'p':
+            numVariables = int(line.split()[2])
     for i in range(1, numVariables + 1):
         graph[i] = Set()
     for line in formula.splitlines():
-        if line[0] != 'p':
+        if line[0] != 'p' and line[0] != 'c':
             for node in line.split():
                 if int(node) != 0:
                     for node2 in line.split():

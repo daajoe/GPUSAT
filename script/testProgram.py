@@ -11,7 +11,7 @@ dirDecomp = "./problems/decomposition"
 dirResults = "./problems/results"
 dirReference = "./problems/reference"
 
-testCasesStrings = ["a_00_test", "b_00_test", "c_00_test", "a_01_test", "b_01_test", "c_01_test"]
+testCasesStrings = ["a_00_test", "b_00_test", "c_00_test"]
 
 
 def getTime(sol):

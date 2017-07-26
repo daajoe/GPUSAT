@@ -1,20 +1,18 @@
-#!/usr/bin/env python2.7
-import random
+#!/usr/bin/env python
 import subprocess
 from os.path import join, isdir, isfile
-import json
 from os import makedirs, listdir, remove
-from sets import Set
+from subprocess import check_output
 
 maxWidth = 20
 maxNumModels = pow(2, 62)
 
-dirRaw = "./benchmarks/raw"
-dirFormula = "./benchmarks/formula"
-dirDecomp = "./benchmarks/decomposition"
-dirResults = "./benchmarks/results"
-dirReference = "./benchmarks/reference"
-dirGraphs = "./benchmarks/graph"
+dirRaw = "./dynasp/raw"
+dirFormula = "./dynasp/formula"
+dirDecomp = "./dynasp/decomposition"
+dirResults = "./dynasp/results"
+dirReference = "./dynasp/reference"
+dirGraphs = "./dynasp/graph"
 
 if not isdir(dirRaw):
     makedirs(dirRaw)
@@ -30,28 +28,6 @@ if not isdir(dirResults):
     makedirs(dirResults)
 
 
-def getModels(sol):
-    if sol[0] == "{":
-        return json.loads(sol)['Models']['Number']
-    elif sol.startswith("cachet"):
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if lines[i].startswith("s "):
-                if (lines[i].split()[1] == "inf"):
-                    return pow(2, 65)
-                else:
-                    return int(lines[i].split()[1])
-            i += 1
-    else:
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if "# solutions" in lines[i]:
-                return int(lines[i + 1])
-            i += 1
-
-
 # check formula
 def checkFormula(formula, resultFile):
     subprocess.call(["./sharpSAT", "-t", "900", formula], stdout=resultFile)
@@ -59,14 +35,7 @@ def checkFormula(formula, resultFile):
 
 # generate tree decomposition
 def genTreeDecomp(graph, decompFile):
-    subprocess.call(["./htd_main", "--opt", "width", "-s", "1234"], stdout=decompFile, stdin=graph)
-
-
-# check formula
-def preprocessFormula(formula, resultFile):
-    subprocess.call(
-        ["./preproc", "-no-solve", "-vivification", "-eliminateLit", "-litImplied", "-iterate=1", "-equiv", "-orGate",
-         "-affine", formula], stdout=resultFile)
+    decompFile.write(check_output(["./htd_main", "--opt", "width", "-s", "1234"], stdin=graph, timeout=120).decode('ascii'))
 
 
 def genPrimalGraph(formulaFile, graphFile):
@@ -74,18 +43,20 @@ def genPrimalGraph(formulaFile, graphFile):
     graphEdges = ""
     graph = {}
     for line in formula.splitlines():
-        if line[0] == 'p':
-            numVariables = int(line.split()[2])
+        if len(line) > 0:
+            if line[0] == 'p':
+                numVariables = int(line.split()[2])
     for i in range(1, numVariables + 1):
-        graph[i] = Set()
+        graph[i] = set()
     for line in formula.splitlines():
-        if line[0] != 'p' and line[0] != 'c':
-            for node in line.split():
-                if int(node) != 0:
-                    for node2 in line.split():
-                        if int(node2) != 0:
-                            graph[abs(int(node))].add(abs(int(node2)))
-                            graph[abs(int(node2))].add(abs(int(node)))
+        if len(line) > 0:
+            if line[0] != 'p' and line[0] != 'c':
+                for node in line.split():
+                    if int(node) != 0:
+                        for node2 in line.split():
+                            if int(node2) != 0 and node!=node2:
+                                graph[abs(int(node))] |= {abs(int(node2))}
+                                graph[abs(int(node2))] |= {abs(int(node))}
 
     for key in graph.keys():
         for node in graph[key]:
@@ -96,45 +67,41 @@ def genPrimalGraph(formulaFile, graphFile):
     graphFile.write(graphString)
 
 
-for testcase in listdir(dirFormula):
-    case = testcase[:-4]
+for testcase in listdir(dirRaw):
+    try:
+        case = testcase[:-8]
+        with open(join(dirRaw, testcase), "r") as formula:
+            with open(join(dirFormula, case + ".cnf"), "w") as f:
+                f.write(formula.read())
 
-    print("formula: " + testcase)
+        print("formula: " + testcase)
 
-    print("    primal graph")
-    # generate the primal graph of the cnf formula
-    with open(join(dirGraphs, case + ".gr"), "w") as graph:
-        with open(join(dirFormula, case + ".cnf"), "r") as formula:
-            genPrimalGraph(formula, graph)
+        print("    primal graph")
+        # generate the primal graph of the cnf formula
+        with open(join(dirGraphs, case + ".gr"), "w") as graph:
+            with open(join(dirFormula, case + ".cnf"), "r") as formula:
+                genPrimalGraph(formula, graph)
 
-    print("    gen decomp")
-    # generate the tree decomposition
-    with open(join(dirDecomp, case + ".td"), "w") as decomp:
-        with open(join(dirGraphs, case + ".gr"), "r") as graph:
-            genTreeDecomp(graph, decomp)
+        print("    gen decomp")
+        # generate the tree decomposition
+        with open(join(dirDecomp, case + ".td"), "w") as decomp:
+            with open(join(dirGraphs, case + ".gr"), "r") as graph:
+                genTreeDecomp(graph, decomp)
 
-    # check decomposition
-    with open(join(dirDecomp, case + ".td"), "r") as decomp:
-        line = decomp.readline()
-        if int(line.split(" ")[3]) > maxWidth:
-            print ("width: " + line.split(" ")[3])
+        # check decomposition
+        with open(join(dirDecomp, case + ".td"), "r") as decomp:
+            line = decomp.readline()
+            if int(line.split(" ")[3]) > maxWidth:
+                print("width: " + line.split(" ")[3])
+                remove(join(dirFormula, case + ".cnf"))
+                remove(join(dirGraphs, case + ".gr"))
+                remove(join(dirDecomp, case + ".td"))
+                continue
+    except:
+        print("Error")
+        if isfile(join(dirFormula, case + ".cnf")):
             remove(join(dirFormula, case + ".cnf"))
+        if isfile(join(dirGraphs, case + ".gr")):
             remove(join(dirGraphs, case + ".gr"))
+        if isfile(join(dirDecomp, case + ".td")):
             remove(join(dirDecomp, case + ".td"))
-            continue
-
-#    print("    check formula")
-#    # check the formula
-#    with open(join(dirReference, case), "w") as reference:
-#        checkFormula(join(dirFormula, case + ".cnf"), reference)
-#
-#    # check number of solutions
-#    with open(join(dirReference, case), "r") as reference:
-#        ref = reference.read()
-#        if getModels(ref) >= maxNumModels:
-#            print("    num Models: " + str(getModels(ref)))
-#            remove(join(dirFormula, case + ".cnf"))
-#            remove(join(dirGraphs, case + ".gr"))
-#            remove(join(dirDecomp, case + ".td"))
-#            remove(join(dirReference, case))
-#            continue

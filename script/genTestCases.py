@@ -400,7 +400,7 @@ if tiny and gena:
     minNumVariables = 1
     maxNumVariables = 10
 
-    numSATTestCases = 200
+    numSATTestCases = 500
     numUNSATTestCases = 0
 
     prefix = "a_00_test"
@@ -420,8 +420,8 @@ if tiny and genb:
     minNumVariables = 1
     maxNumVariables = 10
 
-    numSATTestCases = 180
-    numUNSATTestCases = 10
+    numSATTestCases = 450
+    numUNSATTestCases = 50
 
     minNumClauses = 1
     maxNumClauses = 5
@@ -445,7 +445,7 @@ if tiny and genc:
     minNumVariables = 1
     maxNumVariables = 10
 
-    numSATTestCases = 200
+    numSATTestCases = 500
     numUNSATTestCases = 0
 
     prefix = "c_00_test"
