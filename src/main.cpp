@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
                 bagType &n = treeDecomp.bags[0];
                 solutions += treeDecomp.bags[0].solution[i];
             }
-            std::cout << "{\n    \"Model Count\": " << solutions;
+            printf("{\n    \"Model Count\": %e", solutions);
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }
@@ -206,7 +206,7 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
             }
             bagType &next = decomp.bags[node.edges[0] - 1];
             solveForgIntroduce(formula, node, next);
-            delete[] next.solution;
+            free(next.solution);
 
         } else if (node.numEdges > 1) {
             cl_long edge = node.edges[0] - 1;
@@ -225,7 +225,7 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
             edge1_.numSol = pow(2, edge1_.numVars);
             edge1_.solution = new solType[edge1_.numSol]();
             solveForget(edge1_, edge1);
-            delete[] edge1.solution;
+            free(edge1.solution);
 
             for (int i = 1; i < node.numEdges; i++) {
                 cl_long edge = node.edges[i] - 1;
@@ -245,7 +245,7 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
                 edge2_.numSol = pow(2, edge2_.numVars);
                 edge2_.solution = new solType[edge2_.numSol]();
                 solveForget(edge2_, edge2);
-                delete[]edge2.solution;
+                free(edge2.solution);
 
                 std::vector<cl_long> vt(edge1_.numVars + edge2_.numVars);
                 std::vector<cl_long>::iterator itt = std::set_union(edge1_.variables, edge1_.variables + edge1_.numVars,
@@ -259,8 +259,8 @@ solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
                 tmp.solution = new solType[tmp.numSol]();
                 solveJoin(tmp, edge1_, edge2_);
 
-                delete[]edge1_.solution;
-                delete[]edge2_.solution;
+                free(edge1_.solution);
+                free(edge2_.solution);
                 edge1_ = tmp;
 
                 if (i == node.numEdges - 1) {
@@ -304,7 +304,7 @@ void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
 
         solveForget(edge, next);
         solveIntroduce(formula, node, edge);
-        delete[]edge.solution;
+        free(edge.solution);
     }
 }
 

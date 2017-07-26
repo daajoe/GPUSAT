@@ -12,30 +12,34 @@
 void solveIntroduce_(__global solType *solutions, long numV, __global solType *edge, long numVE,
                      __global long *variables, __global long *edgeVariables) {
     long id = get_global_id(0);
-    long a = 0, b = 0;
     long otherId = 0;
-    for (b = 0; b < numVE && a < numV; b++) {
-        while ((variables[a] != edgeVariables[b])) {
+    {
+        long a = 0, b = 0;
+        for (b = 0; b < numVE && a < numV; b++) {
+            while ((variables[a] != edgeVariables[b])) {
+                a++;
+            }
+            otherId = otherId | (((id >> a) & 1) << b);
             a++;
-        }
-        otherId = otherId | (((id >> a) & 1) << b);
-        a++;
-    };
+        };
+    }
     solutions[id] = edge[otherId];
 }
 
 void solveIntroduce_Join(__global solType *solutions, long numV, __global solType *edge, long numVE,
                          __global long *variables, __global long *edgeVariables) {
     long id = get_global_id(0);
-    long a = 0, b = 0;
     long otherId = 0;
-    for (b = 0; b < numVE && a < numV; b++) {
-        while ((variables[a] != edgeVariables[b])) {
+    {
+        long a = 0, b = 0;
+        for (b = 0; b < numVE && a < numV; b++) {
+            while ((variables[a] != edgeVariables[b])) {
+                a++;
+            }
+            otherId = otherId | (((id >> a) & 1) << b);
             a++;
-        }
-        otherId = otherId | (((id >> a) & 1) << b);
-        a++;
-    };
+        };
+    }
     solutions[id] = solutions[id] * edge[otherId];
 }
 
@@ -61,8 +65,9 @@ void solveIntroduce_Join(__global solType *solutions, long numV, __global solTyp
 solType checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV,
                  __global long *variables) {
     long i, varNum = 0;
+    long satC = 0, a, b;
     for (i = 0; i < numclauses; i++) {
-        long satC = 0, a, b;
+        satC = 0;
         for (a = 0; a < numVarsC[i] && !satC; a++) {
             satC = 1;
             for (b = 0; b < numV; b++) {
