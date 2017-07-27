@@ -1,5 +1,3 @@
-#define __CL_ENABLE_EXCEPTIONS
-
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -7,13 +5,12 @@
 #include <regex>
 #include <math.h>
 #include <chrono>
+#include <types.h>
 #include <gpusatparser.h>
 #include <gpusautils.h>
 #include <sys/stat.h>
 #include <numeric>
-#include <cstdlib>
 #include <solver.h>
-#include <types.h>
 
 using namespace gpusat;
 
@@ -53,7 +50,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             default:
-                fprintf(stderr, "Usage: %s [-f treedecomp] -s formula \n", argv[0]);
+            std::cerr << "Usage: "<<argv[0]<<" [-f treedecomp] -s formula [-c kerneldir] \n";
                 exit(EXIT_FAILURE);
         }
     }
@@ -68,7 +65,7 @@ int main(int argc, char *argv[]) {
 
     // error no sat formula given
     if (!formula) {
-        fprintf(stderr, "Usage: %s [-f treedecomp] -s formula [-c kerneldir] \n", argv[0]);
+        std::cerr << "Usage: "<<argv[0]<<" [-f treedecomp] -s formula [-c kerneldir] \n";
         exit(EXIT_FAILURE);
     }
 
@@ -91,7 +88,7 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (!strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.")) {
+            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.") == 0) {
                 break;
             }
         }
@@ -110,7 +107,7 @@ int main(int argc, char *argv[]) {
             //create kernel binary if it doesn't exist
 
             std::string sourcePath(kernelPath + "SAT.cl");
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath.c_str());
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
                                                            kernelStr.length()));
             program = cl::Program(context, sources);
@@ -122,9 +119,9 @@ int main(int argc, char *argv[]) {
             char *binChunk = &binData[0];
 
             std::vector<char *> binaries;
-            for (unsigned int i = 0; i < binSizes.size(); ++i) {
+            for (const size_t & binSize : binSizes) {
                 binaries.push_back(binChunk);
-                binChunk += binSizes[i];
+                binChunk += binSize;
             }
 
             program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
@@ -137,9 +134,9 @@ int main(int argc, char *argv[]) {
 
             long size = 0;
             cl_int err;
-            std::string kernelStr = GPUSATUtils::readBinary(binPath.c_str());
+            std::string kernelStr = GPUSATUtils::readBinary(binPath);
             cl::Program::Binaries bins(1, std::make_pair((const void *) kernelStr.data(), kernelStr.size()));
-            program = cl::Program(context, devices, bins, NULL, &err);
+            program = cl::Program(context, devices, bins, nullptr, &err);
             program.build(devices);
         }
         time_build_kernel = getTime() - time_build_kernel;
@@ -156,7 +153,7 @@ int main(int argc, char *argv[]) {
                 bagType &n = treeDecomp.bags[0];
                 solutions += treeDecomp.bags[0].solution[i];
             }
-            printf("{\n    \"Model Count\": %e", solutions);
+            std::cout << "{\n    \"Model Count\": " << solutions;
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }
@@ -173,8 +170,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n}";
 
     }
-    catch (cl::Error
-           err) {
+    catch (cl::Error& err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
                   std::endl;
         if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
@@ -183,8 +179,7 @@ int main(int argc, char *argv[]) {
             std::cout << "Program Info: " << str << std::endl;
         }
     }
-    catch (std::string
-           msg) {
+    catch (std::string& msg) {
         std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
 }

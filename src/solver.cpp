@@ -41,7 +41,7 @@ namespace gpusat {
                 free(edge1.solution);
 
                 for (int i = 1; i < node.numEdges; i++) {
-                    cl_long edge = node.edges[i] - 1;
+                    edge = node.edges[i] - 1;
                     solveProblem(decomp, formula, decomp.bags[edge]);
                     if (isSat <= 0) {
                         return;
@@ -65,8 +65,7 @@ namespace gpusat {
                     std::vector<cl_long>::iterator itt = std::set_union(edge1_.variables,
                                                                         edge1_.variables + edge1_.numVars,
                                                                         edge2_.variables,
-                                                                        edge2_.variables + edge2_.numVars,
-                                                                        vt.begin());
+                                                                        edge2_.variables + edge2_.numVars, vt.begin());
                     vt.resize(itt - vt.begin());
                     tmp.variables = new cl_long[vt.size()];
                     memcpy(tmp.variables, &vt[0], vt.size() * sizeof(cl_long));
@@ -102,9 +101,9 @@ namespace gpusat {
                             diff_introduce.begin());
         diff_introduce.resize(it - diff_introduce.begin());
 
-        if (diff_introduce.size() == 0) {
+        if (diff_introduce.empty()) {
             solveForget(node, next);
-        } else if (diff_forget.size() == 0) {
+        } else if (diff_forget.empty()) {
             solveIntroduce(formula, node, next);
         } else {
             std::vector<cl_long> vect(next.numVars + node.numVars);

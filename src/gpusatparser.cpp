@@ -11,7 +11,7 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::queue<std::queue<cl_long  >> *clauses = NULL;
+        std::queue<std::queue<cl_long  >> *clauses = nullptr;
         cl_long clauseSize = 0;
         while (getline(ss, item)) {
             char type = item.at(0);
@@ -26,7 +26,7 @@ namespace gpusat {
             }
         }
 
-        if (clauses != NULL) {
+        if (clauses != nullptr) {
             int a = 0, s = 0;
             ret.totalNumVar = clauseSize;
             ret.clauses = new cl_long[clauseSize]();
@@ -66,12 +66,11 @@ namespace gpusat {
         }
         clauseSize += match_count - 1;
         while (!sline.eof()) {
-            if (i.size() > 0) {
+            if (!i.empty()) {
                 if (stoi(i) == 0) {
                     break;
-                } else {
-                    clause.push(stoi(i));
                 }
+                    clause.push(stoi(i));
             }
             getline(sline, i, ' ');
         }
@@ -95,7 +94,7 @@ namespace gpusat {
         treedecType ret = treedecType();
         std::stringstream ss(graph);
         std::string item;
-        std::queue<cl_long> **edges = NULL;
+        std::queue<cl_long> **edges = nullptr;
         while (getline(ss, item)) {
             char type = item.at(0);
             if (type == 'c') {
@@ -112,7 +111,7 @@ namespace gpusat {
             }
         }
 
-        if (edges != NULL) {
+        if (edges != nullptr) {
             for (int a = 0; a < ret.numb; a++) {
                 ret.bags[a].edges = new cl_long[edges[a]->size()]();
                 ret.bags[a].numEdges = edges[a]->size();

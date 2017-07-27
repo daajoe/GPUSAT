@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 #include <gpusautils.h>
-#include <stdio.h>
 
 namespace gpusat {
 
@@ -47,7 +46,7 @@ namespace gpusat {
                 std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
                           << " ";
             }
-            printf("%i\n", sol[a]);
+            std::cout << sol[a] << "\n";
         }
     }
 

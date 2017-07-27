@@ -1,6 +1,7 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
 
+#define __CL_ENABLE_EXCEPTIONS
 #define alloca __builtin_alloca
 
 #include <CL/cl.hpp>
