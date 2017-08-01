@@ -73,14 +73,18 @@ for case in testCasesStrings:
         currentElement += 1
         if not testcase in listdir(join(dirResults, case)):
             with open("./Summary.txt", "a") as summaryFile:
-                summaryFile.write("Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + "\n")
+                summaryFile.write(
+                    "Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + "\n")
                 summaryFile.flush()
-                print("Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + " " + str(datetime.datetime.now().time()))
+                print(
+                "Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + " " + str(
+                    datetime.datetime.now().time()))
 
                 # generate output
                 with open(join(join(dirResults, case), testcase), "w") as resultFile:
                     subprocess.call(
-                        ["./gpusat", "-f", dirDecomp + "/" + case + "/" + testcase + ".td", "-s", dirFormula + "/" + case + "/" + testcase + ".cnf"],
+                        ["./gpusat", "-f", dirDecomp + "/" + case + "/" + testcase + ".td", "-s",
+                         dirFormula + "/" + case + "/" + testcase + ".cnf"],
                         stdout=resultFile, stderr=resultFile)
                 # check results
                 with open(join(dirResults, case) + "/" + testcase, "r") as resultFile:
@@ -97,11 +101,15 @@ for case in testCasesStrings:
                             else:
                                 summaryFile.write("Failure\n")
                                 print("    ModelCount: Failure")
-                            summaryFile.write("    Time Total: " + str(d['Time']['Total']) + "\n    Time Solving: " + str(
-                                d['Time']['Solving']) + "\n    Time Init_OpenCL: " + str(d['Time']['Init_OpenCL']) + "\n    Time without Init_OpenCL: " + str(
-                                d['Time']['Total'] - d['Time']['Init_OpenCL']) + "\n    Time Clasp: " + str(getTime(ref)) + "\n")
+                            summaryFile.write(
+                                "    Time Total: " + str(d['Time']['Total']) + "\n    Time Solving: " + str(
+                                    d['Time']['Solving']) + "\n    Time Init_OpenCL: " + str(
+                                    d['Time']['Init_OpenCL']) + "\n    Time without Init_OpenCL: " + str(
+                                    d['Time']['Total'] - d['Time']['Init_OpenCL']) + "\n    Time Clasp: " + str(
+                                    getTime(ref)) + "\n")
                             print("    Time Total: " + str(d['Time']['Total']) + " Init: " + str(
-                                d['Time']['Total'] - d['Time']['Init_OpenCL']) + " Time Reference: " + str(getTime(ref)))
+                                d['Time']['Total'] - d['Time']['Init_OpenCL']) + " Time Reference: " + str(
+                                getTime(ref)))
                         except ValueError:
                             summaryFile.write("    Error\n")
                             print("    Error")

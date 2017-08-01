@@ -13,4 +13,5 @@ for case in testCasesStrings:
     for testcase in listdir(join(dirReference, case)):
         with open(join(join(dirReference, case), testcase), "w") as resultFile:
             print ("check: " + join(join(dirReference, case), testcase))
-            subprocess.call(["clasp", "--outf=2", "-n", "0", "-q", join(join(dirFormula, case), testcase + ".cnf")], stdout=resultFile)
+            subprocess.call(["clasp", "--outf=2", "-n", "0", "-q", join(join(dirFormula, case), testcase + ".cnf")],
+                            stdout=resultFile)

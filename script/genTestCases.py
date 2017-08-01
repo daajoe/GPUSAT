@@ -1,23 +1,18 @@
-#!/usr/bin/env python2.7
 import random
 import subprocess
 from os.path import join, isdir
 import json
 from os import makedirs
-from sets import Set
 
 tiny = False
 small = False
 medium = False
 large = False
-benchmark = False
-benchmarkSmall = False
-benchmarkBig = False
 gena = False
 genb = False
 genc = False
 
-maxNumModels = pow(2,62)
+maxNumModels = pow(10, 36)
 numConnections = 2
 
 numDigits = 4
@@ -47,11 +42,11 @@ numSATTestCases = None
 numUNSATTestCases = None
 
 prefix = "test"
-dirFormula = "./problems/formula"
-dirGraphs = "./problems/graph"
-dirDecomp = "./problems/decomposition"
-dirReference = "./problems/reference"
-dirResults = "./problems/results"
+dirFormula = "./new_problems/formula"
+dirGraphs = "./new_problems/graph"
+dirDecomp = "./new_problems/decomposition"
+dirReference = "./new_problems/reference"
+dirResults = "./new_problems/results"
 
 if not isdir(dirFormula):
     makedirs(dirFormula)
@@ -64,20 +59,23 @@ if not isdir(dirReference):
 if not isdir(dirResults):
     makedirs(dirResults)
 
+
 def genFolders():
-    if not isdir(join(dirFormula,prefix)):
-        makedirs(join(dirFormula,prefix))
-    if not isdir(join(dirGraphs,prefix)):
-        makedirs(join(dirGraphs,prefix))
-    if not isdir(join(dirDecomp,prefix)):
-        makedirs(join(dirDecomp,prefix))
-    if not isdir(join(dirReference,prefix)):
-        makedirs(join(dirReference,prefix))
-    if not isdir(join(dirResults,prefix)):
-        makedirs(join(dirResults,prefix))
+    if not isdir(join(dirFormula, prefix)):
+        makedirs(join(dirFormula, prefix))
+    if not isdir(join(dirGraphs, prefix)):
+        makedirs(join(dirGraphs, prefix))
+    if not isdir(join(dirDecomp, prefix)):
+        makedirs(join(dirDecomp, prefix))
+    if not isdir(join(dirReference, prefix)):
+        makedirs(join(dirReference, prefix))
+    if not isdir(join(dirResults, prefix)):
+        makedirs(join(dirResults, prefix))
 
 
 def getModels(sol):
+    if (len(sol) == 0):
+        return pow(10, 400)
     if sol[0] == "{":
         return json.loads(sol)['Models']['Number']
     elif sol.startswith("cachet"):
@@ -85,34 +83,42 @@ def getModels(sol):
         lines = sol.split("\n")
         while i < len(lines):
             if lines[i].startswith("s "):
-                if(lines[i].split()[1] == "inf"):
-                    return  pow(2,65)
+                if (lines[i].split()[1] == "inf"):
+                    return pow(2, 65)
                 else:
                     return int(lines[i].split()[1])
             i += 1
-    else:
+    elif sol.startswith("Solving"):
         i = 0
         lines = sol.split("\n")
         while i < len(lines):
             if "# solutions" in lines[i]:
                 return int(lines[i + 1])
             i += 1
+        return pow(10, 400)
+    else:
+        return pow(10, 400)
+
 
 # check formula
 def checkFormula(formula, resultFile):
     print("    check Formula")
     # subprocess.call(["./clasp", "--outf=2", "-n", "0", "-q", formula], stdout=resultFile)
-    #subprocess.call(["./sharpSAT", formula], stdout=resultFile)
-    subprocess.call(["./cachet", formula], stdout=resultFile)
+    # subprocess.call(["./sharpSAT", formula], stdout=resultFile)
+    # subprocess.call(["./cachet", formula], stdout=resultFile)
+    try:
+        resultFile.write(subprocess.check_output(["./cachet", formula], timeout=1200).decode('ascii'))
+    except subprocess.TimeoutExpired:
+        return
 
 
 # generate tree decomposition
 def genTreeDecomp(graph, decompFile):
     print("    gen Tree Decomp")
-    #print("    command: " + "cat " + graph + " | ./htd_main " + "--opt " + "width " + "--iterations " + "30")
-    with open(graph,"r") as infile:
+    # print("    command: " + "cat " + graph + " | ./htd_main " + "--opt " + "width " + "--iterations " + "30")
+    with open(graph, "r") as infile:
         subprocess.call(["./htd_main", "--opt", "width", "-s", "1234"],
-                    stdout=decompFile, stdin=infile)
+                        stdout=decompFile, stdin=infile)
 
 
 # generate graph
@@ -122,10 +128,10 @@ def genPrimalGraph1(resultFile):
     graph = {}
     numVars = random.randint(minNumVariables, maxNumVariables)
     for i in range(1, numVars + 1):
-        graph[i] = Set()
+        graph[i] = set()
     for i in range(1, numVars + 1):
         clauseSize = random.randint(minClauseSize, numVars if (numVars < maxClauseSize) else maxClauseSize)
-        varList = range(1, numVars + 1)
+        varList = list(range(1, numVars + 1))
         random.shuffle(varList)
         b = 0
         while b < len(varList):
@@ -189,7 +195,8 @@ def genFormulaFromGraph():
     numSAT = 0
     numUNSAT = 0
     while numUNSAT < numUNSATTestCases or numSAT < numSATTestCases:
-        print(prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
+        print(
+        prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
             numSAT) + " UNSAT: " + str(numUNSAT))
         with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
             graph = genPrimalGraph1(graphFile)
@@ -222,10 +229,10 @@ def genFormulaFromGraph():
 def genPrimalGraph_(numVars, start):
     graph = {}
     for i in range(1 + start, numVars + 1 + start):
-        graph[i] = Set()
+        graph[i] = set()
     for i in range(1 + start, numVars + 1 + start):
         clauseSize = random.randint(minClauseSize, numVars if (numVars < maxClauseSize) else maxClauseSize)
-        varList = range(1 + start, numVars + 1 + start)
+        varList = list(range(1 + start, numVars + 1 + start))
         random.shuffle(varList)
         b = 0
         while b < len(varList):
@@ -279,30 +286,31 @@ def genFormulaFromGraph2():
     numSAT = 0
     numUNSAT = 0
     while numUNSAT < numUNSATTestCases or numSAT < numSATTestCases:
-        with open("./log.txt","a") as logfile:
+        with open("./log.txt", "a") as logfile:
             print(
-                prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
+                prefix + " " + str(numTry).zfill(numDigits) + "/" + str(
+                    numUNSATTestCases + numSATTestCases) + " SAT: " + str(
                     numSAT) + " UNSAT: " + str(numUNSAT))
             with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
                 graph = genPrimalGraph2(graphFile)
             with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "w") as formulaFile:
                 toFormula(graph, formulaFile)
-            with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
-                checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
-            with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
-                ref = resultFile.read()
-                if(getModels(ref)>0):
-                    logfile.write("\nModels: " + str(getModels(ref)))
-                if (getModels(ref) == 0 and numUNSAT >= numUNSATTestCases) or (
-                                getModels(ref) > 0 and numSAT >= numSATTestCases) or getModels(ref) >= maxNumModels:
-                    print("    Models: " + str(getModels(ref)))
-                    continue
             with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
                 genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
             with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
                 line = decompFile.readline()
                 if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
                     print ("    width: " + line.split(" ")[3])
+                    continue
+            with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
+                checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+            with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
+                ref = resultFile.read()
+                if (getModels(ref) > 0):
+                    logfile.write("\nModels: " + str(getModels(ref)))
+                if (getModels(ref) == 0 and numUNSAT >= numUNSATTestCases) or (
+                                getModels(ref) > 0 and numSAT >= numSATTestCases) or getModels(ref) >= maxNumModels:
+                    print("    Models: " + str(getModels(ref)))
                     continue
 
             if getModels(ref) == 0:
@@ -318,7 +326,7 @@ def getPrimalGraph(formula, resultFile, numVariables):
     graphEdges = ""
     graph = {}
     for i in range(1, numVariables + 1):
-        graph[i] = Set()
+        graph[i] = set()
     for line in formula.splitlines():
         if line[0] != 'p':
             for node in line.split():
@@ -344,14 +352,15 @@ def genFormula():
     numUNSAT = 0
     while numUNSAT < numUNSATTestCases or numSAT < numSATTestCases:
         print(
-            prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
+            prefix + " " + str(numTry).zfill(numDigits) + "/" + str(
+                numUNSATTestCases + numSATTestCases) + " SAT: " + str(
                 numSAT) + " UNSAT: " + str(numUNSAT))
         numClauses = random.randint(minNumClauses, maxNumClauses)
         numVars = random.randint(minNumVariables, maxNumVariables)
         formula = "p cnf " + str(numVars) + " " + str(numClauses - 1) + "\n"
         for clause in range(1, numClauses):
             clauseSize = random.randint(minClauseSize, numVars if (numVars < maxClauseSize) else maxClauseSize)
-            varList = range(1, numVars + 1)
+            varList = list(range(1, numVars + 1))
             random.shuffle(varList)
             formula = formula + str(varList[0] * random.choice([1, -1]))
             for var in range(1, clauseSize):
@@ -591,6 +600,7 @@ if medium and genc:
 ######################################################################################
 ######################################################################################
 
+maxNumModels = pow(10, 304)
 ###########
 # Large 0 #
 ###########
@@ -666,24 +676,23 @@ if large and genc:
 if False:
     numGraphs = 50
 
-    numConnections = 4
+    numConnections = 15
 
     minClauseSize = 1
-    maxClauseSize = 4
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 40
     maxNumVariables = 80
 
-    numSATTestCases = 0
+    numSATTestCases = 5
     numUNSATTestCases = 15
 
     prefix = "benchmark"
 
     genFormulaFromGraph2()
-
 
 ###############
 # benchmark 1 #
@@ -693,11 +702,11 @@ if False:
 
     numConnections = 12
 
-    minClauseSize = 2
-    maxClauseSize = 4
+    minClauseSize = 1
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 20
     maxNumVariables = 40
@@ -713,39 +722,15 @@ if False:
 # benchmark 0 #
 ###############
 if False:
-    numGraphs = 500
-
-    numConnections = 2
-
-    minClauseSize = 1
-    maxClauseSize = 3
-
-    minTreeWidth = 10
-    maxTreeWidth = 16
-
-    minNumVariables = 40
-    maxNumVariables = 80
-
-    numSATTestCases = 0
-    numUNSATTestCases = 15
-
-    prefix = "benchmark_big"
-
-    genFormulaFromGraph2()
-
-###############
-# benchmark 0 #
-###############
-if False:
     numGraphs = 10
 
     numConnections = 12
 
-    minClauseSize = 2
-    maxClauseSize = 4
+    minClauseSize = 1
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 20
     maxNumVariables = 40
@@ -757,7 +742,6 @@ if False:
 
     genFormulaFromGraph2()
 
-
 ###############
 # benchmark 1 #
 ###############
@@ -767,60 +751,58 @@ if False:
     numConnections = 12
 
     minClauseSize = 1
-    maxClauseSize = 4
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 20
     maxNumVariables = 40
 
-    numSATTestCases = 0
-    numUNSATTestCases = 30
+    numSATTestCases = 5
+    numUNSATTestCases = 25
 
     prefix = "benchmark_1"
 
     genFormulaFromGraph2()
 
-
 ###############
 # benchmark 2 #
 ###############
-if False:
+if True:
     numGraphs = 50
 
-    numConnections = 4
+    numConnections = 16
 
     minClauseSize = 1
-    maxClauseSize = 4
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 40
     maxNumVariables = 80
 
-    numSATTestCases = 0
-    numUNSATTestCases = 30
+    numSATTestCases = 20
+    numUNSATTestCases = 20
 
     prefix = "benchmark_2"
 
     genFormulaFromGraph2()
 
-
 ###############
 # benchmark 3 #
 ###############
-if False:
+if True:
     numGraphs = 70
 
-    numConnections = 4
+    numConnections = 12
 
     minClauseSize = 1
-    maxClauseSize = 4
+    maxClauseSize = 3
 
     minTreeWidth = 8
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 40
     maxNumVariables = 80
@@ -832,20 +814,19 @@ if False:
 
     genFormulaFromGraph2()
 
-
 ###############
 # benchmark 4 #
 ###############
 if True:
     numGraphs = 90
 
-    numConnections = 4
+    numConnections = 12
 
     minClauseSize = 1
     maxClauseSize = 3
 
     minTreeWidth = 10
-    maxTreeWidth = 16
+    maxTreeWidth = 20
 
     minNumVariables = 40
     maxNumVariables = 80

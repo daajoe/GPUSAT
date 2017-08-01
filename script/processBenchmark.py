@@ -35,7 +35,8 @@ def checkFormula(formula, resultFile):
 
 # generate tree decomposition
 def genTreeDecomp(graph, decompFile):
-    decompFile.write(check_output(["./htd_main", "--opt", "width", "-s", "1234"], stdin=graph, timeout=120).decode('ascii'))
+    decompFile.write(
+        check_output(["./htd_main", "--opt", "width", "-s", "1234"], stdin=graph, timeout=120).decode('ascii'))
 
 
 def genPrimalGraph(formulaFile, graphFile):
@@ -54,7 +55,7 @@ def genPrimalGraph(formulaFile, graphFile):
                 for node in line.split():
                     if int(node) != 0:
                         for node2 in line.split():
-                            if int(node2) != 0 and node!=node2:
+                            if int(node2) != 0 and node != node2:
                                 graph[abs(int(node))] |= {abs(int(node2))}
                                 graph[abs(int(node2))] |= {abs(int(node))}
 
