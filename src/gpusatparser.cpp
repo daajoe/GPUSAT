@@ -14,15 +14,18 @@ namespace gpusat {
         std::queue<std::queue<cl_long  >> *clauses = nullptr;
         cl_long clauseSize = 0;
         while (getline(ss, item)) {
-            char type = item.at(0);
-            if (type == 'c') {
-                //comment (ignore)
-            } else if (type == 'p') {
-                //start
-                parseProblemLine(ret, item, clauses);
-            } else {
-                //clause
-                parseClauseLine(item, clauses, clauseSize);
+            //ignore empty line
+            if (item.length() > 0) {
+                char type = item.at(0);
+                if (type == 'c') {
+                    //comment line (ignore)
+                } else if (type == 'p') {
+                    //start line
+                    parseProblemLine(ret, item, clauses);
+                } else {
+                    //clause line
+                    parseClauseLine(item, clauses, clauseSize);
+                }
             }
         }
 
@@ -70,7 +73,7 @@ namespace gpusat {
                 if (stoi(i) == 0) {
                     break;
                 }
-                    clause.push(stoi(i));
+                clause.push(stoi(i));
             }
             getline(sline, i, ' ');
         }
@@ -96,18 +99,21 @@ namespace gpusat {
         std::string item;
         std::queue<cl_long> **edges = nullptr;
         while (getline(ss, item)) {
-            char type = item.at(0);
-            if (type == 'c') {
-                //comment (ignore)
-            } else if (type == 's') {
-                //start
-                parseStartLine(ret, item, edges);
-            } else if (type == 'b') {
-                //bag
-                parseBagLine(ret, item);
-            } else {
-                //edge
-                parseEdgeLine(item, edges);
+            //ignore empty line
+            if (item.length() > 0) {
+                char type = item.at(0);
+                if (type == 'c') {
+                    //comment line (ignore)
+                } else if (type == 's') {
+                    //start line
+                    parseStartLine(ret, item, edges);
+                } else if (type == 'b') {
+                    //bag line
+                    parseBagLine(ret, item);
+                } else {
+                    //edge line
+                    parseEdgeLine(item, edges);
+                }
             }
         }
 
