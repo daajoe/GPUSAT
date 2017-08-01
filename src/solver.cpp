@@ -1,12 +1,14 @@
 #include <solver.h>
 #include <algorithm>
 #include <math.h>
+#include <gpusautils.h>
+#include <iostream>
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
 
+        node.solution = static_cast<solType *>(malloc(sizeof(solType) * node.numSol));
         if (isSat > 0) {
-            node.solution = new solType[node.numSol]();
             if (node.numEdges == 0) {
                 solveLeaf(formula, node);
             } else if (node.numEdges == 1) {
@@ -18,7 +20,6 @@ namespace gpusat {
                 bagType &next = decomp.bags[node.edges[0] - 1];
                 solveForgIntroduce(formula, node, next);
                 free(next.solution);
-
             } else if (node.numEdges > 1) {
                 cl_long edge = node.edges[0] - 1;
                 solveProblem(decomp, formula, decomp.bags[edge]);
@@ -128,7 +129,7 @@ namespace gpusat {
         kernel = cl::Kernel(program, "solveIntroduce");
         cl::Buffer bufSol(context,
                           CL_MEM_READ_WRITE,
-                          sizeof(cl_long) * (node.numSol));
+                          sizeof(solType) * (node.numSol));
         cl::Buffer bufVertices;
         if (node.numVars > 0) {
             bufVertices = cl::Buffer(context,
@@ -192,7 +193,7 @@ namespace gpusat {
         kernel = cl::Kernel(program, "solveLeaf", &err);
         cl::Buffer bufSol(context,
                           CL_MEM_READ_WRITE,
-                          sizeof(cl_long) * (node.numSol));
+                          sizeof(solType) * (node.numSol));
         cl::Buffer bufVertices;
         if (node.numVars > 0) {
             bufVertices = cl::Buffer(context,
@@ -279,7 +280,7 @@ namespace gpusat {
         kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSol(context,
                           CL_MEM_READ_WRITE,
-                          sizeof(cl_long) * (node.numSol));
+                          sizeof(solType) * (node.numSol));
         cl::Buffer bufSol1(context,
                            CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                            sizeof(solType) * (edge1.numSol),

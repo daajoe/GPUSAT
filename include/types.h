@@ -1,12 +1,15 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
 
-#define __CL_ENABLE_EXCEPTIONS
 #define alloca __builtin_alloca
 
 #include <CL/cl.hpp>
+#include <CL/cl_platform.h>
+#include <cmath>
 
-#define solType cl_float
+typedef struct {
+    cl_double x[4];
+} solType;
 
 namespace gpusat {
 
@@ -33,7 +36,6 @@ namespace gpusat {
         cl_long *numVarsC = nullptr;
         cl_long *clauses = nullptr;
     };
-
 }
 
 #endif //GPUSAT_TYPES_H_H

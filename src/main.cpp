@@ -1,3 +1,5 @@
+#define __CL_ENABLE_EXCEPTIONS
+
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -11,6 +13,7 @@
 #include <sys/stat.h>
 #include <numeric>
 #include <solver.h>
+#include <d4_utils.h>
 
 using namespace gpusat;
 
@@ -148,12 +151,11 @@ int main(int argc, char *argv[]) {
 
         long long int time_model = getTime();
         if (sol.isSat > 0) {
-            solType solutions = 0;
+            solType *solutions=to_d4(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                bagType &n = treeDecomp.bags[0];
-                solutions += treeDecomp.bags[0].solution[i];
+                solutions = d4_add(solutions , &treeDecomp.bags[0].solution[i]);
             }
-            std::cout << "{\n    \"Model Count\": " << solutions;
+            std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }

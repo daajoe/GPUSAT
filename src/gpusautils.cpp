@@ -3,6 +3,8 @@
 #include <fstream>
 #include <iostream>
 #include <gpusautils.h>
+#include <CL/cl_platform.h>
+#include <d4_utils.h>
 
 namespace gpusat {
 
@@ -38,7 +40,7 @@ namespace gpusat {
         }
     }
 
-    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, const cl_long *vars, const solType *sol) {
+    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, const cl_long *vars, solType *sol) {
         std::cout << "solutions: \n";
         for (int a = 0; a < numS; a++) {
             std::cout << a << ": ";
@@ -46,7 +48,7 @@ namespace gpusat {
                 std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
                           << " ";
             }
-            std::cout << sol[a] << "\n";
+            std::cout << d4_to_string(&sol[a]) << "\n";
         }
     }
 
@@ -93,4 +95,5 @@ namespace gpusat {
         std::ofstream fileOut(path, std::ios::binary);
         fileOut.write(data, size);
     }
+
 }

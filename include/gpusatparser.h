@@ -1,5 +1,6 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
+#define alloca __builtin_alloca
 
 #include <queue>
 #include <types.h>
