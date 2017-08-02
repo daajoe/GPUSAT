@@ -603,7 +603,7 @@ namespace gpusat {
 
         double m = std::floor(a->x[0] / d4_log2.x[0] + 0.5);
         solType *r = new_d4(d4_mul_pwr2(d4_minus(a, d4_mul(&d4_log2, to_d4(m))), inv_k));
-        solType *s=new solType, *p=new solType, *t=new solType;
+        solType *s = new solType, *p = new solType, *t = new solType;
         double thresh = inv_k * d4_eps;
 
         d4_assign(p, d4_sqr(r));
@@ -717,7 +717,7 @@ namespace gpusat {
         e = static_cast<int>(std::floor(std::log10(std::abs(x->x[0]))));
 
         if (e < -300) {
-            solType *tmp=new solType;
+            solType *tmp = new solType;
             tmp->x[0] = 10.0;
             tmp->x[1] = 0.0;
             tmp->x[2] = 0.0;
@@ -725,7 +725,7 @@ namespace gpusat {
             d4_assign(r, d4_mul(r, d4_pow(tmp, 300)));
             d4_assign(r, d4_div(r, d4_pow(tmp, (e + 300))));
         } else if (e > 300) {
-            solType *tmp=new solType;
+            solType *tmp = new solType;
             tmp->x[0] = 10.0;
             tmp->x[1] = 0.0;
             tmp->x[2] = 0.0;
@@ -734,7 +734,7 @@ namespace gpusat {
             d4_assign(r, d4_div(r, d4_pow(tmp, e)));
             d4_assign(r, d4_ldexp(r, 53));
         } else {
-            solType *tmp=new solType;
+            solType *tmp = new solType;
             tmp->x[0] = 10.0;
             tmp->x[1] = 0.0;
             tmp->x[2] = 0.0;
@@ -802,9 +802,9 @@ namespace gpusat {
         if (n == 0)
             return to_d4(1.0);
 
-        solType *r=new solType;
+        solType *r = new solType;
         d4_assign(r, a);
-        solType *s=new solType;
+        solType *s = new solType;
         d4_assign(s, to_d4(1.0));
         int N = std::abs(n);
 

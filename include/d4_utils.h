@@ -12,11 +12,35 @@
 #define _QD_SPLIT_THRESH 6.69692879491417e+299 // = 2^996
 
 namespace gpusat {
+    /// turn x into string
+    std::string d4_to_string(solType *x, int precision = 62, int width = 0,
+                             std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
+                             bool showpos = false, bool uppercase = false, char fill = ' ');
+
+    /// a - b
+    solType *d4_minus(solType *a, solType *b);
+
+    /// a + b
+    solType *d4_add(solType *a, solType *b);
+
+    /// a * b
+    solType *d4_mul(solType *a, solType *b);
+
+    /// a / b
+    solType *d4_div(solType *a, solType *b);
+
+    /// a = b
+    void d4_assign(solType *a, solType *b);
+
+    /// a ^ n
+    solType *d4_pow(solType *a, int n);
+
+    /// -x
+    solType *d4_neg(solType *x);
+
     solType *new_d4(solType *x);
 
     solType *to_d4(double x);
-
-    solType *d4_neg(solType *x);
 
     solType *new_d4(double d, double d1, double d2, double d3);
 
@@ -54,15 +78,9 @@ namespace gpusat {
     };
     static double d4_eps = 1.21543267145725e-63;
 
-    solType *d4_minus(solType *a, solType *b);
-
     solType *d4_log(solType *a);
 
     solType *_log10(solType *a);
-
-    std::string d4_to_string(solType *x, int precision = 62, int width = 0,
-                             std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
-                             bool showpos = false, bool uppercase = false, char fill = ' ');
 
     double d4_quick_two_sum(double a, double b, double &err);
 
@@ -72,8 +90,6 @@ namespace gpusat {
 
     void d4_renorm(double &c0, double &c1, double &c2, double &c3);
 
-    solType *d4_add(solType *a, solType *b);
-
     void d4_split(double a, double &hi, double &lo);
 
     double d4_two_prod(double a, double b, double &err);
@@ -82,15 +98,9 @@ namespace gpusat {
 
     void d4_renorm(double &c0, double &c1, double &c2, double &c3, double &c4);
 
-    solType *d4_mul(solType *a, solType *b);
-
     void d4_three_sum2(double &a, double &b, double &c);;
 
     solType *d4_mul_qd_d(solType *a, double b);
-
-    solType *d4_div(solType *a, solType *b);
-
-    void d4_assign(solType *a, solType *b);
 
     solType *d4_ldexp(solType *a, int n);
 
@@ -112,12 +122,11 @@ namespace gpusat {
 
     void d4_to_digits(solType *x, char *s, int &expn, int precision);
 
-    solType *d4_pow(solType *a, int n);
-
     void d4_round_string_qd(char *s, int precision, int *offset);
 
     void d4_append_expn(std::string &str, int expn);
 
+    ///  a >= b
     inline bool d4_ge(solType *a, solType *b) {
         return (a->x[0] > b->x[0] ||
                 (a->x[0] == b->x[0] && (a->x[1] > b->x[1] ||
@@ -125,6 +134,7 @@ namespace gpusat {
                                                                 (a->x[2] == b->x[2] && a->x[3] >= b->x[3]))))));
     }
 
+    /// a < b
     inline bool d4_l(solType *a, solType *b) {
         return (a->x[0] < b->x[0] ||
                 (a->x[0] == b->x[0] && (a->x[1] < b->x[1] ||

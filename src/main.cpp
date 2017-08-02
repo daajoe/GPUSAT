@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             default:
-            std::cerr << "Usage: "<<argv[0]<<" [-f treedecomp] -s formula [-c kerneldir] \n";
+                std::cerr << "Usage: " << argv[0] << " [-f treedecomp] -s formula [-c kerneldir] \n";
                 exit(EXIT_FAILURE);
         }
     }
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
 
     // error no sat formula given
     if (!formula) {
-        std::cerr << "Usage: "<<argv[0]<<" [-f treedecomp] -s formula [-c kerneldir] \n";
+        std::cerr << "Usage: " << argv[0] << " [-f treedecomp] -s formula [-c kerneldir] \n";
         exit(EXIT_FAILURE);
     }
 
@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
             char *binChunk = &binData[0];
 
             std::vector<char *> binaries;
-            for (const size_t & binSize : binSizes) {
+            for (const size_t &binSize : binSizes) {
                 binaries.push_back(binChunk);
                 binChunk += binSize;
             }
@@ -151,9 +151,9 @@ int main(int argc, char *argv[]) {
 
         long long int time_model = getTime();
         if (sol.isSat > 0) {
-            solType *solutions=to_d4(0.0);
+            solType *solutions = to_d4(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                solutions = d4_add(solutions , &treeDecomp.bags[0].solution[i]);
+                solutions = d4_add(solutions, &treeDecomp.bags[0].solution[i]);
             }
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
         } else {
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n}";
 
     }
-    catch (cl::Error& err) {
+    catch (cl::Error &err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
                   std::endl;
         if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
@@ -181,7 +181,7 @@ int main(int argc, char *argv[]) {
             std::cout << "Program Info: " << str << std::endl;
         }
     }
-    catch (std::string& msg) {
+    catch (std::string &msg) {
         std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
 }
@@ -190,8 +190,4 @@ long long int getTime() {
     return std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()
     ).count();
-}
-
-namespace gpusat {
-
 }

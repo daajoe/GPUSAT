@@ -12,7 +12,7 @@ gena = False
 genb = False
 genc = False
 
-maxNumModels = pow(10, 36)
+maxNumModels = pow(10, 40)
 numConnections = 2
 
 numDigits = 4
@@ -600,7 +600,7 @@ if medium and genc:
 ######################################################################################
 ######################################################################################
 
-maxNumModels = pow(10, 304)
+maxNumModels = pow(10, 298)
 ###########
 # Large 0 #
 ###########
