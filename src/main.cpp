@@ -24,9 +24,9 @@ int main(int argc, char *argv[]) {
     std::stringbuf treeD, sat;
     std::string inputLine;
     bool file = false, formula = false;
-    int opt;
+    int opt, maxWidth = 12;
     std::string kernelPath = "./kernel/";
-    while ((opt = getopt(argc, argv, "f:s:c:")) != -1) {
+    while ((opt = getopt(argc, argv, "f:s:c:w:")) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -52,6 +52,10 @@ int main(int argc, char *argv[]) {
                 kernelPath = std::string(optarg);
                 break;
             }
+            case 'w': {
+                maxWidth = std::atoi(optarg);
+                break;
+            }
             default:
                 std::cerr << "Usage: " << argv[0] << " [-f treedecomp] -s formula [-c kerneldir] \n";
                 exit(EXIT_FAILURE);
@@ -74,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     long long int time_parsing = getTime();
     CNFParser cnfParser;
-    TDParser tdParser;
+    TDParser tdParser(maxWidth);
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     time_parsing = getTime() - time_parsing;

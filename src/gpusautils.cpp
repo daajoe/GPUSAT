@@ -13,13 +13,13 @@ namespace gpusat {
         for (int i = 0; i < size; i++) {
             std::cout << "\nbagnum: " << i + 1 << "\n";
             cl_long vsize = decomp.bags[i].numVars;
-            std::cout << "vertices: ";
+            std::cout << "variables: ";
             for (int a = 0; a < vsize; a++) {
                 std::cout << decomp.bags[i].variables[a] << " ";
             }
             std::cout << "\n";
             cl_long esize = decomp.bags[i].numEdges;
-            std::cout << "edges: ";
+            std::cout << "children: ";
             for (int a = 0; a < esize; a++) {
                 std::cout << decomp.bags[i].edges[a] << " ";
             }

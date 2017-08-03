@@ -6,6 +6,8 @@
 #include <CL/cl.hpp>
 #include <CL/cl_platform.h>
 #include <cmath>
+#include <list>
+#include <set>
 
 typedef struct {
     cl_double x[4];
@@ -28,6 +30,23 @@ namespace gpusat {
         cl_long numb = 0;
         bagType *bags = nullptr;
     };
+
+    /// type for preprocessing a tree decomposition
+    struct preebagType {
+        cl_long id = 0;
+        cl_long numChildren = 0;
+        cl_long numVariables = 0;
+        cl_long *variables = nullptr;
+        preebagType **children = nullptr;
+    };
+
+    /// type for saving a tree decomposition
+    struct preetreedecType {
+        cl_long numb = 0;
+        preebagType *bags = nullptr;
+    };
+
+    bool compTreedType(const preebagType *a, const preebagType *b);
 
     /// type for saving the sat formula
     struct satformulaType {

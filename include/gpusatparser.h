@@ -8,14 +8,15 @@
 namespace gpusat {
     class CNFParser {
     public:
+
         /**
-         * generates a treedec from a given string
-         *
-         * @param formula
-         *      the string representation of the tree decomposition
-         * @return
-         *      the tree decomposition
-         */
+                 * generates a treedec from a given string
+                 *
+                 * @param formula
+                 *      the string representation of the tree decomposition
+                 * @return
+                 *      the tree decomposition
+                 */
         satformulaType parseSatFormula(std::string formula);
 
     private:
@@ -42,10 +43,14 @@ namespace gpusat {
          *      object containing the clauses in the sat formula
          */
         void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> *&clauses);
+
+        int maxWidht;
     };
 
     class TDParser {
     public:
+        TDParser(int i);
+
         /**
          * generates a treedec from a given string
          *
@@ -77,7 +82,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&edges);
+        void parseStartLine(preetreedecType &ret, std::string &item, std::queue<cl_long> **&edges);
 
         /**
          * parses a pag from the tree decomposition
@@ -87,7 +92,11 @@ namespace gpusat {
          * @param item
          *      a line from the decomposition
          */
-        void parseBagLine(treedecType ret, std::string item);
+        void parseBagLine(preetreedecType &ret, std::string item);
+
+        void preprocessDecomp(preebagType *decomp);
+
+        int maxWidht;
     };
 }
 #endif //GPUSAT_PARSER_H

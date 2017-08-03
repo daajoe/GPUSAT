@@ -150,13 +150,14 @@ __kernel void solveJoin(__global solType *solutions, __global solType *edge1, __
 __kernel void
 solveForget(__global solType *solutions, __global long *variablesCurrent, __global solType *edge, long numVarsEdge,
             __global long *variablesEdge, long combinations, long numVarsCurrent) {
-    long id = get_global_id(0), i = 0, a = 0, templateId = 0;
+    long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
         if (variablesEdge[i] == variablesCurrent[a]) {
             templateId = templateId | (((id >> a) & 1) << i);
             a++;
         }
     }
+    solType tmp,tmp_;
     for (i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (a = 0; a < numVarsEdge; a++) {
@@ -166,8 +167,22 @@ solveForget(__global solType *solutions, __global long *variablesCurrent, __glob
                 b++;
             }
         }
+        tmp.x[0]=solutions[id].x[0];
+        tmp.x[1]=solutions[id].x[1];
+        tmp.x[2]=solutions[id].x[2];
+        tmp.x[3]=solutions[id].x[3];
 
-        d4_add_(&solutions[id], &edge[otherId], &solutions[id]);
+        tmp_.x[0]=edge[otherId].x[0];
+        tmp_.x[1]=edge[otherId].x[1];
+        tmp_.x[2]=edge[otherId].x[2];
+        tmp_.x[3]=edge[otherId].x[3];
+
+        d4_add(&tmp, &tmp_, &tmp);
+
+        solutions[id].x[0] = tmp.x[0];
+        solutions[id].x[1] = tmp.x[1];
+        solutions[id].x[2] = tmp.x[2];
+        solutions[id].x[3] = tmp.x[3];
     }
 }
 

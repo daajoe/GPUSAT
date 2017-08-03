@@ -3,6 +3,7 @@
 #include <math.h>
 #include <gpusautils.h>
 #include <iostream>
+#include <d4_utils.h>
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
@@ -271,7 +272,7 @@ namespace gpusat {
         kernel.setArg(3, edge.numVars);
         kernel.setArg(5, (cl_long) pow(2, edge.numVars - node.numVars));
         kernel.setArg(6, node.numVars);
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(edge.numSol));
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
         queue.finish();
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (node.numSol), node.solution);
     }

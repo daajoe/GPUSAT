@@ -93,8 +93,12 @@ namespace gpusat {
         clauses = new std::queue<std::queue<cl_long>>();
     }
 
+    TDParser::TDParser(int i) {
+        maxWidht = i;
+    }
+
     treedecType TDParser::parseTreeDecomp(std::string graph) {
-        treedecType ret = treedecType();
+        preetreedecType ret = preetreedecType();
         std::stringstream ss(graph);
         std::string item;
         std::queue<cl_long> **edges = nullptr;
@@ -119,17 +123,52 @@ namespace gpusat {
 
         if (edges != nullptr) {
             for (int a = 0; a < ret.numb; a++) {
-                ret.bags[a].edges = new cl_long[edges[a]->size()]();
-                ret.bags[a].numEdges = edges[a]->size();
+                ret.bags[a].children = new preebagType *[edges[a]->size()]();
                 int b = 0;
                 while (!edges[a]->empty()) {
-                    ret.bags[a].edges[b] = edges[a]->front();
+                    ret.bags[a].children[b] = &ret.bags[edges[a]->front() - 1];
                     edges[a]->pop();
                     b++;
                 }
+                ret.bags[a].numChildren = b;
+                std::sort(ret.bags[a].children, ret.bags[a].children + ret.bags[a].numChildren, compTreedType);
             }
         }
-        return ret;
+
+        preprocessDecomp(&ret.bags[0]);
+        treedecType ret_ = treedecType();
+        ret_.numb = 0;
+        std::list<preebagType *> bags;
+        bags.push_back(&ret.bags[0]);
+        while (!bags.empty()) {
+            preebagType *bag = bags.front();
+            bags.pop_front();
+            for (int a = 0; a < bag->numChildren; a++) {
+                bags.push_back(bag->children[a]);
+            }
+            ret_.numb++;
+        }
+        ret_.bags = new bagType[ret_.numb];
+        cl_long id = 0, cid = 2;
+        bags.push_back(&ret.bags[0]);
+        while (!bags.empty()) {
+            preebagType *bag = bags.front();
+            bags.pop_front();
+            ret_.bags[id].numVars = bag->numVariables;
+            ret_.bags[id].variables = new cl_long[ret_.bags[id].numVars];
+            std::copy(bag->variables, bag->variables + bag->numVariables, ret_.bags[id].variables);
+            ret_.bags[id].numEdges = bag->numChildren;
+            ret_.bags[id].edges = new cl_long[ret_.bags[id].numEdges];
+            ret_.bags[id].numSol = pow(2, ret_.bags[id].numVars);
+            for (int a = 0; a < bag->numChildren; a++) {
+                ret_.bags[id].edges[a] = cid;
+                bags.push_back(bag->children[a]);
+                cid++;
+            }
+            std::sort(ret_.bags[id].edges, ret_.bags[id].edges + ret_.bags[id].numEdges);
+            id++;
+        }
+        return ret_;
     }
 
     void TDParser::parseEdgeLine(std::string item, std::queue<cl_long> **edges) {
@@ -142,13 +181,13 @@ namespace gpusat {
         edges[start - 1]->push(end);
     }
 
-    void TDParser::parseStartLine(treedecType &ret, std::string &item, std::queue<cl_long> **&edges) {
+    void TDParser::parseStartLine(preetreedecType &ret, std::string &item, std::queue<cl_long> **&edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //s
         getline(sline, i, ' '); //tw
         getline(sline, i, ' '); //num bags
-        ret.bags = new bagType[stoi(i)];
+        ret.bags = new preebagType[stoi(i)];
         ret.numb = stoi(i);
         edges = new std::queue<cl_long> *[stoi(i)];
         for (int a = 0; a < stoi(i); a++) {
@@ -156,7 +195,7 @@ namespace gpusat {
         }
     }
 
-    void TDParser::parseBagLine(treedecType ret, std::string item) {
+    void TDParser::parseBagLine(preetreedecType &ret, std::string item) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //b
@@ -173,15 +212,66 @@ namespace gpusat {
                 match_count++;
             }
         }
-
+        ret.bags[bnum - 1].id = bnum - 1;
         ret.bags[bnum - 1].variables = new cl_long[match_count - 1]();
-        ret.bags[bnum - 1].numSol = (long) pow(2, match_count - 1);
-        ret.bags[bnum - 1].numVars = match_count - 1;
+        ret.bags[bnum - 1].numVariables = match_count - 1;
         while (getline(sline, i, ' ')) //vertices
         {
             ret.bags[bnum - 1].variables[a] = stoi(i);
             a++;
         }
-        std::sort(ret.bags[bnum - 1].variables, &ret.bags[bnum - 1].variables[ret.bags[bnum - 1].numVars]);
+        std::sort(ret.bags[bnum - 1].variables, &ret.bags[bnum - 1].variables[ret.bags[bnum - 1].numVariables]);
+    }
+
+    void TDParser::preprocessDecomp(preebagType *decomp) {
+
+        bool changed = true;
+        // try to merge with children
+        if (decomp->numVariables < maxWidht) {
+            while (changed) {
+                changed = false;
+                for (int i = 0; i < decomp->numChildren; i++) {
+                    std::vector<cl_long> v(decomp->numVariables + decomp->children[i]->numVariables);
+                    std::vector<cl_long>::iterator it;
+                    it = std::set_union(decomp->variables,
+                                        decomp->variables + decomp->numVariables,
+                                        decomp->children[i]->variables,
+                                        decomp->children[i]->variables + decomp->children[i]->numVariables,
+                                        v.begin());
+                    v.resize(it - v.begin());
+                    if (v.size() < maxWidht) {
+                        changed = true;
+                        cl_long cid = decomp->children[i]->id;
+                        decomp->numVariables = v.size();
+                        decomp->variables = new cl_long[decomp->numVariables];
+                        std::copy(&v[0], &v[0] + v.size(), decomp->variables);
+
+                        std::vector<preebagType *> v_(decomp->numChildren + decomp->children[i]->numChildren);
+                        std::vector<preebagType *>::iterator it_;
+                        it_ = std::set_union(decomp->children,
+                                             decomp->children + decomp->numChildren,
+                                             decomp->children[i]->children,
+                                             decomp->children[i]->children + decomp->children[i]->numChildren,
+                                             v_.begin(),
+                                             compTreedType);
+                        v_.resize(it_ - v_.begin());
+                        decomp->numChildren = v_.size() - 1;
+                        decomp->children = new preebagType *[decomp->numChildren];
+                        for (int asdf = 0, x = 0; asdf < decomp->numChildren; asdf++, x++) {
+                            preebagType *&sdggg = v_[asdf];
+                            if (v_[asdf]->id == cid) {
+                                x++;
+                            }
+                            decomp->children[asdf] = v_[x];
+                        }
+                    }
+                }
+            }
+        }
+
+        // process children
+        for (int i = 0; i < decomp->numChildren; i++) {
+            preprocessDecomp((decomp->children)[i]);
+        }
     }
 }
