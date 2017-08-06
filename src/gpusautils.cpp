@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 #include <gpusautils.h>
-#include <CL/cl_platform.h>
 #include <d4_utils.h>
 
 namespace gpusat {
@@ -19,7 +18,7 @@ namespace gpusat {
             }
             std::cout << "\n";
             cl_long esize = decomp.bags[i].numEdges;
-            std::cout << "children: ";
+            std::cout << "edgeschild nodes: ";
             for (int a = 0; a < esize; a++) {
                 std::cout << decomp.bags[i].edges[a] << " ";
             }
@@ -88,6 +87,7 @@ namespace gpusat {
         fclose(input);
         std::string buffer;
         buffer.assign(binary, size);
+        free(binary);
         return buffer;
     }
 

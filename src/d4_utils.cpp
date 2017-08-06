@@ -8,7 +8,7 @@
 namespace gpusat {
 
     solType *new_d4(solType *x) {
-        solType *ret = new solType;
+        auto *ret = new solType;
         ret->x[0] = x->x[0];
         ret->x[1] = x->x[1];
         ret->x[2] = x->x[2];
@@ -17,7 +17,7 @@ namespace gpusat {
     }
 
     solType *to_d4(double x) {
-        solType *ret = new solType;
+        auto *ret = new solType;
         ret->x[0] = x;
         ret->x[1] = 0.0;
         ret->x[2] = 0.0;
@@ -26,7 +26,7 @@ namespace gpusat {
     }
 
     solType *d4_neg(solType *x) {
-        solType *ret = new solType;
+        auto *ret = new solType;
         ret->x[0] = -x->x[0];
         ret->x[1] = -x->x[1];
         ret->x[2] = -x->x[2];
@@ -48,18 +48,18 @@ namespace gpusat {
             return new_d4(&d4_neg_inf);
         }
 
-        solType *x = new solType;
+        auto *x = new solType;
         x->x[0] = std::log(a->x[0]);
 
         d4_assign(x, d4_minus(d4_add(x, d4_mul(a, d4_exp(d4_neg(x)))), new_d4(&d4_one)));
         d4_assign(x, d4_minus(d4_add(x, d4_mul(a, d4_exp(d4_neg(x)))), new_d4(&d4_one)));
         d4_assign(x, d4_minus(d4_add(x, d4_mul(a, d4_exp(d4_neg(x)))), new_d4(&d4_one)));
 
-        return new_d4(x);
+        return x;
     }
 
     solType *_log10(solType *a) {
-        solType *b;
+        solType *b = nullptr;
         d4_assign(b, d4_div(d4_log(a), &d4_log10));
         return new_d4(b);
     }
@@ -96,7 +96,7 @@ namespace gpusat {
     }
 
     solType *new_d4(double d, double d1, double d2, double d3) {
-        solType *x = new solType;
+        auto *x = new solType;
         x->x[0] = d;
         x->x[1] = d1;
         x->x[2] = d2;
@@ -197,7 +197,7 @@ namespace gpusat {
                             s += t[i];
 
                     }
-                    delete[] t;
+                    //delete t;
                 }
             }
 
@@ -205,9 +205,6 @@ namespace gpusat {
                 double from_string = atof(s.c_str());
 
                 if (fabs(from_string / x->x[0]) > 3.0) {
-
-                    int point_position;
-                    char temp;
 
                     for (i = 1; i < s.length(); i++) {
                         if (s[i] == '.') {
@@ -244,6 +241,7 @@ namespace gpusat {
             }
         }
 
+        //delete x;
         return s;
     }
 
@@ -362,7 +360,7 @@ namespace gpusat {
             x->x[3] += b->x[k];
 
         d4_renorm(x->x[0], x->x[1], x->x[2], x->x[3]);
-        return new_d4(x);
+        return x;
     }
 
     void d4_split(double a, double &hi, double &lo) {
@@ -407,7 +405,6 @@ namespace gpusat {
         s0 = d4_quick_two_sum(c1, s0, c2);
         c0 = d4_quick_two_sum(c0, s0, c1);
 
-        s0 = c0;
         s1 = c1;
 
         s0 = d4_quick_two_sum(c0, c1, s1);
@@ -508,11 +505,9 @@ namespace gpusat {
 
 
     solType *d4_minus(solType *a, solType *b) {
-        solType *c = new solType;
-        d4_assign(c, d4_neg(b));
-        solType *d = new solType;
-        d4_assign(d, d4_add(a, c));
-        return new_d4(d);
+        auto *d = new solType;
+        d4_assign(d, d4_add(a, d4_neg(b)));
+        return d;
     }
 
     void d4_three_sum2(double &a, double &b, double &c) {
@@ -569,6 +564,7 @@ namespace gpusat {
 
         d4_renorm(q0, q1, q2, q3, q4);
 
+        //delete r;
         return new_d4(q0, q1, q2, q3);
     }
 
@@ -635,7 +631,10 @@ namespace gpusat {
 
         solType *asdf;
         d4_assign(asdf, d4_ldexp(s, static_cast<int>(m)));
-        return new_d4(asdf);
+        //delete s;
+        //delete p;
+        //delete t;
+        return asdf;
     }
 
     bool d4_is_zero(solType *x) {
@@ -724,6 +723,7 @@ namespace gpusat {
             tmp->x[3] = 0.0;
             d4_assign(r, d4_mul(r, d4_pow(tmp, 300)));
             d4_assign(r, d4_div(r, d4_pow(tmp, (e + 300))));
+            delete tmp;
         } else if (e > 300) {
             solType *tmp = new solType;
             tmp->x[0] = 10.0;
@@ -733,6 +733,7 @@ namespace gpusat {
             d4_assign(r, d4_ldexp(r, -53));
             d4_assign(r, d4_div(r, d4_pow(tmp, e)));
             d4_assign(r, d4_ldexp(r, 53));
+            delete tmp;
         } else {
             solType *tmp = new solType;
             tmp->x[0] = 10.0;
@@ -740,6 +741,7 @@ namespace gpusat {
             tmp->x[2] = 0.0;
             tmp->x[3] = 0.0;
             d4_assign(r, d4_div(r, d4_pow(tmp, e)));
+            delete tmp;
         }
 
         if (d4_ge(r, to_d4(10.0))) {
@@ -823,10 +825,13 @@ namespace gpusat {
             d4_assign(s, r);
         }
 
-        if (n < 0)
-            return new_d4(d4_div(to_d4(1.0), s));
+        if (n < 0) {
+            delete r;
+            return d4_div(to_d4(1.0), s);
+        }
 
-        return new_d4(s);
+        delete r;
+        return s;
     }
 
     void d4_round_string_qd(char *s, int precision, int *offset) {

@@ -30,7 +30,7 @@ namespace gpusat {
          * @param clauseSize
          *      size of each clause
          */
-        void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses, cl_long &clauseSize);
+        void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> &clauses, cl_long &clauseSize);
 
         /**
          * parses a problem line from the sat formula
@@ -42,7 +42,7 @@ namespace gpusat {
          * @param clauses
          *      object containing the clauses in the sat formula
          */
-        void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> *&clauses);
+        void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> &clauses);
 
         int maxWidht;
     };
@@ -70,7 +70,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseEdgeLine(std::string item, std::queue<cl_long> **edges);
+        void parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges);
 
         /**
          * parses the start line from the tree decomposition
@@ -82,7 +82,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseStartLine(preetreedecType &ret, std::string &item, std::queue<cl_long> **&edges);
+        void parseStartLine(preetreedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges);
 
         /**
          * parses a pag from the tree decomposition

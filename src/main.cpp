@@ -79,8 +79,8 @@ int main(int argc, char *argv[]) {
     long long int time_parsing = getTime();
     CNFParser cnfParser;
     TDParser tdParser(maxWidth);
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
     time_parsing = getTime() - time_parsing;
 
     std::vector<cl::Platform> platforms;
@@ -174,6 +174,9 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
+        delete treeDecomp.bags;
+        delete satFormula.clauses;
+        delete satFormula.numVarsC;
 
     }
     catch (cl::Error &err) {

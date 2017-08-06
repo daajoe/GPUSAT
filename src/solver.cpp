@@ -1,9 +1,9 @@
-#include <solver.h>
 #include <algorithm>
-#include <math.h>
-#include <gpusautils.h>
+#include <cmath>
 #include <iostream>
 #include <d4_utils.h>
+#include <gpusautils.h>
+#include <solver.h>
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
@@ -15,73 +15,72 @@ namespace gpusat {
             } else if (node.numEdges == 1) {
                 cl_long edge = node.edges[0] - 1;
                 solveProblem(decomp, formula, decomp.bags[edge]);
-                if (isSat <= 0) {
-                    return;
+                if (isSat == 1) {
+                    bagType &next = decomp.bags[node.edges[0] - 1];
+                    solveForgIntroduce(formula, node, next);
+                    delete next.solution;
                 }
-                bagType &next = decomp.bags[node.edges[0] - 1];
-                solveForgIntroduce(formula, node, next);
-                free(next.solution);
             } else if (node.numEdges > 1) {
                 cl_long edge = node.edges[0] - 1;
                 solveProblem(decomp, formula, decomp.bags[edge]);
-                if (isSat <= 0) {
-                    return;
-                }
-                bagType tmp, edge2_, edge1_, &edge1 = decomp.bags[node.edges[0] - 1];
-                std::vector<cl_long> v1(edge1.numVars + node.numVars);
-                std::vector<cl_long>::iterator it1 = std::set_intersection(node.variables,
-                                                                           node.variables + node.numVars,
-                                                                           edge1.variables,
-                                                                           edge1.variables + edge1.numVars,
-                                                                           v1.begin());
-                v1.resize(it1 - v1.begin());
-                edge1_.variables = &v1[0];
-                edge1_.numVars = v1.size();
-                edge1_.numSol = pow(2, edge1_.numVars);
-                edge1_.solution = new solType[edge1_.numSol]();
-                solveForget(edge1_, edge1);
-                free(edge1.solution);
+                if (isSat == 1) {
+                    bagType tmp, edge2_, edge1_, &edge1 = decomp.bags[node.edges[0] - 1];
+                    std::vector<cl_long> v1(static_cast<unsigned long long int>(edge1.numVars + node.numVars));
+                    auto it1 = std::set_intersection(node.variables,
+                                                     node.variables + node.numVars,
+                                                     edge1.variables,
+                                                     edge1.variables + edge1.numVars,
+                                                     v1.begin());
+                    v1.resize(static_cast<unsigned long long int>(it1 - v1.begin()));
+                    edge1_.variables = &v1[0];
+                    edge1_.numVars = v1.size();
+                    edge1_.numSol = static_cast<cl_long>(pow(2, edge1_.numVars));
+                    edge1_.solution = new solType[edge1_.numSol]();
+                    solveForget(edge1_, edge1);
+                    delete edge1.solution;
 
-                for (int i = 1; i < node.numEdges; i++) {
-                    edge = node.edges[i] - 1;
-                    solveProblem(decomp, formula, decomp.bags[edge]);
-                    if (isSat <= 0) {
-                        return;
-                    }
-                    bagType &edge2 = decomp.bags[node.edges[i] - 1];
-                    std::vector<cl_long> v2(edge2.numVars + node.numVars);
-                    std::vector<cl_long>::iterator it2 = std::set_intersection(node.variables,
-                                                                               node.variables + node.numVars,
-                                                                               edge2.variables,
-                                                                               edge2.variables + edge2.numVars,
-                                                                               v2.begin());
-                    v2.resize(it2 - v2.begin());
-                    edge2_.variables = &v2[0];
-                    edge2_.numVars = v2.size();
-                    edge2_.numSol = pow(2, edge2_.numVars);
-                    edge2_.solution = new solType[edge2_.numSol]();
-                    solveForget(edge2_, edge2);
-                    free(edge2.solution);
+                    for (int i = 1; i < node.numEdges; i++) {
+                        edge = node.edges[i] - 1;
+                        solveProblem(decomp, formula, decomp.bags[edge]);
+                        if (isSat <= 0) {
+                            return;
+                        }
+                        bagType &edge2 = decomp.bags[node.edges[i] - 1];
+                        std::vector<cl_long> v2(static_cast<unsigned long long int>(edge2.numVars + node.numVars));
+                        auto it2 = std::set_intersection(node.variables,
+                                                         node.variables + node.numVars,
+                                                         edge2.variables,
+                                                         edge2.variables + edge2.numVars,
+                                                         v2.begin());
+                        v2.resize(static_cast<unsigned long long int>(it2 - v2.begin()));
+                        edge2_.variables = &v2[0];
+                        edge2_.numVars = v2.size();
+                        edge2_.numSol = static_cast<cl_long>(pow(2, edge2_.numVars));
+                        edge2_.solution = new solType[edge2_.numSol]();
+                        solveForget(edge2_, edge2);
+                        delete edge2.solution;
 
-                    std::vector<cl_long> vt(edge1_.numVars + edge2_.numVars);
-                    std::vector<cl_long>::iterator itt = std::set_union(edge1_.variables,
-                                                                        edge1_.variables + edge1_.numVars,
-                                                                        edge2_.variables,
-                                                                        edge2_.variables + edge2_.numVars, vt.begin());
-                    vt.resize(itt - vt.begin());
-                    tmp.variables = new cl_long[vt.size()];
-                    memcpy(tmp.variables, &vt[0], vt.size() * sizeof(cl_long));
-                    tmp.numVars = vt.size();
-                    tmp.numSol = pow(2, tmp.numVars);
-                    tmp.solution = new solType[tmp.numSol]();
-                    solveJoin(tmp, edge1_, edge2_);
+                        std::vector<cl_long> vt(static_cast<unsigned long long int>(edge1_.numVars + edge2_.numVars));
+                        auto itt = std::set_union(edge1_.variables,
+                                                  edge1_.variables + edge1_.numVars,
+                                                  edge2_.variables,
+                                                  edge2_.variables + edge2_.numVars, vt.begin());
+                        vt.resize(static_cast<unsigned long long int>(itt - vt.begin()));
+                        tmp.variables = new cl_long[vt.size()];
+                        memcpy(tmp.variables, &vt[0], vt.size() * sizeof(cl_long));
+                        tmp.numVars = vt.size();
+                        tmp.numSol = static_cast<cl_long>(pow(2, tmp.numVars));
+                        tmp.solution = new solType[tmp.numSol]();
+                        solveJoin(tmp, edge1_, edge2_);
 
-                    free(edge1_.solution);
-                    free(edge2_.solution);
-                    edge1_ = tmp;
+                        delete edge1_.solution;
+                        delete edge2_.solution;
+                        edge1_ = tmp;
 
-                    if (i == node.numEdges - 1) {
-                        solveIntroduce(formula, node, tmp);
+                        if (i == node.numEdges - 1) {
+                            solveIntroduce(formula, node, tmp);
+                            delete tmp.solution;
+                        }
                     }
                 }
             }
@@ -90,39 +89,39 @@ namespace gpusat {
 
     void Solver::solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next) {
 
-        std::vector<cl_long> diff_forget(next.numVars + node.numVars);
+        std::vector<cl_long> diff_forget(static_cast<unsigned long long int>(next.numVars + node.numVars));
         std::vector<cl_long>::iterator it, it2;
         it = set_difference(next.variables,
                             next.variables + next.numVars,
                             node.variables, node.variables + node.numVars, diff_forget.begin());
-        diff_forget.resize(it - diff_forget.begin());
-        std::vector<cl_long> diff_introduce(next.numVars + node.numVars);
+        diff_forget.resize(static_cast<unsigned long long int>(it - diff_forget.begin()));
+        std::vector<cl_long> diff_introduce(static_cast<unsigned long long int>(next.numVars + node.numVars));
         it = set_difference(node.variables, node.variables + node.numVars,
                             next.variables,
                             next.variables + next.numVars,
                             diff_introduce.begin());
-        diff_introduce.resize(it - diff_introduce.begin());
+        diff_introduce.resize(static_cast<unsigned long long int>(it - diff_introduce.begin()));
 
         if (diff_introduce.empty()) {
             solveForget(node, next);
         } else if (diff_forget.empty()) {
             solveIntroduce(formula, node, next);
         } else {
-            std::vector<cl_long> vect(next.numVars + node.numVars);
+            std::vector<cl_long> vect(static_cast<unsigned long long int>(next.numVars + node.numVars));
             it2 = set_difference(next.variables,
                                  next.variables + next.numVars,
                                  &diff_forget[0], &diff_forget[0] + diff_forget.size(),
                                  vect.begin());
-            vect.resize(it2 - vect.begin());
+            vect.resize(static_cast<unsigned long long int>(it2 - vect.begin()));
             bagType edge;
             edge.numVars = vect.size();
             edge.variables = &vect[0];
-            edge.numSol = pow(2, vect.size());
+            edge.numSol = static_cast<cl_long>(pow(2, vect.size()));
             edge.solution = new solType[edge.numSol]();
 
             solveForget(edge, next);
             solveIntroduce(formula, node, edge);
-            free(edge.solution);
+            delete edge.solution;
         }
     }
 
@@ -183,7 +182,7 @@ namespace gpusat {
         kernel.setArg(5, bufSolNext);
         kernel.setArg(6, edge.numVars);
         kernel.setArg(9, bufSAT);
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(static_cast<size_t>(node.numSol)));
         queue.finish();
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (node.numSol), node.solution);
         queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
@@ -231,7 +230,7 @@ namespace gpusat {
         kernel.setArg(3, bufSol);
         kernel.setArg(4, node.numVars);
         kernel.setArg(6, bufSAT);
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(static_cast<size_t>(node.numSol)));
         queue.finish();
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (node.numSol), node.solution);
         queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
@@ -272,7 +271,7 @@ namespace gpusat {
         kernel.setArg(3, edge.numVars);
         kernel.setArg(5, (cl_long) pow(2, edge.numVars - node.numVars));
         kernel.setArg(6, node.numVars);
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(static_cast<size_t>(node.numSol)));
         queue.finish();
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (node.numSol), node.solution);
     }
@@ -326,7 +325,7 @@ namespace gpusat {
         kernel.setArg(6, node.numVars);
         kernel.setArg(7, edge1.numVars);
         kernel.setArg(8, edge2.numVars);
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(static_cast<size_t>(node.numSol)));
         queue.finish();
         queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (node.numSol), node.solution);
     }

@@ -1,4 +1,4 @@
-#include <math.h>
+#include <cmath>
 #include <fstream>
 #include <sstream>
 #include <iostream>
@@ -11,7 +11,7 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::queue<std::queue<cl_long  >> *clauses = nullptr;
+        std::queue<std::queue<cl_long  >> clauses;
         cl_long clauseSize = 0;
         while (getline(ss, item)) {
             //ignore empty line
@@ -29,12 +29,12 @@ namespace gpusat {
             }
         }
 
-        if (clauses != nullptr) {
+        if (!clauses.empty()) {
             int a = 0, s = 0;
             ret.totalNumVar = clauseSize;
             ret.clauses = new cl_long[clauseSize]();
-            while (!clauses->empty()) {
-                std::queue<cl_long> &clause = clauses->front();
+            while (!clauses.empty()) {
+                std::queue<cl_long> &clause = clauses.front();
                 ret.numVarsC[a] = clause.size();
 
                 int b = 0;
@@ -44,7 +44,7 @@ namespace gpusat {
                     b++;
                 }
                 std::sort(&ret.clauses[s], &ret.clauses[s + b]);
-                clauses->pop();
+                clauses.pop();
                 s += ret.numVarsC[a];
                 a++;
             }
@@ -52,7 +52,7 @@ namespace gpusat {
         return ret;
     }
 
-    void CNFParser::parseClauseLine(std::string item, std::queue<std::queue<cl_long>> *clauses, cl_long &clauseSize) {
+    void CNFParser::parseClauseLine(std::string item, std::queue<std::queue<cl_long>> &clauses, cl_long &clauseSize) {
         std::stringstream sline(item);
         std::string i;
         std::queue<cl_long> clause;
@@ -77,11 +77,11 @@ namespace gpusat {
             }
             getline(sline, i, ' ');
         }
-        clauses->push(clause);
+        clauses.push(clause);
     }
 
     void CNFParser::parseProblemLine(satformulaType &satformula, std::string item,
-                                     std::queue<std::queue<cl_long>> *&clauses) {
+                                     std::queue<std::queue<cl_long>> &clauses) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //p
@@ -90,7 +90,6 @@ namespace gpusat {
         getline(sline, i, ' '); //num clauses
         satformula.numclauses = stoi(i);
         satformula.numVarsC = new cl_long[satformula.numclauses]();
-        clauses = new std::queue<std::queue<cl_long>>();
     }
 
     TDParser::TDParser(int i) {
@@ -101,7 +100,7 @@ namespace gpusat {
         preetreedecType ret = preetreedecType();
         std::stringstream ss(graph);
         std::string item;
-        std::queue<cl_long> **edges = nullptr;
+        std::vector<std::vector<cl_long>> edges;
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 0) {
@@ -121,17 +120,17 @@ namespace gpusat {
             }
         }
 
-        if (edges != nullptr) {
+        if (!edges.empty()) {
             for (int a = 0; a < ret.numb; a++) {
-                ret.bags[a].children = new preebagType *[edges[a]->size()]();
+                ret.bags[a].edges = new preebagType *[edges[a].size()]();
                 int b = 0;
-                while (!edges[a]->empty()) {
-                    ret.bags[a].children[b] = &ret.bags[edges[a]->front() - 1];
-                    edges[a]->pop();
+                while (!edges[a].empty()) {
+                    ret.bags[a].edges[b] = &ret.bags[edges[a].back() - 1];
+                    edges[a].pop_back();
                     b++;
                 }
-                ret.bags[a].numChildren = b;
-                std::sort(ret.bags[a].children, ret.bags[a].children + ret.bags[a].numChildren, compTreedType);
+                ret.bags[a].numEdges = b;
+                std::sort(ret.bags[a].edges, ret.bags[a].edges + ret.bags[a].numEdges, compTreedType);
             }
         }
 
@@ -143,8 +142,8 @@ namespace gpusat {
         while (!bags.empty()) {
             preebagType *bag = bags.front();
             bags.pop_front();
-            for (int a = 0; a < bag->numChildren; a++) {
-                bags.push_back(bag->children[a]);
+            for (int a = 0; a < bag->numEdges; a++) {
+                bags.push_back(bag->edges[a]);
             }
             ret_.numb++;
         }
@@ -157,31 +156,32 @@ namespace gpusat {
             ret_.bags[id].numVars = bag->numVariables;
             ret_.bags[id].variables = new cl_long[ret_.bags[id].numVars];
             std::copy(bag->variables, bag->variables + bag->numVariables, ret_.bags[id].variables);
-            ret_.bags[id].numEdges = bag->numChildren;
+            ret_.bags[id].numEdges = bag->numEdges;
             ret_.bags[id].edges = new cl_long[ret_.bags[id].numEdges];
-            ret_.bags[id].numSol = pow(2, ret_.bags[id].numVars);
-            for (int a = 0; a < bag->numChildren; a++) {
+            ret_.bags[id].numSol = static_cast<cl_long>(pow(2, ret_.bags[id].numVars));
+            for (int a = 0; a < bag->numEdges; a++) {
                 ret_.bags[id].edges[a] = cid;
-                bags.push_back(bag->children[a]);
+                bags.push_back(bag->edges[a]);
                 cid++;
             }
             std::sort(ret_.bags[id].edges, ret_.bags[id].edges + ret_.bags[id].numEdges);
             id++;
         }
+        delete ret.bags;
         return ret_;
     }
 
-    void TDParser::parseEdgeLine(std::string item, std::queue<cl_long> **edges) {
+    void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //start
         cl_long start = stoi(i);
         getline(sline, i, ' '); //end
         cl_long end = stoi(i);
-        edges[start - 1]->push(end);
+        edges[start - 1].push_back(end);
     }
 
-    void TDParser::parseStartLine(preetreedecType &ret, std::string &item, std::queue<cl_long> **&edges) {
+    void TDParser::parseStartLine(preetreedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //s
@@ -189,9 +189,9 @@ namespace gpusat {
         getline(sline, i, ' '); //num bags
         ret.bags = new preebagType[stoi(i)];
         ret.numb = stoi(i);
-        edges = new std::queue<cl_long> *[stoi(i)];
-        for (int a = 0; a < stoi(i); a++) {
-            edges[a] = new std::queue<cl_long>();
+        for (int a = 0; a < ret.numb; a++) {
+            std::vector<cl_long> edge;
+            edges.push_back(edge);
         }
     }
 
@@ -226,52 +226,101 @@ namespace gpusat {
     void TDParser::preprocessDecomp(preebagType *decomp) {
 
         bool changed = true;
-        // try to merge with children
+        // try to merge with child nodes
         if (decomp->numVariables < maxWidht) {
             while (changed) {
                 changed = false;
-                for (int i = 0; i < decomp->numChildren; i++) {
-                    std::vector<cl_long> v(decomp->numVariables + decomp->children[i]->numVariables);
+                for (int i = 0; i < decomp->numEdges; i++) {
+                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->numVariables +
+                                                                               decomp->edges[i]->numVariables));
                     std::vector<cl_long>::iterator it;
                     it = std::set_union(decomp->variables,
                                         decomp->variables + decomp->numVariables,
-                                        decomp->children[i]->variables,
-                                        decomp->children[i]->variables + decomp->children[i]->numVariables,
+                                        decomp->edges[i]->variables,
+                                        decomp->edges[i]->variables + decomp->edges[i]->numVariables,
                                         v.begin());
-                    v.resize(it - v.begin());
+                    v.resize(static_cast<unsigned long long int>(it - v.begin()));
                     if (v.size() < maxWidht) {
                         changed = true;
-                        cl_long cid = decomp->children[i]->id;
+                        cl_long cid = decomp->edges[i]->id;
                         decomp->numVariables = v.size();
                         decomp->variables = new cl_long[decomp->numVariables];
                         std::copy(&v[0], &v[0] + v.size(), decomp->variables);
 
-                        std::vector<preebagType *> v_(decomp->numChildren + decomp->children[i]->numChildren);
+                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->numEdges +
+                                                                                          decomp->edges[i]->numEdges));
                         std::vector<preebagType *>::iterator it_;
-                        it_ = std::set_union(decomp->children,
-                                             decomp->children + decomp->numChildren,
-                                             decomp->children[i]->children,
-                                             decomp->children[i]->children + decomp->children[i]->numChildren,
+                        it_ = std::set_union(decomp->edges,
+                                             decomp->edges + decomp->numEdges,
+                                             decomp->edges[i]->edges,
+                                             decomp->edges[i]->edges + decomp->edges[i]->numEdges,
                                              v_.begin(),
                                              compTreedType);
-                        v_.resize(it_ - v_.begin());
-                        decomp->numChildren = v_.size() - 1;
-                        decomp->children = new preebagType *[decomp->numChildren];
-                        for (int asdf = 0, x = 0; asdf < decomp->numChildren; asdf++, x++) {
+                        v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
+                        decomp->numEdges = v_.size() - 1;
+                        decomp->edges = new preebagType *[decomp->numEdges];
+                        for (int asdf = 0, x = 0; asdf < decomp->numEdges; asdf++, x++) {
                             preebagType *&sdggg = v_[asdf];
                             if (v_[asdf]->id == cid) {
                                 x++;
                             }
-                            decomp->children[asdf] = v_[x];
+                            decomp->edges[asdf] = v_[x];
                         }
                     }
                 }
             }
         }
 
-        // process children
-        for (int i = 0; i < decomp->numChildren; i++) {
-            preprocessDecomp((decomp->children)[i]);
+        changed = true;
+        // try to merge child nodes
+        while (changed) {
+            changed = false;
+            for (int a = 0; a < decomp->numEdges && !changed; a++) {
+                for (int b = 0; b < decomp->numEdges && !changed; b++) {
+                    if (a!=b && decomp->edges[a]->numVariables < maxWidht && decomp->edges[b]->numVariables < maxWidht) {
+                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables +
+                                                                                   decomp->edges[b]->numVariables));
+                        std::vector<cl_long>::iterator it;
+                        it = std::set_union(decomp->edges[a]->variables,
+                                            decomp->edges[a]->variables + decomp->edges[a]->numVariables,
+                                            decomp->edges[b]->variables,
+                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables,
+                                            v.begin());
+                        v.resize(static_cast<unsigned long long int>(it - v.begin()));
+                        if (v.size() < maxWidht) {
+                            changed = true;
+                            cl_long cid = decomp->edges[b]->id;
+                            decomp->edges[a]->numVariables = v.size();
+                            decomp->edges[a]->variables = new cl_long[decomp->edges[a]->numVariables];
+                            std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
+
+                            std::vector<preebagType *> v_(
+                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges +
+                                                                        decomp->edges[b]->numEdges));
+                            std::vector<preebagType *>::iterator it_;
+                            it_ = std::set_union(decomp->edges[a]->edges,
+                                                 decomp->edges[a]->edges + decomp->edges[a]->numEdges,
+                                                 decomp->edges[b]->edges,
+                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges,
+                                                 v_.begin(),
+                                                 compTreedType);
+                            v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
+                            decomp->edges[a]->numEdges = v_.size();
+                            decomp->edges[a]->edges = new preebagType *[decomp->edges[a]->numEdges];
+                            std::copy(&v_[0], &v_[0] + v_.size(), decomp->edges[a]->edges);
+                            if (b < decomp->numEdges-1) {
+                                std::copy(decomp->edges + b + 1, decomp->edges + decomp->numEdges, decomp->edges + b);
+                            }
+                            decomp->numEdges--;
+                        }
+                    }
+                }
+            }
+        }
+
+        // process child nodes
+        for (int i = 0; i < decomp->numEdges; i++) {
+            preprocessDecomp((decomp->edges)[i]);
         }
     }
 }

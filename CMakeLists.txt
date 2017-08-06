@@ -7,8 +7,11 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 ")# -Wl,--stack,4194304")
 
+# valgrind flags
+SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -O3" )# -g -O1")#
+SET( CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}" )
+
 file(GLOB gpusat_SRC
-        "include/*.h"
         "src/*.cpp"
         )
 add_executable(gpusat ${gpusat_SRC})

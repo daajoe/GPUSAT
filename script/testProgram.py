@@ -6,12 +6,13 @@ from os.path import join, isdir
 from os import makedirs
 import datetime
 
-dirFormula = "./problems/formula"
-dirDecomp = "./problems/decomposition"
-dirResults = "./problems/results"
-dirReference = "./problems/reference"
+dirFormula = "./new_problems/formula"
+dirDecomp = "./new_problems/decomposition"
+dirResults = "./new_problems/results"
+dirReference = "./new_problems/reference"
 
-testCasesStrings = ["a_00_test", "b_00_test", "c_00_test"]
+testCasesStrings = ["a_00_test", "b_00_test", "c_00_test","a_01_test", "b_01_test", "c_01_test","a_02_test", "b_02_test", "c_02_test","a_03_test", "b_03_test", "c_03_test",
+                    "benchmark_0","benchmark_1","benchmark_2"]
 
 
 def getTime(sol):
@@ -83,7 +84,7 @@ for case in testCasesStrings:
                 # generate output
                 with open(join(join(dirResults, case), testcase), "w") as resultFile:
                     subprocess.call(
-                        ["./gpusat", "-f", dirDecomp + "/" + case + "/" + testcase + ".td", "-s",
+                        ["./gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + ".td", "-s",
                          dirFormula + "/" + case + "/" + testcase + ".cnf"],
                         stdout=resultFile, stderr=resultFile)
                 # check results

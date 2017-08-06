@@ -34,10 +34,10 @@ namespace gpusat {
     /// type for preprocessing a tree decomposition
     struct preebagType {
         cl_long id = 0;
-        cl_long numChildren = 0;
+        cl_long numEdges = 0;
         cl_long numVariables = 0;
         cl_long *variables = nullptr;
-        preebagType **children = nullptr;
+        preebagType **edges = nullptr;
     };
 
     /// type for saving a tree decomposition
