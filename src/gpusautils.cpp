@@ -50,7 +50,7 @@ namespace gpusat {
 #ifdef sType_Double
             std::cout << sol[a] << "\n";
 #else
-            std::cout << d4_to_string(&sol[a]) << "\n";
+            std::cout << d4_to_string(sol[a]) << "\n";
 #endif
         }
     }

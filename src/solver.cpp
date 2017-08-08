@@ -79,14 +79,16 @@ namespace gpusat {
                         delete[] edge1_.solution;
                         delete[] edge2_.solution;
 
+                        if (i > 1) {
+                            delete[] edge1_.variables;
+                        }
+                        edge1_ = tmp;
+
                         if (i == node.numEdges - 1) {
                             solveIntroduce(formula, node, tmp);
                             delete[] tmp.solution;
                             delete[] tmp.variables;
-                        }else if(i>1){
-                            delete[] edge1_.variables;
                         }
-                        edge1_ = tmp;
                     }
                 }
             }

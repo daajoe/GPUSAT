@@ -168,8 +168,8 @@ namespace gpusat {
             id++;
         }
         for (int a = 0; a < ret.numb; a++) {
-            delete [] ret.bags[a].edges;
-            delete [] ret.bags[a].variables;
+            delete[] ret.bags[a].edges;
+            delete[] ret.bags[a].variables;
         }
         delete[] ret.bags;
         return ret_;

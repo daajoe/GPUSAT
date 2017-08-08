@@ -9,9 +9,54 @@
 #include <list>
 #include <set>
 
-typedef struct {
+struct d4_Type {
     cl_double x[4];
-} d4_Type;
+
+    d4_Type() {
+        x[0] = 0.0;
+        x[1] = 0.0;
+        x[2] = 0.0;
+        x[3] = 0.0;
+    }
+
+    d4_Type(double a, double b, double c, double d) {
+        x[0] = a;
+        x[1] = b;
+        x[2] = c;
+        x[3] = d;
+    }
+
+    d4_Type(double a) {
+        x[0] = a;
+        x[1] = 0.0;
+        x[2] = 0.0;
+        x[3] = 0.0;
+    }
+
+    d4_Type &operator=(double a) {
+        x[0] = a;
+        x[1] = 0.0;
+        x[2] = 0.0;
+        x[3] = 0.0;
+        return *this;
+    }
+
+    d4_Type &operator=(d4_Type a) {
+        x[0] = a.x[0];
+        x[1] = a.x[1];
+        x[2] = a.x[2];
+        x[3] = a.x[3];
+        return *this;
+    }
+
+    d4_Type &operator=(d4_Type *a) {
+        x[0] = a->x[0];
+        x[1] = a->x[1];
+        x[2] = a->x[2];
+        x[3] = a->x[3];
+        return *this;
+    }
+};
 
 #ifdef sType_Double
 #define solType double
