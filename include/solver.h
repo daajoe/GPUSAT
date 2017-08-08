@@ -18,7 +18,7 @@ namespace gpusat {
         void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
     public:
-        cl_long isSat = 1;
+        int isSat = 1;
 
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_,
                cl::CommandQueue &queue_, cl::Program &program_, cl::Kernel &kernel_) : platforms(platforms_),
@@ -26,7 +26,7 @@ namespace gpusat {
                                                                                        devices(devices_), queue(queue_),
                                                                                        program(program_),
                                                                                        kernel(kernel_) {
-
+            isSat = 1;
         }
 
         /**

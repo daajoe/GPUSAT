@@ -2,19 +2,19 @@
 
 typedef struct {
     stype x[4];
-} solType;
+} d4_Type;
 
-void d4_mul(solType *a, solType *b, __global solType *ret);
+void d4_mul(d4_Type *a, d4_Type *b, __global d4_Type *ret);
 
-void d4_add(solType *a, solType *b, solType *ret);
+void d4_add(d4_Type *a, d4_Type *b, d4_Type *ret);
 
-void d4_add_(__global solType *a, __global solType *b, __global solType *ret);
+void d4_add_(__global d4_Type *a, __global d4_Type *b, __global d4_Type *ret);
 
-void d4_div(solType *a, solType *b, solType *ret);
+void d4_div(d4_Type *a, d4_Type *b, d4_Type *ret);
 
-void d4_assign(solType *a, solType *b);
+void d4_assign(d4_Type *a, d4_Type *b);
 
-void new_d4(stype d, stype d1, stype d2, stype d3, solType *ret);
+void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret);
 
 /**
  *
@@ -25,8 +25,8 @@ void new_d4(stype d, stype d1, stype d2, stype d3, solType *ret);
  * @param variables
  * @param edgeVariables
  */
-void solveIntroduce_(long numV, __global solType *edge, long numVE,
-                     __global long *variables, __global long *edgeVariables, solType *ret) {
+void solveIntroduce_(long numV, __global d4_Type *edge, long numVE,
+                     __global long *variables, __global long *edgeVariables, d4_Type *ret) {
     long id = get_global_id(0);
     long otherId = 0;
     long a = 0, b = 0;
@@ -119,11 +119,11 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global solType *solutions, __global solType *edge1, __global solType *edge2,
+__kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __global d4_Type *edge2,
                         __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
                         long numV, long numVE1, long numVE2) {
     long id = get_global_id(0);
-    solType tmp, tmp_;
+    d4_Type tmp, tmp_;
     solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, &tmp);
     solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, &tmp_);
     d4_mul(&tmp, &tmp_, &solutions[id]);
@@ -148,7 +148,7 @@ __kernel void solveJoin(__global solType *solutions, __global solType *edge1, __
  *      number of variables in the current bag
  */
 __kernel void
-solveForget(__global solType *solutions, __global long *variablesCurrent, __global solType *edge, long numVarsEdge,
+solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __global d4_Type *edge, long numVarsEdge,
             __global long *variablesEdge, long combinations, long numVarsCurrent) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
@@ -157,7 +157,7 @@ solveForget(__global solType *solutions, __global long *variablesCurrent, __glob
             a++;
         }
     }
-    solType tmp,tmp_;
+    d4_Type tmp,tmp_;
     for (i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (a = 0; a < numVarsEdge; a++) {
@@ -203,7 +203,7 @@ solveForget(__global solType *solutions, __global long *variablesCurrent, __glob
  *      array containing the ids of the variables in the bag
  */
 __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses,
-                        __global solType *solutions, long numV, __global long *variables, __global long *models) {
+                        __global d4_Type *solutions, long numV, __global long *variables, __global long *models) {
     long id = get_global_id(0);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     if (sat == 1) {
@@ -243,10 +243,10 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
  *      the ids of the variables in the next bag
  */
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
-                             __global solType *solutions, long numV, __global solType *edge, long numVE,
+                             __global d4_Type *solutions, long numV, __global d4_Type *edge, long numVE,
                              __global long *variables, __global long *edgeVariables, __global long *models) {
     long id = get_global_id(0);
-    solType tmp;
+    d4_Type tmp;
     solveIntroduce_(numV, edge, numVE, variables, edgeVariables, &tmp);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     if (sat == 1 && tmp.x[0] > 0.0) {
@@ -272,13 +272,13 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
 #define _QD_SPLITTER 134217729.0               // = 2^27 + 1
 #define _QD_SPLIT_THRESH 6.69692879491417e+299 // = 2^996
 
-void to_d4(stype x, solType *ret);
+void to_d4(stype x, d4_Type *ret);
 
-void d4_neg(solType *x, solType *ret);
+void d4_neg(d4_Type *x, d4_Type *ret);
 
-void d4_minus(solType *a, solType *b, solType *ret);
+void d4_minus(d4_Type *a, d4_Type *b, d4_Type *ret);
 
-void d4_log(solType *a, solType *ret);
+void d4_log(d4_Type *a, d4_Type *ret);
 
 stype d4_quick_two_sum(stype a, stype b, stype *err);
 
@@ -298,21 +298,21 @@ void d4_renorm_(stype *c0, stype *c1, stype *c2, stype *c3, stype *c4);
 
 void d4_three_sum2(stype *a, stype *b, stype *c);;
 
-void d4_mul_qd_d(solType *a, stype b, solType *ret);
+void d4_mul_qd_d(d4_Type *a, stype b, d4_Type *ret);
 
-void d4_ldexp(solType *a, int n, solType *ret);
+void d4_ldexp(d4_Type *a, int n, d4_Type *ret);
 
-bool d4_is_zero(solType *x);
+bool d4_is_zero(d4_Type *x);
 
-bool d4_is_one(solType *x);
+bool d4_is_one(d4_Type *x);
 
-void d4_mul_pwr2(solType *a, stype b, solType *ret);
+void d4_mul_pwr2(d4_Type *a, stype b, d4_Type *ret);
 
-void d4_sqr(solType *a, solType *ret);
+void d4_sqr(d4_Type *a, d4_Type *ret);
 
-void d4_pow(solType *a, int n, solType *ret);
+void d4_pow(d4_Type *a, int n, d4_Type *ret);
 
-bool d4_l(solType *a, solType *b) {
+bool d4_l(d4_Type *a, d4_Type *b) {
     return (a->x[0] < b->x[0] ||
             (a->x[0] == b->x[0] && (a->x[1] < b->x[1] ||
                                     (a->x[1] == b->x[1] && (a->x[2] < b->x[2] ||
@@ -320,21 +320,21 @@ bool d4_l(solType *a, solType *b) {
 }
 
 ///implementation
-void to_d4(stype x, solType *ret) {
+void to_d4(stype x, d4_Type *ret) {
     ret->x[0] = x;
     ret->x[1] = 0.0;
     ret->x[2] = 0.0;
     ret->x[3] = 0.0;
 }
 
-void d4_neg(solType *x, solType *ret) {
+void d4_neg(d4_Type *x, d4_Type *ret) {
     ret->x[0] = -x->x[0];
     ret->x[1] = -x->x[1];
     ret->x[2] = -x->x[2];
     ret->x[3] = -x->x[3];
 }
 
-void new_d4(stype d, stype d1, stype d2, stype d3, solType *ret) {
+void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret) {
     ret->x[0] = d;
     ret->x[1] = d1;
     ret->x[2] = d2;
@@ -408,11 +408,11 @@ void d4_renorm(stype *c0, stype *c1, stype *c2, stype *c3) {
     (*c3) = s3;
 }
 
-void d4_add(solType *a, solType *b, solType *ret) {
+void d4_add(d4_Type *a, d4_Type *b, d4_Type *ret) {
     int i, j, k;
     stype s, t;
     stype u, v;
-    solType x;
+    d4_Type x;
     to_d4(0.0, &x);
 
     i = j = k = 0;
@@ -460,11 +460,11 @@ void d4_add(solType *a, solType *b, solType *ret) {
     d4_assign(ret, &x);
 }
 
-void d4_add_(__global solType *a, __global solType *b, __global solType *ret) {
+void d4_add_(__global d4_Type *a, __global d4_Type *b, __global d4_Type *ret) {
     int i, j, k;
     stype s, t;
     stype u, v;
-    solType x;
+    d4_Type x;
     to_d4(0.0, &x);
 
     i = j = k = 0;
@@ -599,7 +599,7 @@ void d4_renorm_(stype *c0, stype *c1, stype *c2, stype *c3, stype *c4) {
     (*c3) = s3;
 }
 
-void d4_mul(solType *a, solType *b, __global solType *ret) {
+void d4_mul(d4_Type *a, d4_Type *b, __global d4_Type *ret) {
     stype p0, p1, p2, p3, p4, p5;
     stype q0, q1, q2, q3, q4, q5;
     stype p6, p7, p8, p9;
@@ -660,10 +660,10 @@ void d4_mul(solType *a, solType *b, __global solType *ret) {
 }
 
 
-void d4_minus(solType *a, solType *b, solType *ret) {
-    solType c;
+void d4_minus(d4_Type *a, d4_Type *b, d4_Type *ret) {
+    d4_Type c;
     d4_neg(b, &c);
-    solType d;
+    d4_Type d;
     d4_add(a, &c, &d);
     d4_assign(ret, &d);
 }
@@ -675,7 +675,7 @@ void d4_three_sum2(stype *a, stype *b, stype *c) {
     (*b) = t2 + t3;
 }
 
-void d4_mul_qd_d(solType *a, stype b, solType *ret) {
+void d4_mul_qd_d(d4_Type *a, stype b, d4_Type *ret) {
     stype p0, p1, p2, p3;
     stype q0, q1, q2;
     stype s0, s1, s2, s3, s4;
@@ -700,10 +700,10 @@ void d4_mul_qd_d(solType *a, stype b, solType *ret) {
     new_d4(s0, s1, s2, s3, ret);
 }
 
-void d4_div(solType *a, solType *b, solType *ret) {
+void d4_div(d4_Type *a, d4_Type *b, d4_Type *ret) {
     stype q0, q1, q2, q3;
 
-    solType r, tmp;
+    d4_Type r, tmp;
 
     q0 = a->x[0] / b->x[0];
     d4_mul_qd_d(b, q0, &tmp);
@@ -728,7 +728,7 @@ void d4_div(solType *a, solType *b, solType *ret) {
     new_d4(q0, q1, q2, q3, ret);
 }
 
-void d4_assign(solType *a, solType *b) {
+void d4_assign(d4_Type *a, d4_Type *b) {
     a->x[0] = b->x[0];
     a->x[1] = b->x[1];
     a->x[2] = b->x[2];

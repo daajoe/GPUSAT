@@ -47,7 +47,11 @@ namespace gpusat {
                 std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
                           << " ";
             }
+#ifdef sType_Double
+            std::cout << sol[a] << "\n";
+#else
             std::cout << d4_to_string(&sol[a]) << "\n";
+#endif
         }
     }
 
@@ -96,4 +100,9 @@ namespace gpusat {
         fileOut.write(data, size);
     }
 
+    double *d4_add(double *a, double *b) {
+        double *d = new double;
+        (*d) = (*a) + (*b);
+        return d;
+    }
 }

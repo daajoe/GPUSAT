@@ -109,11 +109,19 @@ int main(int argc, char *argv[]) {
         long long int time_build_kernel = getTime();
         struct stat buffer;
 
+#ifdef sType_Double
+        std::string binPath(kernelPath + "SAT_d.clbin");
+#else
         std::string binPath(kernelPath + "SAT.clbin");
+#endif
         if (stat(binPath.c_str(), &buffer) != 0) {
             //create kernel binary if it doesn't exist
 
+#ifdef sType_Double
+            std::string sourcePath(kernelPath + "SAT_d.cl");
+#else
             std::string sourcePath(kernelPath + "SAT.cl");
+#endif
             std::string kernelStr = GPUSATUtils::readFile(sourcePath);
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
                                                            kernelStr.length()));
@@ -155,11 +163,20 @@ int main(int argc, char *argv[]) {
 
         long long int time_model = getTime();
         if (sol.isSat > 0) {
+#ifdef sType_Double
+            double solutions=0.0;
+            for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
+                solutions += treeDecomp.bags[0].solution[i];
+            }
+            printf("{\n    \"Model Count\": %f",solutions);
+#else
             solType *solutions = to_d4(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
                 solutions = d4_add(solutions, &treeDecomp.bags[0].solution[i]);
             }
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
+#endif
+
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }
@@ -174,9 +191,9 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
-        delete treeDecomp.bags;
-        delete satFormula.clauses;
-        delete satFormula.numVarsC;
+        delete[] treeDecomp.bags;
+        delete[] satFormula.clauses;
+        delete[] satFormula.numVarsC;
 
     }
     catch (cl::Error &err) {

@@ -167,7 +167,11 @@ namespace gpusat {
             std::sort(ret_.bags[id].edges, ret_.bags[id].edges + ret_.bags[id].numEdges);
             id++;
         }
-        delete ret.bags;
+        for (int a = 0; a < ret.numb; a++) {
+            delete [] ret.bags[a].edges;
+            delete [] ret.bags[a].variables;
+        }
+        delete[] ret.bags;
         return ret_;
     }
 
@@ -226,6 +230,54 @@ namespace gpusat {
     void TDParser::preprocessDecomp(preebagType *decomp) {
 
         bool changed = true;
+        // try to merge child nodes
+        while (changed) {
+            changed = false;
+            for (int a = 0; a < decomp->numEdges && !changed; a++) {
+                for (int b = 0; b < decomp->numEdges && !changed; b++) {
+                    if (a != b && decomp->edges[a]->numVariables < maxWidht &&
+                        decomp->edges[b]->numVariables < maxWidht) {
+                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables +
+                                                                                   decomp->edges[b]->numVariables));
+                        std::vector<cl_long>::iterator it;
+                        it = std::set_union(decomp->edges[a]->variables,
+                                            decomp->edges[a]->variables + decomp->edges[a]->numVariables,
+                                            decomp->edges[b]->variables,
+                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables,
+                                            v.begin());
+                        v.resize(static_cast<unsigned long long int>(it - v.begin()));
+                        if (v.size() < maxWidht) {
+                            changed = true;
+                            cl_long cid = decomp->edges[b]->id;
+                            decomp->edges[a]->numVariables = v.size();
+                            decomp->edges[a]->variables = new cl_long[decomp->edges[a]->numVariables];
+                            std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
+
+                            std::vector<preebagType *> v_(
+                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges +
+                                                                        decomp->edges[b]->numEdges));
+                            std::vector<preebagType *>::iterator it_;
+                            it_ = std::set_union(decomp->edges[a]->edges,
+                                                 decomp->edges[a]->edges + decomp->edges[a]->numEdges,
+                                                 decomp->edges[b]->edges,
+                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges,
+                                                 v_.begin(),
+                                                 compTreedType);
+                            v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
+                            decomp->edges[a]->numEdges = v_.size();
+                            decomp->edges[a]->edges = new preebagType *[decomp->edges[a]->numEdges];
+                            std::copy(&v_[0], &v_[0] + v_.size(), decomp->edges[a]->edges);
+                            if (b < decomp->numEdges - 1) {
+                                std::copy(decomp->edges + b + 1, decomp->edges + decomp->numEdges, decomp->edges + b);
+                            }
+                            decomp->numEdges--;
+                        }
+                    }
+                }
+            }
+        }
+
+        changed = true;
         // try to merge with child nodes
         if (decomp->numVariables < maxWidht) {
             while (changed) {
@@ -271,52 +323,6 @@ namespace gpusat {
             }
         }
 
-        changed = true;
-        // try to merge child nodes
-        while (changed) {
-            changed = false;
-            for (int a = 0; a < decomp->numEdges && !changed; a++) {
-                for (int b = 0; b < decomp->numEdges && !changed; b++) {
-                    if (a!=b && decomp->edges[a]->numVariables < maxWidht && decomp->edges[b]->numVariables < maxWidht) {
-                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables +
-                                                                                   decomp->edges[b]->numVariables));
-                        std::vector<cl_long>::iterator it;
-                        it = std::set_union(decomp->edges[a]->variables,
-                                            decomp->edges[a]->variables + decomp->edges[a]->numVariables,
-                                            decomp->edges[b]->variables,
-                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables,
-                                            v.begin());
-                        v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                        if (v.size() < maxWidht) {
-                            changed = true;
-                            cl_long cid = decomp->edges[b]->id;
-                            decomp->edges[a]->numVariables = v.size();
-                            decomp->edges[a]->variables = new cl_long[decomp->edges[a]->numVariables];
-                            std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
-
-                            std::vector<preebagType *> v_(
-                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges +
-                                                                        decomp->edges[b]->numEdges));
-                            std::vector<preebagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges,
-                                                 decomp->edges[a]->edges + decomp->edges[a]->numEdges,
-                                                 decomp->edges[b]->edges,
-                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges,
-                                                 v_.begin(),
-                                                 compTreedType);
-                            v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                            decomp->edges[a]->numEdges = v_.size();
-                            decomp->edges[a]->edges = new preebagType *[decomp->edges[a]->numEdges];
-                            std::copy(&v_[0], &v_[0] + v_.size(), decomp->edges[a]->edges);
-                            if (b < decomp->numEdges-1) {
-                                std::copy(decomp->edges + b + 1, decomp->edges + decomp->numEdges, decomp->edges + b);
-                            }
-                            decomp->numEdges--;
-                        }
-                    }
-                }
-            }
-        }
 
         // process child nodes
         for (int i = 0; i < decomp->numEdges; i++) {

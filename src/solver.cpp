@@ -7,9 +7,9 @@
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
-
-        node.solution = static_cast<solType *>(malloc(sizeof(solType) * node.numSol));
+        int isSat = this->isSat;
         if (isSat > 0) {
+            node.solution = new solType[node.numSol]();
             if (node.numEdges == 0) {
                 solveLeaf(formula, node);
             } else if (node.numEdges == 1) {
@@ -18,7 +18,8 @@ namespace gpusat {
                 if (isSat == 1) {
                     bagType &next = decomp.bags[node.edges[0] - 1];
                     solveForgIntroduce(formula, node, next);
-                    delete next.solution;
+                    delete[] next.solution;
+                    delete[] next.variables;
                 }
             } else if (node.numEdges > 1) {
                 cl_long edge = node.edges[0] - 1;
@@ -37,7 +38,8 @@ namespace gpusat {
                     edge1_.numSol = static_cast<cl_long>(pow(2, edge1_.numVars));
                     edge1_.solution = new solType[edge1_.numSol]();
                     solveForget(edge1_, edge1);
-                    delete edge1.solution;
+                    delete[] edge1.solution;
+                    delete[] edge1.variables;
 
                     for (int i = 1; i < node.numEdges; i++) {
                         edge = node.edges[i] - 1;
@@ -58,7 +60,8 @@ namespace gpusat {
                         edge2_.numSol = static_cast<cl_long>(pow(2, edge2_.numVars));
                         edge2_.solution = new solType[edge2_.numSol]();
                         solveForget(edge2_, edge2);
-                        delete edge2.solution;
+                        delete[] edge2.solution;
+                        delete[] edge2.variables;
 
                         std::vector<cl_long> vt(static_cast<unsigned long long int>(edge1_.numVars + edge2_.numVars));
                         auto itt = std::set_union(edge1_.variables,
@@ -73,14 +76,17 @@ namespace gpusat {
                         tmp.solution = new solType[tmp.numSol]();
                         solveJoin(tmp, edge1_, edge2_);
 
-                        delete edge1_.solution;
-                        delete edge2_.solution;
-                        edge1_ = tmp;
+                        delete[] edge1_.solution;
+                        delete[] edge2_.solution;
 
                         if (i == node.numEdges - 1) {
                             solveIntroduce(formula, node, tmp);
-                            delete tmp.solution;
+                            delete[] tmp.solution;
+                            delete[] tmp.variables;
+                        }else if(i>1){
+                            delete[] edge1_.variables;
                         }
+                        edge1_ = tmp;
                     }
                 }
             }
@@ -121,7 +127,7 @@ namespace gpusat {
 
             solveForget(edge, next);
             solveIntroduce(formula, node, edge);
-            delete edge.solution;
+            delete[] edge.solution;
         }
     }
 

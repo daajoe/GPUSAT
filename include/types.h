@@ -11,7 +11,13 @@
 
 typedef struct {
     cl_double x[4];
-} solType;
+} d4_Type;
+
+#ifdef sType_Double
+#define solType double
+#else
+#define solType d4_Type
+#endif
 
 namespace gpusat {
 
