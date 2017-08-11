@@ -191,7 +191,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
-        for(int i=0;i<treeDecomp.numb;i++){
+        for (int i = 0; i < treeDecomp.numb; i++) {
             delete[] treeDecomp.bags[i].edges;
         }
         delete[] treeDecomp.bags[0].solution;
@@ -202,21 +202,10 @@ int main(int argc, char *argv[]) {
 
     }
     catch (cl::Error &err) {
-        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
-                  std::endl;
-        if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
-            std::string str =
-                    program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
-            std::cout << "Program Info: " << str << std::endl;
-        }
-    }
-    catch (std::string &msg) {
-        std::cerr << "Exception caught in main(): " << msg << std::endl;
+        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
     }
 }
 
 long long int getTime() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch()
-    ).count();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }

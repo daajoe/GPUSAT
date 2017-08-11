@@ -282,7 +282,7 @@ namespace gpusat {
     void d4_renorm(double &c0, double &c1, double &c2, double &c3) {
         double s0, s1, s2 = 0.0, s3 = 0.0;
 
-        if (isinf(c0)) return;
+        if (std::isinf(c0)) return;
 
         s0 = d4_quick_two_sum(c2, c3, c3);
         s0 = d4_quick_two_sum(c1, s0, c2);
@@ -396,7 +396,7 @@ namespace gpusat {
     void d4_renorm(double &c0, double &c1, double &c2, double &c3, double &c4) {
         double s0, s1, s2 = 0.0, s3 = 0.0;
 
-        if (isinf(c0)) return;
+        if (std::isinf(c0)) return;
 
         s0 = d4_quick_two_sum(c3, c4, c4);
         s0 = d4_quick_two_sum(c2, s0, c3);

@@ -25,8 +25,7 @@ void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret);
  * @param variables
  * @param edgeVariables
  */
-void solveIntroduce_(long numV, __global d4_Type *edge, long numVE,
-                     __global long *variables, __global long *edgeVariables, d4_Type *ret) {
+void solveIntroduce_(long numV, __global d4_Type *edge, long numVE, __global long *variables, __global long *edgeVariables, d4_Type *ret) {
     long id = get_global_id(0);
     long otherId = 0;
     long a = 0, b = 0;
@@ -63,8 +62,7 @@ void solveIntroduce_(long numV, __global d4_Type *edge, long numVE,
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV,
-             __global long *variables) {
+int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     for (i = 0; i < numclauses; i++) {
@@ -119,9 +117,9 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __global d4_Type *edge2,
-                        __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
-                        long numV, long numVE1, long numVE2) {
+__kernel void
+solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __global d4_Type *edge2, __global long *variables, __global long *edgeVariables1,
+          __global long *edgeVariables2, long numV, long numVE1, long numVE2) {
     long id = get_global_id(0);
     d4_Type tmp, tmp_;
     solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, &tmp);
@@ -148,8 +146,8 @@ __kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __
  *      number of variables in the current bag
  */
 __kernel void
-solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __global d4_Type *edge, long numVarsEdge,
-            __global long *variablesEdge, long combinations, long numVarsCurrent) {
+solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __global d4_Type *edge, long numVarsEdge, __global long *variablesEdge,
+            long combinations, long numVarsCurrent) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
         if (variablesEdge[i] == variablesCurrent[a]) {
@@ -157,7 +155,7 @@ solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __glob
             a++;
         }
     }
-    d4_Type tmp,tmp_;
+    d4_Type tmp, tmp_;
     for (i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (a = 0; a < numVarsEdge; a++) {
@@ -167,15 +165,15 @@ solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __glob
                 b++;
             }
         }
-        tmp.x[0]=solutions[id].x[0];
-        tmp.x[1]=solutions[id].x[1];
-        tmp.x[2]=solutions[id].x[2];
-        tmp.x[3]=solutions[id].x[3];
+        tmp.x[0] = solutions[id].x[0];
+        tmp.x[1] = solutions[id].x[1];
+        tmp.x[2] = solutions[id].x[2];
+        tmp.x[3] = solutions[id].x[3];
 
-        tmp_.x[0]=edge[otherId].x[0];
-        tmp_.x[1]=edge[otherId].x[1];
-        tmp_.x[2]=edge[otherId].x[2];
-        tmp_.x[3]=edge[otherId].x[3];
+        tmp_.x[0] = edge[otherId].x[0];
+        tmp_.x[1] = edge[otherId].x[1];
+        tmp_.x[2] = edge[otherId].x[2];
+        tmp_.x[3] = edge[otherId].x[3];
 
         d4_add(&tmp, &tmp_, &tmp);
 
@@ -202,8 +200,9 @@ solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __glob
  * @param variables
  *      array containing the ids of the variables in the bag
  */
-__kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses,
-                        __global d4_Type *solutions, long numV, __global long *variables, __global long *models) {
+__kernel void
+solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __global d4_Type *solutions, long numV, __global long *variables, __global
+          long *models) {
     long id = get_global_id(0);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     if (sat == 1) {
@@ -242,9 +241,9 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-__kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
-                             __global d4_Type *solutions, long numV, __global d4_Type *edge, long numVE,
-                             __global long *variables, __global long *edgeVariables, __global long *models) {
+__kernel void
+solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global d4_Type *solutions, long numV, __global d4_Type *edge,
+               long numVE, __global long *variables, __global long *edgeVariables, __global long *models) {
     long id = get_global_id(0);
     d4_Type tmp;
     solveIntroduce_(numV, edge, numVE, variables, edgeVariables, &tmp);
@@ -314,9 +313,9 @@ void d4_pow(d4_Type *a, int n, d4_Type *ret);
 
 bool d4_l(d4_Type *a, d4_Type *b) {
     return (a->x[0] < b->x[0] ||
-            (a->x[0] == b->x[0] && (a->x[1] < b->x[1] ||
-                                    (a->x[1] == b->x[1] && (a->x[2] < b->x[2] ||
-                                                            (a->x[2] == b->x[2] && a->x[3] < b->x[3]))))));
+            (a->x[0] == b->x[0] && (a->x[1] < b->x[1]
+                                    || (a->x[1] == b->x[1] && (a->x[2] < b->x[2]
+                                                               || (a->x[2] == b->x[2] && a->x[3] < b->x[3]))))));
 }
 
 ///implementation

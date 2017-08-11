@@ -9,8 +9,7 @@
  * @param variables
  * @param edgeVariables
  */
-stype solveIntroduce_(long numV, __global stype *edge, long numVE,
-                     __global long *variables, __global long *edgeVariables) {
+stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables) {
     long id = get_global_id(0);
     long otherId = 0;
     long a = 0, b = 0;
@@ -44,8 +43,7 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE,
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV,
-             __global long *variables) {
+int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     for (i = 0; i < numclauses; i++) {
@@ -100,13 +98,13 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2,
-                        __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
-                        long numV, long numVE1, long numVE2) {
+__kernel void
+solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1, __global
+          long *edgeVariables2, long numV, long numVE1, long numVE2) {
     long id = get_global_id(0);
     stype tmp, tmp_;
-    solutions[id]=solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1);
-    solutions[id]*=solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2);
+    solutions[id] = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1);
+    solutions[id] *= solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2);
 }
 
 /**
@@ -128,8 +126,8 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
  *      number of variables in the current bag
  */
 __kernel void
-solveForget(__global stype *solutions, __global long *variablesCurrent, __global stype *edge, long numVarsEdge,
-            __global long *variablesEdge, long combinations, long numVarsCurrent) {
+solveForget(__global stype *solutions, __global long *variablesCurrent, __global stype *edge, long numVarsEdge, __global long *variablesEdge,
+            long combinations, long numVarsCurrent) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
         if (variablesEdge[i] == variablesCurrent[a]) {
@@ -137,7 +135,7 @@ solveForget(__global stype *solutions, __global long *variablesCurrent, __global
             a++;
         }
     }
-    stype tmp,tmp_;
+    stype tmp, tmp_;
     for (i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (a = 0; a < numVarsEdge; a++) {
@@ -167,8 +165,9 @@ solveForget(__global stype *solutions, __global long *variablesCurrent, __global
  * @param variables
  *      array containing the ids of the variables in the bag
  */
-__kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses,
-                        __global stype *solutions, long numV, __global long *variables, __global long *models) {
+__kernel void
+solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global long *variables, __global
+          long *models) {
     long id = get_global_id(0);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     if (sat == 1) {
@@ -201,9 +200,9 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-__kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses,
-                             __global stype *solutions, long numV, __global stype *edge, long numVE,
-                             __global long *variables, __global long *edgeVariables, __global long *models) {
+__kernel void
+solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge,
+               long numVE, __global long *variables, __global long *edgeVariables, __global long *models) {
     long id = get_global_id(0);
     stype tmp;
     solutions[id] = solveIntroduce_(numV, edge, numVE, variables, edgeVariables);

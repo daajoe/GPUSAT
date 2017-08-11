@@ -44,8 +44,7 @@ namespace gpusat {
         for (int a = 0; a < numS; a++) {
             std::cout << a << ": ";
             for (int b = 0; b < numVariables; b++) {
-                std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b]
-                          << " ";
+                std::cout << (((a >> b) & 1) == 0 ? "-" : " ") << vars[b] << " ";
             }
 #ifdef sType_Double
             std::cout << sol[a] << "\n";
@@ -98,11 +97,5 @@ namespace gpusat {
     void GPUSATUtils::writeBinary(char *data, size_t size, std::string path) {
         std::ofstream fileOut(path, std::ios::binary);
         fileOut.write(data, size);
-    }
-
-    double *d4_add(double *a, double *b) {
-        double *d = new double;
-        (*d) = (*a) + (*b);
-        return d;
     }
 }

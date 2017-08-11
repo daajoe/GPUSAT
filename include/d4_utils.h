@@ -17,25 +17,25 @@ namespace gpusat {
                              std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
                              bool showpos = false, bool uppercase = false, char fill = ' ');
 
-    /// a - b
+    /// return a - b
     d4_Type d4_minus(d4_Type a, d4_Type b);
 
-    /// a + b
+    /// return a + b
     d4_Type d4_add(d4_Type a, d4_Type b);
 
-    /// a * b
+    /// return a * b
     d4_Type d4_mul(d4_Type a, d4_Type b);
 
-    /// a / b
+    /// return a / b
     d4_Type d4_div(d4_Type a, d4_Type b);
 
-    /// a = b
+    /// return a = b
     void d4_assign(d4_Type *a, d4_Type *b);
 
-    /// a ^ n
+    /// return a ^ n
     d4_Type d4_pow(d4_Type a, int n);
 
-    /// -x
+    /// return -x
     d4_Type d4_neg(d4_Type x);
 
     d4_Type new_d4(d4_Type x);
@@ -44,20 +44,15 @@ namespace gpusat {
 
     d4_Type new_d4(double d, double d1, double d2, double d3);
 
-    static d4_Type d4_e(2.718281828459045091e+00, 1.445646891729250158e-16, -2.127717108038176765e-33,
-                        1.515630159841218954e-49);
-    static d4_Type d4_log10(2.302585092994045901e+00, -2.170756223382249351e-16, -9.984262454465776570e-33,
-                            -4.023357454450206379e-49);
-    static d4_Type d4_neg_inf(-std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity(),
-                              -std::numeric_limits<double>::infinity());
+    static d4_Type d4_e(2.718281828459045091e+00, 1.445646891729250158e-16, -2.127717108038176765e-33, 1.515630159841218954e-49);
+    static d4_Type d4_log10(2.302585092994045901e+00, -2.170756223382249351e-16, -9.984262454465776570e-33, -4.023357454450206379e-49);
+    static d4_Type d4_neg_inf(-std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
+                              -std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity());
     static d4_Type d4_inf(std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
                           std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
     static d4_Type d4_zero(0.0, 0.0, 0.0, 0.0);
     static d4_Type d4_one(1.0, 0.0, 0.0, 0.0);
-    static d4_Type d4_log2(6.931471805599452862e-01, 2.319046813846299558e-17, 5.707708438416212066e-34,
-                           -3.582432210601811423e-50);
+    static d4_Type d4_log2(6.931471805599452862e-01, 2.319046813846299558e-17, 5.707708438416212066e-34, -3.582432210601811423e-50);
     static const int n_inv_fact = 15;
     static d4_Type d4_inv_fact[n_inv_fact] = {
             {1.66666666666666657e-01, 9.25185853854297066e-18,  5.13581318503262866e-34,  2.85094902409834186e-50},

@@ -1,7 +1,7 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
 
-#define alloca __builtin_alloca
+//#define alloca __builtin_alloca
 
 #include <CL/cl.hpp>
 #include <CL/cl_platform.h>

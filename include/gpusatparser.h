@@ -10,13 +10,13 @@ namespace gpusat {
     public:
 
         /**
-                 * generates a treedec from a given string
-                 *
-                 * @param formula
-                 *      the string representation of the tree decomposition
-                 * @return
-                 *      the tree decomposition
-                 */
+         * generates a treedec from a given string
+         *
+         * @param formula
+         *      the string representation of the tree decomposition
+         * @return
+         *      the tree decomposition
+         */
         satformulaType parseSatFormula(std::string formula);
 
     private:

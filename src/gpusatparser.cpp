@@ -237,14 +237,10 @@ namespace gpusat {
                 for (int b = 0; b < decomp->numEdges && !changed; b++) {
                     if (a != b && decomp->edges[a]->numVariables < maxWidht &&
                         decomp->edges[b]->numVariables < maxWidht) {
-                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables +
-                                                                                   decomp->edges[b]->numVariables));
+                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables + decomp->edges[b]->numVariables));
                         std::vector<cl_long>::iterator it;
-                        it = std::set_union(decomp->edges[a]->variables,
-                                            decomp->edges[a]->variables + decomp->edges[a]->numVariables,
-                                            decomp->edges[b]->variables,
-                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables,
-                                            v.begin());
+                        it = std::set_union(decomp->edges[a]->variables, decomp->edges[a]->variables + decomp->edges[a]->numVariables,
+                                            decomp->edges[b]->variables, decomp->edges[b]->variables + decomp->edges[b]->numVariables, v.begin());
                         v.resize(static_cast<unsigned long long int>(it - v.begin()));
                         if (v.size() < maxWidht) {
                             changed = true;
@@ -254,14 +250,10 @@ namespace gpusat {
                             std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
 
                             std::vector<preebagType *> v_(
-                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges +
-                                                                        decomp->edges[b]->numEdges));
+                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges + decomp->edges[b]->numEdges));
                             std::vector<preebagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges,
-                                                 decomp->edges[a]->edges + decomp->edges[a]->numEdges,
-                                                 decomp->edges[b]->edges,
-                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges,
-                                                 v_.begin(),
+                            it_ = std::set_union(decomp->edges[a]->edges, decomp->edges[a]->edges + decomp->edges[a]->numEdges,
+                                                 decomp->edges[b]->edges, decomp->edges[b]->edges + decomp->edges[b]->numEdges, v_.begin(),
                                                  compTreedType);
                             v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
                             decomp->edges[a]->numEdges = v_.size();
@@ -283,14 +275,10 @@ namespace gpusat {
             while (changed) {
                 changed = false;
                 for (int i = 0; i < decomp->numEdges; i++) {
-                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->numVariables +
-                                                                               decomp->edges[i]->numVariables));
+                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->numVariables + decomp->edges[i]->numVariables));
                     std::vector<cl_long>::iterator it;
-                    it = std::set_union(decomp->variables,
-                                        decomp->variables + decomp->numVariables,
-                                        decomp->edges[i]->variables,
-                                        decomp->edges[i]->variables + decomp->edges[i]->numVariables,
-                                        v.begin());
+                    it = std::set_union(decomp->variables, decomp->variables + decomp->numVariables, decomp->edges[i]->variables,
+                                        decomp->edges[i]->variables + decomp->edges[i]->numVariables, v.begin());
                     v.resize(static_cast<unsigned long long int>(it - v.begin()));
                     if (v.size() < maxWidht) {
                         changed = true;
@@ -299,15 +287,10 @@ namespace gpusat {
                         decomp->variables = new cl_long[decomp->numVariables];
                         std::copy(&v[0], &v[0] + v.size(), decomp->variables);
 
-                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->numEdges +
-                                                                                          decomp->edges[i]->numEdges));
+                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->numEdges + decomp->edges[i]->numEdges));
                         std::vector<preebagType *>::iterator it_;
-                        it_ = std::set_union(decomp->edges,
-                                             decomp->edges + decomp->numEdges,
-                                             decomp->edges[i]->edges,
-                                             decomp->edges[i]->edges + decomp->edges[i]->numEdges,
-                                             v_.begin(),
-                                             compTreedType);
+                        it_ = std::set_union(decomp->edges, decomp->edges + decomp->numEdges, decomp->edges[i]->edges,
+                                             decomp->edges[i]->edges + decomp->edges[i]->numEdges, v_.begin(), compTreedType);
                         v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
                         decomp->numEdges = v_.size() - 1;
                         decomp->edges = new preebagType *[decomp->numEdges];
