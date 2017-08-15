@@ -24,9 +24,18 @@ int main(int argc, char *argv[]) {
     std::stringbuf treeD, sat;
     std::string inputLine;
     bool file = false, formula = false;
-    int opt, maxWidth = 12;
+    int opt, combineWidth = 12, maxBag = 22;
     std::string kernelPath = "./kernel/";
-    while ((opt = getopt(argc, argv, "f:s:c:w:")) != -1) {
+    static struct option flags[] = {
+            {"formula",       required_argument, 0, 's'},
+            {"decomposition", required_argument, 0, 'f'},
+            {"combineWidth",  required_argument, 0, 'w'},
+            {"maxBagSize",    required_argument, 0, 'm'},
+            {"kernelDir",     required_argument, 0, 'c'},
+            {"help",          no_argument,       0, 'h'},
+            {0,               0,                 0, 0}
+    };
+    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:h", flags, NULL)) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -53,11 +62,31 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case 'w': {
-                maxWidth = std::atoi(optarg);
+                combineWidth = std::atoi(optarg);
                 break;
             }
+            case 'm': {
+                maxBag = std::atoi(optarg);
+                break;
+            }
+            case 'h': {
+                std::cout << "Usage: \n" << argv[0] << "\n"
+                          << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
+                          << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
+                          << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
+                          << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
+                          << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
+                          << "    --help,-h                       : prints this message\n";
+                exit(EXIT_SUCCESS);
+            }
             default:
-                std::cerr << "Usage: " << argv[0] << " [-f treedecomp] -s formula [-c kerneldir] \n";
+                std::cerr << "Error: Unknown option\n" << "Usage: \n" << argv[0] << "\n"
+                          << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
+                          << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
+                          << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
+                          << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
+                          << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
+                          << "    --help,-h                       : prints this message\n";
                 exit(EXIT_FAILURE);
         }
     }
@@ -78,7 +107,7 @@ int main(int argc, char *argv[]) {
 
     long long int time_parsing = getTime();
     CNFParser cnfParser;
-    TDParser tdParser(maxWidth);
+    TDParser tdParser(combineWidth);
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
     time_parsing = getTime() - time_parsing;
@@ -156,7 +185,7 @@ int main(int argc, char *argv[]) {
         }
         time_build_kernel = getTime() - time_build_kernel;
 
-        Solver sol(platforms, context, devices, queue, program, kernel);
+        Solver sol(platforms, context, devices, queue, program, kernel, maxBag);
         long long int time_solving = getTime();
         sol.solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
         time_solving = getTime() - time_solving;
@@ -164,7 +193,7 @@ int main(int argc, char *argv[]) {
         long long int time_model = getTime();
         if (sol.isSat > 0) {
 #ifdef sType_Double
-            double solutions=0.0;
+            solType solutions=0.0;
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
                 solutions += treeDecomp.bags[0].solution[i];
             }
@@ -202,7 +231,16 @@ int main(int argc, char *argv[]) {
 
     }
     catch (cl::Error &err) {
-        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
+        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
+                  std::endl;
+        if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
+            std::string str =
+                    program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
+            std::cout << "Program Info: " << str << std::endl;
+        }
+    }
+    catch (std::string &msg) {
+        std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
 }
 

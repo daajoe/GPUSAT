@@ -14,16 +14,16 @@ namespace gpusat {
         cl::CommandQueue &queue;
         cl::Program &program;
         cl::Kernel &kernel;
+        cl_long maxWidth;
 
         void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
 
     public:
-        int isSat = 1;
+        int isSat=1;
 
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
-               cl::Program &program_, cl::Kernel &kernel_) : platforms(platforms_), context(context_), devices(devices_), queue(queue_),
-                                                             program(program_), kernel(kernel_) {
-            isSat = 1;
+               cl::Program &program_, cl::Kernel &kernel_,int width) : platforms(platforms_), context(context_), devices(devices_), queue(queue_),
+                                                             program(program_), kernel(kernel_),maxWidth(width) {
         }
 
         /**

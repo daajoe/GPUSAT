@@ -59,7 +59,7 @@ struct d4_Type {
 };
 
 #ifdef sType_Double
-#define solType double
+#define solType cl_double
 #else
 #define solType d4_Type
 #endif

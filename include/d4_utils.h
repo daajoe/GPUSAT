@@ -164,5 +164,13 @@ namespace gpusat {
     inline bool operator<(d4_Type a, d4_Type b) {
         return d4_l(a, b);
     }
+
+    inline bool operator!=(d4_Type a, d4_Type b) {
+        return d4_l(a, b) || d4_l(b,a);
+    }
+
+    inline bool operator==(d4_Type a, d4_Type b) {
+        return !d4_l(a, b) && !d4_l(b,a);
+    }
 }
 #endif //GPUSAT_D4_UTILS_H

@@ -93,7 +93,7 @@ namespace gpusat {
     }
 
     TDParser::TDParser(int i) {
-        maxWidht = i;
+        combineWidth = i;
     }
 
     treedecType TDParser::parseTreeDecomp(std::string graph) {
@@ -235,14 +235,14 @@ namespace gpusat {
             changed = false;
             for (int a = 0; a < decomp->numEdges && !changed; a++) {
                 for (int b = 0; b < decomp->numEdges && !changed; b++) {
-                    if (a != b && decomp->edges[a]->numVariables < maxWidht &&
-                        decomp->edges[b]->numVariables < maxWidht) {
+                    if (a != b && decomp->edges[a]->numVariables < combineWidth &&
+                        decomp->edges[b]->numVariables < combineWidth) {
                         std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables + decomp->edges[b]->numVariables));
                         std::vector<cl_long>::iterator it;
                         it = std::set_union(decomp->edges[a]->variables, decomp->edges[a]->variables + decomp->edges[a]->numVariables,
                                             decomp->edges[b]->variables, decomp->edges[b]->variables + decomp->edges[b]->numVariables, v.begin());
                         v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                        if (v.size() < maxWidht) {
+                        if (v.size() < combineWidth) {
                             changed = true;
                             cl_long cid = decomp->edges[b]->id;
                             decomp->edges[a]->numVariables = v.size();
@@ -271,7 +271,7 @@ namespace gpusat {
 
         changed = true;
         // try to merge with child nodes
-        if (decomp->numVariables < maxWidht) {
+        if (decomp->numVariables < combineWidth) {
             while (changed) {
                 changed = false;
                 for (int i = 0; i < decomp->numEdges; i++) {
@@ -280,7 +280,7 @@ namespace gpusat {
                     it = std::set_union(decomp->variables, decomp->variables + decomp->numVariables, decomp->edges[i]->variables,
                                         decomp->edges[i]->variables + decomp->edges[i]->numVariables, v.begin());
                     v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                    if (v.size() < maxWidht) {
+                    if (v.size() < combineWidth) {
                         changed = true;
                         cl_long cid = decomp->edges[i]->id;
                         decomp->numVariables = v.size();

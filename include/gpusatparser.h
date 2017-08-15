@@ -43,8 +43,6 @@ namespace gpusat {
          *      object containing the clauses in the sat formula
          */
         void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> &clauses);
-
-        int maxWidht;
     };
 
     class TDParser {
@@ -96,7 +94,7 @@ namespace gpusat {
 
         void preprocessDecomp(preebagType *decomp);
 
-        int maxWidht;
+        int combineWidth;
     };
 }
 #endif //GPUSAT_PARSER_H
