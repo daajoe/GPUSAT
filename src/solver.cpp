@@ -9,7 +9,6 @@
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
-        int isSat = this->isSat;
         if (isSat > 0) {
             node.solution = new solType[node.numSol]();
             if (node.numEdges == 0) {
@@ -25,9 +24,13 @@ namespace gpusat {
                 }
             } else if (node.numEdges > 1) {
                 cl_long edge = node.edges[0] - 1;
-                solveProblem(decomp, formula, decomp.bags[edge]);
+                bagType &edge1 = decomp.bags[edge];
+                solveProblem(decomp, formula, edge1);
+                if (isSat <= 0) {
+                    return;
+                }
                 if (isSat == 1) {
-                    bagType tmp, edge2_, edge1_, &edge1 = decomp.bags[node.edges[0] - 1];
+                    bagType tmp, edge2_, edge1_;
                     std::vector<cl_long> v1(static_cast<unsigned long long int>(edge1.numVars + node.numVars));
                     auto it1 = std::set_intersection(node.variables, node.variables + node.numVars, edge1.variables, edge1.variables + edge1.numVars,
                                                      v1.begin());
@@ -42,11 +45,11 @@ namespace gpusat {
 
                     for (int i = 1; i < node.numEdges; i++) {
                         edge = node.edges[i] - 1;
-                        solveProblem(decomp, formula, decomp.bags[edge]);
+                        bagType &edge2 = decomp.bags[edge];
+                        solveProblem(decomp, formula, edge2);
                         if (isSat <= 0) {
                             return;
                         }
-                        bagType &edge2 = decomp.bags[node.edges[i] - 1];
                         std::vector<cl_long> v2(static_cast<unsigned long long int>(edge2.numVars + node.numVars));
                         auto it2 = std::set_intersection(node.variables, node.variables + node.numVars, edge2.variables,
                                                          edge2.variables + edge2.numVars, v2.begin());
