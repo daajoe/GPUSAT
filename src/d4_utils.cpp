@@ -103,8 +103,7 @@ namespace gpusat {
     }
 
     std::string
-    d4_to_string(d4_Type x_, int precision, int width, std::ios_base::fmtflags fmt, bool showpos, bool uppercase,
-                 char fill) {
+    d4_to_string(d4_Type x_, int precision, int width, std::ios_base::fmtflags fmt, bool showpos, bool uppercase, char fill) {
         std::string s;
         bool fixed = (fmt & std::ios_base::fixed) != 0;
         bool sgn = true;

@@ -14,6 +14,7 @@
 #include <numeric>
 #include <solver.h>
 #include <d4_utils.h>
+#include <kernels.h>
 
 using namespace gpusat;
 
@@ -128,8 +129,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
         }
-        cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM,
-                                        (cl_context_properties) (*iter)(), 0};
+        cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
         context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
         devices = context.getInfo<CL_CONTEXT_DEVICES>();
         queue = cl::CommandQueue(context, devices[0]);
@@ -147,19 +147,16 @@ int main(int argc, char *argv[]) {
             //create kernel binary if it doesn't exist
 
 #ifdef sType_Double
-            std::string sourcePath(kernelPath + "SAT_d.cl");
+            std::string kernelStr = DOUBLE_KERNEL_STRING;
 #else
-            std::string sourcePath(kernelPath + "SAT.cl");
+            std::string kernelStr = D4_KERNEL_STRING;
 #endif
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(),
-                                                           kernelStr.length()));
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
             program = cl::Program(context, sources);
             program.build(devices);
 
             const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData(
-                    (unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
             char *binChunk = &binData[0];
 
             std::vector<char *> binaries;
@@ -231,11 +228,9 @@ int main(int argc, char *argv[]) {
 
     }
     catch (cl::Error &err) {
-        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" <<
-                  std::endl;
+        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
         if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
-            std::string str =
-                    program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
+            std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
             std::cout << "Program Info: " << str << std::endl;
         }
     }

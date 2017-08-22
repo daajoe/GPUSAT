@@ -13,8 +13,7 @@
 
 namespace gpusat {
     /// turn x into string
-    std::string d4_to_string(d4_Type x, int precision = 62, int width = 0,
-                             std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
+    std::string d4_to_string(d4_Type x, int precision = 62, int width = 0, std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
                              bool showpos = false, bool uppercase = false, char fill = ' ');
 
     /// return a - b
@@ -166,11 +165,11 @@ namespace gpusat {
     }
 
     inline bool operator!=(d4_Type a, d4_Type b) {
-        return d4_l(a, b) || d4_l(b,a);
+        return d4_l(a, b) || d4_l(b, a);
     }
 
     inline bool operator==(d4_Type a, d4_Type b) {
-        return !d4_l(a, b) && !d4_l(b,a);
+        return !d4_l(a, b) && !d4_l(b, a);
     }
 }
 #endif //GPUSAT_D4_UTILS_H

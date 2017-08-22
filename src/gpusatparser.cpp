@@ -80,8 +80,7 @@ namespace gpusat {
         clauses.push(clause);
     }
 
-    void CNFParser::parseProblemLine(satformulaType &satformula, std::string item,
-                                     std::queue<std::queue<cl_long>> &clauses) {
+    void CNFParser::parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> &clauses) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //p

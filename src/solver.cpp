@@ -129,8 +129,7 @@ namespace gpusat {
         isSat = 0;
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagsizeNode;
-            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagsizeNode),
-                              &node.solution[a * bagsizeNode]);
+            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagsizeNode), &node.solution[a * bagsizeNode]);
             cl_long numSubIterations = pow(2, std::max((cl_long) 0, edge.numVars - maxWidth));
             for (int b = 0; b < numSubIterations; b++) {
                 cl_long startIdEdge = b * bagsizeEdge;
@@ -184,8 +183,7 @@ namespace gpusat {
                 kernel.setArg(12, bufStartNode);
                 cl::Buffer bufStartEdge(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &startIdEdge);
                 kernel.setArg(13, bufStartEdge);
-                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)),
-                                           cl::NDRange(static_cast<size_t>(bagsizeNode)));
+                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagsizeNode)));
                 //queue.finish();
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagsizeNode), &node.solution[startIdNode]);
                 queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
@@ -232,8 +230,7 @@ namespace gpusat {
             kernel.setArg(6, bufSAT);
             cl::Buffer bufStart(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &startIdNode);
             kernel.setArg(7, bufStart);
-            queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)),
-                                       cl::NDRange(static_cast<size_t>(bagsizeNode)));
+            queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagsizeNode)));
             //queue.finish();
             queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagsizeNode), &node.solution[startIdNode]);
             queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
@@ -248,8 +245,7 @@ namespace gpusat {
         cl_long numIterations = pow(2, std::max((cl_long) 0, node.numVars - maxWidth));
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagsizeNode;
-            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagsizeNode),
-                              &node.solution[a * bagsizeNode]);
+            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagsizeNode), &node.solution[a * bagsizeNode]);
             cl_long numSubIterations = pow(2, std::max((cl_long) 0, edge.numVars - maxWidth));
             for (int b = 0; b < numSubIterations; b++) {
                 cl_long startIdEdge = b * bagsizeEdge;
@@ -285,8 +281,7 @@ namespace gpusat {
                 kernel.setArg(9, bufStartNode);
                 cl::Buffer bufStartEdge(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &startIdEdge);
                 kernel.setArg(10, bufStartEdge);
-                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)),
-                                           cl::NDRange(static_cast<size_t>(bagsizeNode)));
+                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagsizeNode)));
                 //queue.finish();
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagsizeNode), &node.solution[startIdNode]);
             }
@@ -375,8 +370,7 @@ namespace gpusat {
                 kernel.setArg(14, bufStartEdge1);
                 cl::Buffer bufStartEdge2(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &startIdEdge2);
                 kernel.setArg(15, bufStartEdge2);
-                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)),
-                                           cl::NDRange(static_cast<size_t>(bagsizeNode)));
+                queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagsizeNode)));
                 //queue.finish();
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagsizeNode), &node.solution[startIdNode]);
             }
