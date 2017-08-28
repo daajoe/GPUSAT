@@ -86,6 +86,7 @@ namespace gpusat {
         getline(sline, i, ' '); //p
         getline(sline, i, ' '); //cnf
         getline(sline, i, ' '); //num vars
+        satformula.numVars = stoi(i);
         getline(sline, i, ' '); //num clauses
         satformula.numclauses = stoi(i);
         satformula.numVarsC = new cl_long[satformula.numclauses]();
@@ -102,7 +103,7 @@ namespace gpusat {
         std::vector<std::vector<cl_long>> edges;
         while (getline(ss, item)) {
             //ignore empty line
-            if (item.length() > 0) {
+            if (item.length() > 2) {
                 char type = item.at(0);
                 if (type == 'c') {
                     //comment line (ignore)

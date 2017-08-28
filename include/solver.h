@@ -1,29 +1,39 @@
-#ifndef GPUSAT_SOLVER_H
-#define GPUSAT_SOLVER_H
-#define alloca __builtin_alloca
+#ifndef GPUSAT_SOLVER_H_H
+#define GPUSAT_SOLVER_H_H
 
-#include <CL/cl.hpp>
 #include <types.h>
 
 namespace gpusat {
     class Solver {
-    private:
+    protected:
+        //TODO
         std::vector<cl::Platform> &platforms;
+        //TODO
         cl::Context &context;
+        //TODO
         std::vector<cl::Device> &devices;
+        //TODO
         cl::CommandQueue &queue;
+        //TODO
         cl::Program &program;
+        //TODO
         cl::Kernel &kernel;
+        //TODO
         cl_long maxWidth;
-
-        void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
+        //TODO
+        cl_long inci;
 
     public:
         int isSat = 1;
 
-        Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-               cl::Kernel &kernel_, int width) : platforms(platforms_), context(context_), devices(devices_), queue(queue_), program(program_), kernel(kernel_),
-                                                 maxWidth(width) {
+        /**
+         * TODO
+         */
+        Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
+               cl::Program &program_,
+               cl::Kernel &kernel_, int width, bool incidence) :
+                platforms(platforms_), context(context_), devices(devices_), queue(queue_), program(program_), kernel(kernel_), maxWidth(width),
+                inci(incidence) {
         }
 
         /**
@@ -40,6 +50,14 @@ namespace gpusat {
 
     protected:
         /**
+         * TODO
+         * @param formula
+         * @param node
+         * @param next
+         */
+        virtual void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
+
+        /**
          * function to solve a join node
          *
          * @param node
@@ -49,7 +67,7 @@ namespace gpusat {
          * @param edge2
          *      the second edge
          */
-        void solveJoin(bagType &node, bagType &edge1, bagType &edge2);
+        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type)=0;
 
         /**
          * function to solve a forget node
@@ -59,7 +77,7 @@ namespace gpusat {
          * @param edge
          *      the next node
          */
-        void solveForget(bagType &node, bagType &edge);
+        virtual void solveForget(bagType &node, bagType &edge, satformulaType &formula)=0;
 
         /**
          * function to solve a leaf node
@@ -69,7 +87,7 @@ namespace gpusat {
          * @param node
          *      the node to save the solutions in
          */
-        void solveLeaf(satformulaType &formula, bagType &node);
+        virtual void solveLeaf(satformulaType &formula, bagType &node)=0;
 
         /**
          * function to solve a introduce node
@@ -81,8 +99,39 @@ namespace gpusat {
          * @param edge
          *      the next node
          */
+        virtual void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge)=0;
+    };
+
+    class Solver_Primal : public Solver {
+    public:
+        Solver_Primal(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
+                      cl::Program &program_, cl::Kernel &kernel_, int width, bool inzi) :
+                Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi) {}
+
+    protected:
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type);
+
+        void solveForget(bagType &node, bagType &edge, satformulaType &formula);
+
+        void solveLeaf(satformulaType &formula, bagType &node);
+
+        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
+    };
+
+    class Solver_Incidence : public Solver {
+    public:
+        Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_,
+                         cl::CommandQueue &queue_, cl::Program &program_, cl::Kernel &kernel_, int width, bool inzi) :
+                Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi) {}
+
+    protected:
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
+
+        void solveForget(bagType &node, bagType &edge, satformulaType &formula);
+
+        void solveLeaf(satformulaType &formula, bagType &node);
+
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
     };
 }
-
-#endif //GPUSAT_SOLVER_H
+#endif //GPUSAT_SOLVER_H_H

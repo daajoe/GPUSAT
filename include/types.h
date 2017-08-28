@@ -1,7 +1,7 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
 
-//#define alloca __builtin_alloca
+#define alloca __builtin_alloca
 
 #include <CL/cl.hpp>
 #include <CL/cl_platform.h>
@@ -102,9 +102,18 @@ namespace gpusat {
     /// type for saving the sat formula
     struct satformulaType {
         cl_long numclauses = 0;
+        cl_long numVars = 0;
         cl_long totalNumVar = 0;
         cl_long *numVarsC = nullptr;
         cl_long *clauses = nullptr;
+    };
+
+    enum graphTypes {
+        INCIDENCE, PRIMAL
+    };
+
+    enum precisionTypes {
+        DOUBLE, D4
     };
 }
 

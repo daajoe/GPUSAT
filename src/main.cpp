@@ -14,7 +14,6 @@
 #include <numeric>
 #include <solver.h>
 #include <d4_utils.h>
-#include <kernels.h>
 
 using namespace gpusat;
 
@@ -27,6 +26,7 @@ int main(int argc, char *argv[]) {
     bool file = false, formula = false;
     int opt, combineWidth = 12, maxBag = 22;
     std::string kernelPath = "./kernel/";
+    int graph = 'p';
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -34,9 +34,10 @@ int main(int argc, char *argv[]) {
             {"maxBagSize",    required_argument, 0, 'm'},
             {"kernelDir",     required_argument, 0, 'c'},
             {"help",          no_argument,       0, 'h'},
+            {"graph",         required_argument, 0, 'g'},
             {0,               0,                 0, 0}
     };
-    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:h", flags, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:hg:", flags, NULL)) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -70,6 +71,10 @@ int main(int argc, char *argv[]) {
                 maxBag = std::atoi(optarg);
                 break;
             }
+            case 'g': {
+                graph = optarg[0];
+                break;
+            }
             case 'h': {
                 std::cout << "Usage: \n" << argv[0] << "\n"
                           << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
@@ -77,6 +82,7 @@ int main(int argc, char *argv[]) {
                           << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
                           << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
                           << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
+                          << "    --graph,-g <p|i>                : i ... incidence graph, p ... primal graph\n"
                           << "    --help,-h                       : prints this message\n";
                 exit(EXIT_SUCCESS);
             }
@@ -137,39 +143,82 @@ int main(int argc, char *argv[]) {
 
         long long int time_build_kernel = getTime();
         struct stat buffer;
+        std::string binPath;
 
 #ifdef sType_Double
-        std::string binPath(kernelPath + "SAT_d.clbin");
+        switch (graph) {
+            case 'p':
+                binPath = kernelPath + "SAT_d_p.clbin";
+                break;
+            case 'i':
+                binPath = kernelPath + "SAT_d_i.clbin";
+                break;
+            default:
+                break;
+        }
 #else
-        std::string binPath(kernelPath + "SAT.clbin");
+        switch (graph) {
+            case 'p':
+                binPath = kernelPath + "SAT_d4_p.clbin";
+                break;
+            case 'i':
+                binPath = kernelPath + "SAT_d4_i.clbin";
+                break;
+            default:
+                break;
+        }
 #endif
+
+#ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
-            //create kernel binary if it doesn't exist
+#endif
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
 #ifdef sType_Double
-            std::string kernelStr = DOUBLE_KERNEL_STRING;
+        switch (graph) {
+            case 'p':
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case 'i':
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+            default:
+                break;
+        }
 #else
-            std::string kernelStr = D4_KERNEL_STRING;
+        switch (graph) {
+            case 'p':
+                sourcePath = kernelPath + "SAT_d4_primal.cl";
+                break;
+            case 'i':
+                sourcePath = kernelPath + "SAT_d4_inci.cl";
+                break;
+            default:
+                break;
+        }
 #endif
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
+#ifndef DEBUG
         } else {
             //load kernel binary
 
@@ -180,21 +229,47 @@ int main(int argc, char *argv[]) {
             program = cl::Program(context, devices, bins, nullptr, &err);
             program.build(devices);
         }
+#endif
         time_build_kernel = getTime() - time_build_kernel;
 
-        Solver sol(platforms, context, devices, queue, program, kernel, maxBag);
+        Solver *sol;
+        switch (graph) {
+            case 'p':
+                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false);
+                break;
+            case 'i':
+                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true);
+                break;
+            default:
+                break;
+        }
         long long int time_solving = getTime();
-        sol.solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
+        (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
         time_solving = getTime() - time_solving;
 
         long long int time_model = getTime();
-        if (sol.isSat > 0) {
+        if ((*sol).isSat > 0) {
 #ifdef sType_Double
-            solType solutions=0.0;
+            solType solutions = 0.0;
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                solutions += treeDecomp.bags[0].solution[i];
+                if (graph == 'i') {
+                    bool sat = true;
+                    int b = 0, c = 0;
+                    for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
+                    };
+                    for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
+                        if (((i >> c) & 1) == 0) {
+                            sat = false;
+                        }
+                    }
+                    if (sat) {
+                        solutions += treeDecomp.bags[0].solution[i];
+                    }
+                } else {
+                    solutions += treeDecomp.bags[0].solution[i];
+                }
             }
-            printf("{\n    \"Model Count\": %f",solutions);
+            printf("{\n    \"Model Count\": %f", solutions);
 #else
             solType solutions(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
