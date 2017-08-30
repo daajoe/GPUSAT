@@ -6,21 +6,14 @@
 namespace gpusat {
     class Solver {
     protected:
-        //TODO
         std::vector<cl::Platform> &platforms;
-        //TODO
         cl::Context &context;
-        //TODO
         std::vector<cl::Device> &devices;
-        //TODO
         cl::CommandQueue &queue;
-        //TODO
         cl::Program &program;
-        //TODO
         cl::Kernel &kernel;
-        //TODO
+        //max with before splitting the bags
         cl_long maxWidth;
-        //TODO
         cl_long inci;
 
     public:

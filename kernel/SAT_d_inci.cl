@@ -1,6 +1,3 @@
-//#define __kernel
-//#define __global
-
 #define stype double
 
 int isNotSat(unsigned long assignment, __global long *clause, __global unsigned long *variables);
@@ -9,18 +6,27 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
  * Operation to solve a Join node in the decomposition.
  *
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param e1Sol
+ *      array containing the number of solutions for each assignment for the first edge
  * @param e2Sol
- * @param nVar
- * @param e1Var
- * @param e2Var
+ *      array containing the number of solutions for each assignment for the second edge
  * @param minIDe1
- * @param minIDe2
+ *      min id of the first edge
  * @param maxIDe1
+ *      max id of the first edge
+ * @param minIDe2
+ *      min id of the second edge
  * @param maxIDe2
+ *      max id of the second edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe1
+ *      start id of the first edge
  * @param startIDe2
+ *      of the second edge
+ * @param numClauses
+ *      number of clauses in the current node
  */
 __kernel void
 solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
@@ -50,14 +56,34 @@ solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
 /**
  * Operation to solve a Forget node in the decomposition.
  *
- * @param nVars
- * @param eVars
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param eSol
- * @param minID
- * @param maxID
+ *      array containing the number of solutions for each assignment for the edge
+ * @param nVars
+ *      array containing the variable ids of the current node
+ * @param eVars
+ *      array containing the variable ids of the edge
+ * @param numNVars
+ *      array containing the number of variables in the current node
+ * @param numEVars
+ *      array containing the number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe
+ *      start id of the edge
+ * @param minID
+ *      min id of the edge
+ * @param maxID
+ *      max id of the edge
  */
 __kernel void
 solveForget(__global stype *nSol, __global stype *eSol,
@@ -106,11 +132,18 @@ solveForget(__global stype *nSol, __global stype *eSol,
 /**
  * Operation to solve a Leaf node in the decomposition.
  *
+ * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param clauses
- * @param variables
- * @param solutions
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param numNC
+ *      number of clauses in the current node
  * @param startID
+ *      start id of the current node
  * @param models
+ *      set to 1 if models are found
  */
 __kernel void
 solveLeaf(__global stype *nSol,
@@ -139,16 +172,40 @@ solveLeaf(__global stype *nSol,
 /**
  * Operation to solve a Introduce node in the decomposition.
  *
- * @param clauses
- * @param nVars
- * @param eVars
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param eSol
- * @param models
- * @param minID
- * @param maxID
+ *      array containing the number of solutions for each assignment for the edge
+ * @param clauses
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param cLen
+ *      length of the clauses array
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param eVars
+ *      array containing the ids of the variables in the edge
+ * @param numNV
+ *      number of variables in the current node
+ * @param numEV
+ *      number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe
+ *      start id of the edge
+ * @param minID
+ *      min id of the edge
+ * @param maxID
+ *      max id of the edge
+ * @param isSAT
+ *      set to 1 if models are found
  */
 __kernel void
 solveIntroduce(__global stype *nSol, __global stype *eSol,
@@ -163,7 +220,6 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> *numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
-    //if (id == 3) printf("start");
 
     //check clauses
     for (a = 0, b = 0, i = 0; a < *numNC; i++) {
@@ -173,7 +229,6 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
                 b++;
             } else if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
                 nSol[id - *startIDn] = 0.0;
-                //if (id == 3) printf("check Clause, n: %i, e: %i, a: %i, b:%i",nClauses[a],eClauses[b],a,b);
                 return;
             }
             a++;
@@ -191,10 +246,8 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
             c++;
         } else {
             for (a = 0; a < *numNV; a++) {
-                //if (id == 6) printf("__id: %i, clause: %i, var: %i ", id, clauses[i],nVars[a]);
                 if ((((id >> c) & 1) == 0) && (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
                     nSol[id - *startIDn] = 0.0;
-                    //if (id == 3) printf("check variable");
                     return;
                 }
                 if ((baseSum == 0) && (nClauses[c] == eClauses[d]) && (((id >> c) & 1) == 1) &&
@@ -235,7 +288,7 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
                 if (eClauses[ec] == nClauses[nc]) {
                     for (; clauses[x] != 0; x++) {
                         for (a = 0, b = 0; a < *numNV && rec == 0; a++) {
-                            if (clauses[x] == (nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1)))  {
+                            if (clauses[x] == (nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
                                 otherID &= ~(((i >> index) & 1) << ec);
                                 index++;
                                 rec = 1;

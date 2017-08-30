@@ -1,6 +1,3 @@
-//#define __kernel
-//#define __global
-
 #define stype double
 
 typedef struct {
@@ -16,6 +13,7 @@ void d4_add2(__global d4_Type *a, d4_Type *b, __global d4_Type *ret);
 void d4_div(d4_Type *a, d4_Type *b, d4_Type *ret);
 
 void d4_assign(d4_Type *a, d4_Type *b);
+
 void d4_assign_(__global d4_Type *a, d4_Type *b);
 
 void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret);
@@ -26,18 +24,27 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
  * Operation to solve a Join node in the decomposition.
  *
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param e1Sol
+ *      array containing the number of solutions for each assignment for the first edge
  * @param e2Sol
- * @param nVar
- * @param e1Var
- * @param e2Var
+ *      array containing the number of solutions for each assignment for the second edge
  * @param minIDe1
- * @param minIDe2
+ *      min id of the first edge
  * @param maxIDe1
+ *      max id of the first edge
+ * @param minIDe2
+ *      min id of the second edge
  * @param maxIDe2
+ *      max id of the second edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe1
+ *      start id of the first edge
  * @param startIDe2
+ *      of the second edge
+ * @param numClauses
+ *      number of clauses in the current node
  */
 __kernel void
 solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __global d4_Type *e2Sol,
@@ -69,14 +76,34 @@ solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __global d4_Type *e2S
 /**
  * Operation to solve a Forget node in the decomposition.
  *
- * @param nVars
- * @param eVars
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param eSol
- * @param minID
- * @param maxID
+ *      array containing the number of solutions for each assignment for the edge
+ * @param nVars
+ *      array containing the variable ids of the current node
+ * @param eVars
+ *      array containing the variable ids of the edge
+ * @param numNVars
+ *      array containing the number of variables in the current node
+ * @param numEVars
+ *      array containing the number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe
+ *      start id of the edge
+ * @param minID
+ *      min id of the edge
+ * @param maxID
+ *      max id of the edge
  */
 __kernel void
 solveForget(__global d4_Type *nSol, __global d4_Type *eSol,
@@ -125,11 +152,18 @@ solveForget(__global d4_Type *nSol, __global d4_Type *eSol,
 /**
  * Operation to solve a Leaf node in the decomposition.
  *
+ * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param clauses
- * @param variables
- * @param solutions
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param numNC
+ *      number of clauses in the current node
  * @param startID
+ *      start id of the current node
  * @param models
+ *      set to 1 if models are found
  */
 __kernel void
 solveLeaf(__global d4_Type *nSol,
@@ -164,16 +198,40 @@ solveLeaf(__global d4_Type *nSol,
 /**
  * Operation to solve a Introduce node in the decomposition.
  *
- * @param clauses
- * @param nVars
- * @param eVars
  * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
  * @param eSol
- * @param models
- * @param minID
- * @param maxID
+ *      array containing the number of solutions for each assignment for the edge
+ * @param clauses
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param cLen
+ *      length of the clauses array
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param eVars
+ *      array containing the ids of the variables in the edge
+ * @param numNV
+ *      number of variables in the current node
+ * @param numEV
+ *      number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
  * @param startIDn
+ *      start id of the current node
  * @param startIDe
+ *      start id of the edge
+ * @param minID
+ *      min id of the edge
+ * @param maxID
+ *      max id of the edge
+ * @param isSAT
+ *      set to 1 if models are found
  */
 __kernel void
 solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,

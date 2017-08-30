@@ -1,6 +1,3 @@
-//#define __kernel
-//#define __global
-
 #define stype double
 
 typedef struct {
@@ -17,15 +14,6 @@ void d4_assign(d4_Type *a, d4_Type *b);
 
 void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret);
 
-/**
- *
- * @param solutions
- * @param numV
- * @param edge
- * @param numVE
- * @param variables
- * @param edgeVariables
- */
 void solveIntroduce_(long numV, __global d4_Type *edge, long numVE, __global long *variables, __global long *edgeVariables, d4_Type *ret, __global
                      long *minId, __global long *maxId, __global long *startIDEdge) {
     long id = get_global_id(0);

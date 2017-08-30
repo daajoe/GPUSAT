@@ -92,6 +92,12 @@ namespace gpusat {
          */
         void parseBagLine(preetreedecType &ret, std::string item);
 
+        /**
+         * preprocess the tree decomposition
+         *
+         * @param decomp
+         *      the tree decomposition
+         */
         void preprocessDecomp(preebagType *decomp);
 
         int combineWidth;

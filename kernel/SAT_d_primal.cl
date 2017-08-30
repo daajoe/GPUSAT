@@ -1,17 +1,5 @@
-//#define __kernel
-//#define __global
-
 #define stype double
 
-/**
- *
- * @param solutions
- * @param numV
- * @param edge
- * @param numVE
- * @param variables
- * @param edgeVariables
- */
 stype
 solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, __global long *minId, __global
                 long *maxId, __global long *startIDEdge) {
