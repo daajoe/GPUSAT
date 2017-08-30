@@ -172,6 +172,7 @@ namespace gpusat {
             delete[] ret.bags[a].variables;
         }
         delete[] ret.bags;
+        ret_.numVars = ret.numVars;
         return ret_;
     }
 
@@ -189,7 +190,7 @@ namespace gpusat {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //s
-        getline(sline, i, ' '); //tw
+        getline(sline, i, ' '); //td
         getline(sline, i, ' '); //num bags
         ret.bags = new preebagType[stoi(i)];
         ret.numb = stoi(i);
@@ -197,6 +198,9 @@ namespace gpusat {
             std::vector<cl_long> edge;
             edges.push_back(edge);
         }
+        getline(sline, i, ' '); //width
+        getline(sline, i, ' '); //num vars
+        ret.numVars = stoi(i);
     }
 
     void TDParser::parseBagLine(preetreedecType &ret, std::string item) {
@@ -221,8 +225,10 @@ namespace gpusat {
         ret.bags[bnum - 1].numVariables = match_count - 1;
         while (getline(sline, i, ' ')) //vertices
         {
-            ret.bags[bnum - 1].variables[a] = stoi(i);
-            a++;
+            if (i[0] != '\r') {
+                ret.bags[bnum - 1].variables[a] = stoi(i);
+                a++;
+            }
         }
         std::sort(ret.bags[bnum - 1].variables, &ret.bags[bnum - 1].variables[ret.bags[bnum - 1].numVariables]);
     }

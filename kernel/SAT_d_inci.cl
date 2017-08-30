@@ -29,16 +29,19 @@ solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
           __global unsigned long *startIDn, __global unsigned long *startIDe1, __global unsigned long *startIDe2,
           __global unsigned long *numClauses) {
     unsigned long id = get_global_id(0);
-    unsigned long significant = (((unsigned long) exp2((double) *numClauses)) - 1);
     unsigned long mask = id & (((unsigned long) exp2((double) *numClauses)) - 1);
     unsigned long combinations = ((unsigned long) exp2((double) *numClauses));
     unsigned long templateID = id >> *numClauses << *numClauses;
     //sum up all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
+    unsigned long start2 = 0, end2 = combinations - 1;
+    for (; start2 < combinations && e2Sol[(templateID | start2) - (*startIDe2)] == 0; start2++);
+    for (; end2 > 0 && e2Sol[(templateID | end2) - (*startIDe2)] == 0; end2--);
     for (int a = 0; a < combinations; a++) {
-        for (int b = 0; b < combinations; b++) {
-            if (((a | b)) == mask && ((templateID | a) >= *minIDe1 && (templateID | a) < *maxIDe1) &&
-                ((templateID | b) >= *minIDe2 && (templateID | b) < *maxIDe2)) {
-                nSol[id - (*startIDn)] += e1Sol[(templateID | a) - (*startIDe1)] * e2Sol[(templateID | b) - (*startIDe2)];
+        if ((templateID | a) >= *minIDe1 && (templateID | a) < *maxIDe1 && e1Sol[(templateID | a) - (*startIDe1)] != 0) {
+            for (int b = start2; b <= end2; b++) {
+                if (((a | b)) == mask && ((templateID | b) >= *minIDe2 && (templateID | b) < *maxIDe2) && e2Sol[(templateID | b) - (*startIDe2)] != 0) {
+                    nSol[id - (*startIDn)] += e1Sol[(templateID | a) - (*startIDe1)] * e2Sol[(templateID | b) - (*startIDe2)];
+                }
             }
         }
     }
@@ -222,7 +225,6 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
     unsigned long combinations = (unsigned long) exp2((double) base);
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
-    //if (id == 2) printf("id: %i, combinations: %i, base: %i, clauses: %i, nv: %i, ev: %i", id, combinations, base, *numNC, *numNV, *numEV);
     if (*numNV != *numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -232,12 +234,9 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
                 rec = 0;
                 if (eClauses[ec] == nClauses[nc]) {
                     for (; clauses[x] != 0; x++) {
-                        //if (id == 2) printf("__id: %i, clause: %i, numNV: %i, rec: %i", id, clauses[x], *numNV, rec);
                         for (a = 0, b = 0; a < *numNV && rec == 0; a++) {
-                            //if (id == 2) printf("__id: %i, clause: %i, nVars: %i, sign: %i", id, clauses[x], nVars[a], (((assignment >> a) & 1) > 0 ? 1 : -1));
-                            if ((clauses[x] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
+                            if (clauses[x] == (nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1)))  {
                                 otherID &= ~(((i >> index) & 1) << ec);
-                                //if (id == 2) printf("__id: %i, otherid: %i, template: %i, i: %i, %x", id, otherID, templateID, i, ~(((i >> index) & 1) << ec));
                                 index++;
                                 rec = 1;
                             }
@@ -253,7 +252,6 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
                 }
             }
 
-            //if (id == 2) printf("id: %i, otherid: %i, template: %i", id, otherID, templateID);
             if (otherID >= (*minIDe) && otherID < (*maxIDe)) {
                 nSol[id - (*startIDn)] += eSol[otherID - (*startIDe)];
             }

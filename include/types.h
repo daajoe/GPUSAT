@@ -79,6 +79,7 @@ namespace gpusat {
     /// type for saving a tree decomposition
     struct treedecType {
         cl_long numb = 0;
+        cl_long numVars=0;
         bagType *bags = nullptr;
     };
 
@@ -94,6 +95,7 @@ namespace gpusat {
     /// type for saving a tree decomposition
     struct preetreedecType {
         cl_long numb = 0;
+        cl_long numVars=0;
         preebagType *bags = nullptr;
     };
 

@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     bool file = false, formula = false;
     int opt, combineWidth = 12, maxBag = 22;
     std::string kernelPath = "./kernel/";
-    int graph = 'p';
+    graphTypes graph = INCIDENCE;
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -34,10 +34,9 @@ int main(int argc, char *argv[]) {
             {"maxBagSize",    required_argument, 0, 'm'},
             {"kernelDir",     required_argument, 0, 'c'},
             {"help",          no_argument,       0, 'h'},
-            {"graph",         required_argument, 0, 'g'},
             {0,               0,                 0, 0}
     };
-    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:hg:", flags, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:h", flags, NULL)) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -71,10 +70,6 @@ int main(int argc, char *argv[]) {
                 maxBag = std::atoi(optarg);
                 break;
             }
-            case 'g': {
-                graph = optarg[0];
-                break;
-            }
             case 'h': {
                 std::cout << "Usage: \n" << argv[0] << "\n"
                           << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
@@ -82,7 +77,6 @@ int main(int argc, char *argv[]) {
                           << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
                           << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
                           << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
-                          << "    --graph,-g <p|i>                : i ... incidence graph, p ... primal graph\n"
                           << "    --help,-h                       : prints this message\n";
                 exit(EXIT_SUCCESS);
             }
@@ -108,7 +102,13 @@ int main(int argc, char *argv[]) {
 
     // error no sat formula given
     if (!formula) {
-        std::cerr << "Usage: " << argv[0] << " [-f treedecomp] -s formula [-c kerneldir] \n";
+        std::cerr << "Error: No SAT formula\n" << "Usage: \n" << argv[0] << "\n"
+                  << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
+                  << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
+                  << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
+                  << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
+                  << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
+                  << "    --help,-h                       : prints this message\n";
         exit(EXIT_FAILURE);
     }
 
@@ -117,6 +117,20 @@ int main(int argc, char *argv[]) {
     TDParser tdParser(combineWidth);
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
+    if (satFormula.numVars + satFormula.numclauses == treeDecomp.numVars) {
+        graph = INCIDENCE;
+    } else if (satFormula.numVars == treeDecomp.numVars) {
+        graph = PRIMAL;
+    } else {
+        std::cerr << "Error: Unknown graph type\n" << "Usage: \n" << argv[0] << "\n"
+                  << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
+                  << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
+                  << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
+                  << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
+                  << "    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
+                  << "    --help,-h                       : prints this message\n";
+        exit(EXIT_FAILURE);
+    }
     time_parsing = getTime() - time_parsing;
 
     std::vector<cl::Platform> platforms;
@@ -147,10 +161,10 @@ int main(int argc, char *argv[]) {
 
 #ifdef sType_Double
         switch (graph) {
-            case 'p':
+            case PRIMAL:
                 binPath = kernelPath + "SAT_d_p.clbin";
                 break;
-            case 'i':
+            case INCIDENCE:
                 binPath = kernelPath + "SAT_d_i.clbin";
                 break;
             default:
@@ -158,13 +172,11 @@ int main(int argc, char *argv[]) {
         }
 #else
         switch (graph) {
-            case 'p':
+            case PRIMAL:
                 binPath = kernelPath + "SAT_d4_p.clbin";
                 break;
-            case 'i':
+            case INCIDENCE:
                 binPath = kernelPath + "SAT_d4_i.clbin";
-                break;
-            default:
                 break;
         }
 #endif
@@ -172,52 +184,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-        //create kernel binary if it doesn't exist
-        std::string sourcePath;
+            //create kernel binary if it doesn't exist
+            std::string sourcePath;
 
 #ifdef sType_Double
-        switch (graph) {
-            case 'p':
-                sourcePath = kernelPath + "SAT_d_primal.cl";
-                break;
-            case 'i':
-                sourcePath = kernelPath + "SAT_d_inci.cl";
-                break;
-            default:
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d_inci.cl";
+                    break;
+            }
 #else
-        switch (graph) {
-            case 'p':
-                sourcePath = kernelPath + "SAT_d4_primal.cl";
-                break;
-            case 'i':
-                sourcePath = kernelPath + "SAT_d4_inci.cl";
-                break;
-            default:
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d4_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d4_inci.cl";
+                    break;
+            }
 #endif
-        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+            program = cl::Program(context, sources);
+            program.build(devices);
 
-        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-        char *binChunk = &binData[0];
+            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            char *binChunk = &binData[0];
 
-        std::vector<char *> binaries;
-        for (const size_t &binSize : binSizes) {
-            binaries.push_back(binChunk);
-            binChunk += binSize;
-        }
+            std::vector<char *> binaries;
+            for (const size_t &binSize : binSizes) {
+                binaries.push_back(binChunk);
+                binChunk += binSize;
+            }
 
-        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-        for (unsigned int i = 0; i < binaries.size(); ++i)
-            binaryfile.write(binaries[i], binSizes[i]);
-        binaryfile.close();
+            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+            for (unsigned int i = 0; i < binaries.size(); ++i)
+                binaryfile.write(binaries[i], binSizes[i]);
+            binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
@@ -234,13 +242,11 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         switch (graph) {
-            case 'p':
+            case PRIMAL:
                 sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false);
                 break;
-            case 'i':
+            case INCIDENCE:
                 sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true);
-                break;
-            default:
                 break;
         }
         long long int time_solving = getTime();
@@ -252,7 +258,7 @@ int main(int argc, char *argv[]) {
 #ifdef sType_Double
             solType solutions = 0.0;
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                if (graph == 'i') {
+                if (graph == INCIDENCE) {
                     bool sat = true;
                     int b = 0, c = 0;
                     for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
@@ -273,7 +279,22 @@ int main(int argc, char *argv[]) {
 #else
             solType solutions(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                solutions = d4_add(solutions, treeDecomp.bags[0].solution[i]);
+                if (graph == INCIDENCE) {
+                    bool sat = true;
+                    int b = 0, c = 0;
+                    for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
+                    };
+                    for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
+                        if (((i >> c) & 1) == 0) {
+                            sat = false;
+                        }
+                    }
+                    if (sat) {
+                        solutions = d4_add(solutions, treeDecomp.bags[0].solution[i]);
+                    }
+                } else {
+                    solutions = d4_add(solutions, treeDecomp.bags[0].solution[i]);
+                }
             }
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
 #endif
