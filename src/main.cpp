@@ -443,7 +443,7 @@ void solveForget(bagType &node, bagType &edge) {
     kernel.setArg(3, edge.numVars);
     kernel.setArg(5, (cl_long) pow(2, edge.numVars - node.numVars));
     kernel.setArg(6, node.numVars);
-    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(edge.numSol));
+    queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(node.numSol));
     queue.finish();
     queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * (node.numSol), node.solution);
 }
