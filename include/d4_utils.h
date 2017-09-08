@@ -13,8 +13,8 @@
 
 namespace gpusat {
     /// turn x into string
-    std::string d4_to_string(d4_Type x, int precision = 62, int width = 0, std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0),
-                             bool showpos = false, bool uppercase = false, char fill = ' ');
+    std::string d4_to_string(d4_Type x, int precision = 62, int width = 0, std::ios_base::fmtflags fmt = static_cast<std::ios_base::fmtflags>(0), bool showpos = false,
+                             bool uppercase = false, char fill = ' ');
 
     /// return a - b
     d4_Type d4_minus(d4_Type a, d4_Type b);
@@ -136,12 +136,24 @@ namespace gpusat {
                                                             (a.x[2] == b.x[2] && a.x[3] < b.x[3]))))));
     }
 
+    /// a > b
+    inline bool d4_g(d4_Type a, d4_Type b) {
+        return (a.x[0] > b.x[0] ||
+                (a.x[0] == b.x[0] && (a.x[1] > b.x[1] ||
+                                      (a.x[1] == b.x[1] && (a.x[2] > b.x[2] ||
+                                                            (a.x[2] == b.x[2] && a.x[3] > b.x[3]))))));
+    }
+
     inline d4_Type operator-(d4_Type a) {
         return d4_neg(a);
     }
 
     inline d4_Type operator-(d4_Type a, d4_Type b) {
         return d4_minus(a, b);
+    }
+
+    inline d4_Type operator-(d4_Type a, double b) {
+        return d4_minus(a, d4_Type(b));
     }
 
     inline d4_Type operator+(d4_Type a, d4_Type b) {
@@ -164,12 +176,32 @@ namespace gpusat {
         return d4_l(a, b);
     }
 
+    inline bool operator<(d4_Type a, double b) {
+        return d4_l(a, d4_Type(b));
+    }
+
+    inline bool operator>(d4_Type a, d4_Type b) {
+        return d4_g(a, b);
+    }
+
+    inline bool operator>(d4_Type a, double b) {
+        return d4_g(a, d4_Type(b));
+    }
+
     inline bool operator!=(d4_Type a, d4_Type b) {
         return d4_l(a, b) || d4_l(b, a);
     }
 
     inline bool operator==(d4_Type a, d4_Type b) {
         return !d4_l(a, b) && !d4_l(b, a);
+    }
+
+    inline bool operator==(double a, d4_Type b) {
+        return !d4_l(d4_Type(a), b) && !d4_l(b, d4_Type(a));
+    }
+
+    inline bool operator==(d4_Type a, double b) {
+        return b == a;
     }
 }
 #endif //GPUSAT_D4_UTILS_H

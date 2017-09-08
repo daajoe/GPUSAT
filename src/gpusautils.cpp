@@ -39,7 +39,7 @@ namespace gpusat {
         }
     }
 
-    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, cl_double *sol, satformulaType &formula) {
+    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType *sol, satformulaType &formula) {
         std::cout << "solutions: \n";
         for (int a = 0; a < numS; a++) {
             std::cout << a << ": ";
@@ -55,7 +55,7 @@ namespace gpusat {
                 std::cout << (((a >> (c + d)) & 1) == 0 ? "-" : " ") << vars[d] << " ";
             }
 #ifdef sType_Double
-            std::cout << sol[a] << "\n";
+            printf("%e\n", sol[a]);
 #else
             std::cout << d4_to_string(sol[a]) << "\n";
 #endif

@@ -28,16 +28,25 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
  * @param numClauses
  *      number of clauses in the current node
  */
-__kernel void
-solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
-          __global unsigned long *minIDe1, __global unsigned long *maxIDe1,
-          __global unsigned long *minIDe2, __global unsigned long *maxIDe2,
-          __global unsigned long *startIDn, __global unsigned long *startIDe1, __global unsigned long *startIDe2,
-          __global unsigned long *numClauses) {
+__kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
+                        __global unsigned long *minIDe1, __global unsigned long *maxIDe1,
+                        __global unsigned long *minIDe2, __global unsigned long *maxIDe2,
+                        __global unsigned long *startIDn, __global unsigned long *startIDe1, __global unsigned long *startIDe2,
+                        __global unsigned long *numClauses,
+                        __global double *weights, __global unsigned long *nVars) {
     unsigned long id = get_global_id(0);
     unsigned long mask = id & (((unsigned long) exp2((double) *numClauses)) - 1);
     unsigned long combinations = ((unsigned long) exp2((double) *numClauses));
     unsigned long templateID = id >> *numClauses << *numClauses;
+    unsigned long assignment = id >> *numClauses;
+    double tmpSol = 0;
+    double weight = 1;
+    unsigned long i = 0;
+    if (weights != 0) {
+        for (int a = 0; nVars[a] != 0; a++) {
+            weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
+        }
+    }
     //sum up all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
     unsigned long start2 = 0, end2 = combinations - 1;
     for (; start2 < combinations && e2Sol[(templateID | start2) - (*startIDe2)] == 0; start2++);
@@ -46,10 +55,13 @@ solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
         if ((templateID | a) >= *minIDe1 && (templateID | a) < *maxIDe1 && e1Sol[(templateID | a) - (*startIDe1)] != 0) {
             for (int b = start2; b <= end2; b++) {
                 if (((a | b)) == mask && ((templateID | b) >= *minIDe2 && (templateID | b) < *maxIDe2) && e2Sol[(templateID | b) - (*startIDe2)] != 0) {
-                    nSol[id - (*startIDn)] += e1Sol[(templateID | a) - (*startIDe1)] * e2Sol[(templateID | b) - (*startIDe2)];
+                    tmpSol += e1Sol[(templateID | a) - (*startIDe1)] * e2Sol[(templateID | b) - (*startIDe2)];
                 }
             }
         }
+    }
+    if (tmpSol != 0.0) {
+        nSol[id - (*startIDn)] += tmpSol / weight;
     }
 }
 
@@ -85,14 +97,13 @@ solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
  * @param maxID
  *      max id of the edge
  */
-__kernel void
-solveForget(__global stype *nSol, __global stype *eSol,
-            __global unsigned long *nVars, __global unsigned long *eVars,
-            __global unsigned long *numNVars, __global unsigned long *numEVars,
-            __global unsigned long *nClauses, __global unsigned long *eClauses,
-            __global unsigned long *numNC, __global unsigned long *numEC,
-            __global unsigned long *startIDn, __global unsigned long *startIDe,
-            __global unsigned long *minID, __global unsigned long *maxID) {
+__kernel void solveForget(__global stype *nSol, __global stype *eSol,
+                          __global unsigned long *nVars, __global unsigned long *eVars,
+                          __global unsigned long *numNVars, __global unsigned long *numEVars,
+                          __global unsigned long *nClauses, __global unsigned long *eClauses,
+                          __global unsigned long *numNC, __global unsigned long *numEC,
+                          __global unsigned long *startIDn, __global unsigned long *startIDe,
+                          __global unsigned long *minID, __global unsigned long *maxID) {
     unsigned long id = get_global_id(0);
     unsigned long a = 0, b = 0, templateId = 0, i = 0;
     unsigned long combinations = (unsigned long) exp2((double) *numEVars - *numNVars);
@@ -145,17 +156,24 @@ solveForget(__global stype *nSol, __global stype *eSol,
  * @param models
  *      set to 1 if models are found
  */
-__kernel void
-solveLeaf(__global stype *nSol,
-          __global long *clauses,
-          __global unsigned long *nVars,
-          __global unsigned long *numNC,
-          __global unsigned long *startID,
-          __global unsigned long *models) {
+__kernel void solveLeaf(__global stype *nSol,
+                        __global long *clauses,
+                        __global unsigned long *nVars,
+                        __global unsigned long *numNC,
+                        __global unsigned long *startID,
+                        __global unsigned long *models,
+                        __global double *weights) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> *numNC;
     unsigned long i = 0, a = 0;
-    for (i = 0; a < *numNC; i++) {
+    double weight = 1;
+
+    if (weights != 0) {
+        for (a = 0; nVars[a] != 0; a++) {
+            weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
+        }
+    }
+    for (i = 0, a = 0; a < *numNC; i++) {
         if (i == 0 || clauses[i] == 0) {
             if (clauses[i] == 0) i++;
             if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
@@ -166,7 +184,7 @@ solveLeaf(__global stype *nSol,
         }
     }
     *models = 1;
-    nSol[id - *startID] = 1.0;
+    nSol[id - *startID] = weight;
 }
 
 /**
@@ -207,20 +225,18 @@ solveLeaf(__global stype *nSol,
  * @param isSAT
  *      set to 1 if models are found
  */
-__kernel void
-solveIntroduce(__global stype *nSol, __global stype *eSol,
-               __global long *clauses, __global unsigned long *cLen,
-               __global unsigned long *nVars, __global unsigned long *eVars,
-               __global unsigned long *numNV, __global unsigned long *numEV,
-               __global unsigned long *nClauses, __global unsigned long *eClauses,
-               __global unsigned long *numNC, __global unsigned long *numEC,
-               __global unsigned long *startIDn, __global unsigned long *startIDe,
-               __global unsigned long *minIDe, __global unsigned long *maxIDe,
-               __global unsigned long *isSAT) {
+__kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
+                             __global long *clauses, __global unsigned long *cLen,
+                             __global unsigned long *nVars, __global unsigned long *eVars,
+                             __global unsigned long *numNV, __global unsigned long *numEV,
+                             __global unsigned long *nClauses, __global unsigned long *eClauses,
+                             __global unsigned long *numNC, __global unsigned long *numEC,
+                             __global unsigned long *startIDn, __global unsigned long *startIDe,
+                             __global unsigned long *minIDe, __global unsigned long *maxIDe,
+                             __global unsigned long *isSAT, __global double *weights) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> *numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
-
     //check clauses
     for (a = 0, b = 0, i = 0; a < *numNC; i++) {
         if (i == 0 || clauses[i] == 0) {
@@ -278,6 +294,18 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
     unsigned long combinations = (unsigned long) exp2((double) base);
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
+    double weight = 1;
+
+    if (weights != 0) {
+        for (b = 0, a = 0; nVars[a] != 0; a++) {
+            if ((nVars[a] != eVars[b])) {
+                weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
+            }
+            if (nVars[a] == eVars[b] && eVars[b] != 0) {
+                b++;
+            }
+        }
+    }
     if (*numNV != *numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -314,7 +342,7 @@ solveIntroduce(__global stype *nSol, __global stype *eSol,
             nSol[id - (*startIDn)] += eSol[otherID - (*startIDe)];
         }
     }
-
+    nSol[id - (*startIDn)] *= weight;
     if (nSol[id - (*startIDn)] > 0) {
         *isSAT = 1;
     }

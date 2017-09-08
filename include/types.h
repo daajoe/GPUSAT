@@ -106,6 +106,8 @@ namespace gpusat {
         cl_long numclauses = 0;
         cl_long numVars = 0;
         cl_long totalNumVar = 0;
+        cl_long numWeights = 0;
+        solType *variableWeights = nullptr;
         cl_long *numVarsC = nullptr;
         cl_long *clauses = nullptr;
     };

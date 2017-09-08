@@ -1,11 +1,11 @@
 #define stype double
 
-stype
-solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, __global long *minId, __global
-                long *maxId, __global long *startIDEdge) {
+stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, __global long *minId, __global long *maxId,
+                      __global long *startIDEdge, __global double *weights) {
     long id = get_global_id(0);
     long otherId = 0;
     long a = 0, b = 0;
+    double weight = 1;
     for (b = 0; b < numVE && a < numV; b++) {
         while ((variables[a] != edgeVariables[b])) {
             a++;
@@ -14,8 +14,20 @@ solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *vari
         a++;
     };
 
+    if (weights != 0) {
+        for (b = 0, a = 0; a < numV; a++) {
+            if ((variables[a] != edgeVariables[b])) {
+                weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
+            }
+            if ((variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
+                b++;
+            }
+        }
+    }
+
+
     if (otherId >= (*minId) && otherId < (*maxId)) {
-        return edge[otherId - (*startIDEdge)];
+        return edge[otherId - (*startIDEdge)] * weight;
     } else {
         return -1.0;
     }
@@ -96,16 +108,22 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void
-solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1, __global
-          long *edgeVariables2, long numV, long numVE1, long numVE2, __global long *minId1, __global long *maxId1, __global long *minId2, __global
-          long *maxId2, __global long *startIDNode, __global long *startIDEdge1, __global long *startIDEdge2) {
+__kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1,
+                        __global long *edgeVariables2, long numV, long numVE1, long numVE2, __global long *minId1, __global long *maxId1, __global long *minId2,
+                        __global long *maxId2, __global long *startIDNode, __global long *startIDEdge1, __global long *startIDEdge2, __global double *weights) {
     long id = get_global_id(0);
     stype tmp, tmp_;
-    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1);
-    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2);
+    double weight = 1;
+    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights);
+    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights);
+    if (weights != 0) {
+        for (int a = 0; a < numV; a++) {
+            weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
+        }
+    }
     if (tmp >= 0.0) {
         solutions[id - (*startIDNode)] *= tmp;
+        solutions[id - (*startIDNode)] /= weight;
     }
     if (tmp_ >= 0.0) {
         solutions[id - (*startIDNode)] *= tmp_;
@@ -130,10 +148,8 @@ solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge
  * @param numVarsCurrent
  *      number of variables in the current bag
  */
-__kernel void
-solveForget(__global stype *solutions, __global long *variablesCurrent, __global stype *edge, long numVarsEdge, __global long *variablesEdge,
-            long combinations, long numVarsCurrent, __global long *minId, __global long *maxId, __global long *startIDNode, __global
-            long *startIDEdge) {
+__kernel void solveForget(__global stype *solutions, __global long *variablesCurrent, __global stype *edge, long numVarsEdge, __global long *variablesEdge,
+                          long combinations, long numVarsCurrent, __global long *minId, __global long *maxId, __global long *startIDNode, __global long *startIDEdge) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
         if (variablesEdge[i] == variablesCurrent[a]) {
@@ -173,14 +189,19 @@ solveForget(__global stype *solutions, __global long *variablesCurrent, __global
  * @param variables
  *      array containing the ids of the variables in the bag
  */
-__kernel void
-solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global long *variables, __global
-          long *models, __global long *startID) {
+__kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global long *variables,
+                        __global long *models, __global long *startID, __global double *weights) {
     long id = get_global_id(0);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+    double weight = 1;
+    if (weights != 0) {
+        for (int i = 0; i < numV; i++) {
+            weight *= weights[((id >> i) & 1) > 0 ? variables[i] * 2 : variables[i] * 2 + 1];
+        }
+    }
     if (sat == 1) {
         (*models) = 1;
-        solutions[id - (*startID)] = 1.0;
+        solutions[id - (*startID)] = weight;
     } else {
         solutions[id - (*startID)] = 0.0;
     }
@@ -208,13 +229,12 @@ solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __gl
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-__kernel void
-solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge,
-               long numVE, __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global long *maxId,
-               __global long *startIDNode, __global long *startIDEdge) {
+__kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge, long numVE,
+                             __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global long *maxId,
+                             __global long *startIDNode, __global long *startIDEdge, __global double *weights) {
     long id = get_global_id(0);
     stype tmp;
-    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge);
+    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights);
     if (tmp > 0.0) {
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (sat != 1) {

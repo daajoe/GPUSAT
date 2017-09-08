@@ -4,6 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
+#include <d4_utils.h>
 
 namespace gpusat {
 
@@ -11,7 +12,8 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::queue<std::queue<cl_long  >> clauses;
+        std::queue<std::queue<cl_long>> clauses;
+        std::vector<std::pair<cl_long, solType>> weights;
         cl_long clauseSize = 0;
         while (getline(ss, item)) {
             //ignore empty line
@@ -22,6 +24,9 @@ namespace gpusat {
                 } else if (type == 'p') {
                     //start line
                     parseProblemLine(ret, item, clauses);
+                } else if (type == 'w') {
+                    //start line
+                    this->parseWeightLine(item, weights);
                 } else {
                     //clause line
                     parseClauseLine(item, clauses, clauseSize);
@@ -48,6 +53,37 @@ namespace gpusat {
                 s += ret.numVarsC[a];
                 a++;
             }
+        }
+
+        if (!weights.empty()) {
+            ret.variableWeights = new solType[(ret.numVars + 1) * 2];
+            ret.numWeights = (ret.numVars + 1) * 2;
+
+            for (int i = 0; i <= ret.numVars; i++) {
+                ret.variableWeights[i * 2] = -1.0;
+                ret.variableWeights[i * 2 + 1] = -1.0;
+            }
+
+            for (int i = 0; i < weights.size(); i++) {
+                if (weights[i].first < 0) {
+                    ret.variableWeights[abs(weights[i].first) * 2 + 1] = weights[i].second;
+                } else if (weights[i].first > 0) {
+                    ret.variableWeights[abs(weights[i].first) * 2] = weights[i].second;
+                }
+            }
+
+            for (int i = 0; i <= ret.numVars; i++) {
+                if (ret.variableWeights[i * 2] < 0.0 && ret.variableWeights[i * 2 + 1] < 0.0) {
+                    ret.variableWeights[i * 2] = 1.0;
+                    ret.variableWeights[i * 2 + 1] = 1.0;
+                } else if (ret.variableWeights[i * 2] < 0.0) {
+                    ret.variableWeights[i * 2] = 1.0 - ret.variableWeights[i * 2 + 1];
+                } else if (ret.variableWeights[i * 2 + 1] < 0.0) {
+                    ret.variableWeights[i * 2 + 1] = 1.0 - ret.variableWeights[i * 2];
+                }
+            }
+        }else{
+            ret.variableWeights= nullptr;
         }
         return ret;
     }
@@ -90,6 +126,18 @@ namespace gpusat {
         getline(sline, i, ' '); //num clauses
         satformula.numclauses = stoi(i);
         satformula.numVarsC = new cl_long[satformula.numclauses]();
+    }
+
+    void CNFParser::parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights) {
+        std::stringstream sline(item);
+        std::string i;
+        std::pair<cl_long, solType> weight;
+        getline(sline, i, ' '); //w
+        getline(sline, i, ' '); //variable
+        weight.first = stoi(i);
+        getline(sline, i, ' '); //weight
+        weight.second=stod(i);
+        weights.push_back(weight);
     }
 
     TDParser::TDParser(int i) {
@@ -246,7 +294,8 @@ namespace gpusat {
                         std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables + decomp->edges[b]->numVariables));
                         std::vector<cl_long>::iterator it;
                         it = std::set_union(decomp->edges[a]->variables, decomp->edges[a]->variables + decomp->edges[a]->numVariables,
-                                            decomp->edges[b]->variables, decomp->edges[b]->variables + decomp->edges[b]->numVariables, v.begin());
+                                            decomp->edges[b]->variables,
+                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables, v.begin());
                         v.resize(static_cast<unsigned long long int>(it - v.begin()));
                         if (v.size() < combineWidth) {
                             changed = true;
@@ -255,12 +304,10 @@ namespace gpusat {
                             decomp->edges[a]->variables = new cl_long[decomp->edges[a]->numVariables];
                             std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
 
-                            std::vector<preebagType *> v_(
-                                    static_cast<unsigned long long int>(decomp->edges[a]->numEdges + decomp->edges[b]->numEdges));
+                            std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges[a]->numEdges + decomp->edges[b]->numEdges));
                             std::vector<preebagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges, decomp->edges[a]->edges + decomp->edges[a]->numEdges,
-                                                 decomp->edges[b]->edges, decomp->edges[b]->edges + decomp->edges[b]->numEdges, v_.begin(),
-                                                 compTreedType);
+                            it_ = std::set_union(decomp->edges[a]->edges, decomp->edges[a]->edges + decomp->edges[a]->numEdges, decomp->edges[b]->edges,
+                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges, v_.begin(), compTreedType);
                             v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
                             decomp->edges[a]->numEdges = v_.size();
                             decomp->edges[a]->edges = new preebagType *[decomp->edges[a]->numEdges];
