@@ -82,8 +82,8 @@ namespace gpusat {
                     ret.variableWeights[i * 2 + 1] = 1.0 - ret.variableWeights[i * 2];
                 }
             }
-        }else{
-            ret.variableWeights= nullptr;
+        } else {
+            ret.variableWeights = nullptr;
         }
         return ret;
     }
@@ -136,7 +136,7 @@ namespace gpusat {
         getline(sline, i, ' '); //variable
         weight.first = stoi(i);
         getline(sline, i, ' '); //weight
-        weight.second=stod(i);
+        weight.second = stod(i);
         weights.push_back(weight);
     }
 

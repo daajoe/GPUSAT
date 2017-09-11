@@ -193,7 +193,7 @@ namespace gpusat {
                 kernel.setArg(13, bufStartEdge);
                 cl::Buffer bufWeights;
                 if (formula.variableWeights != nullptr) {
-                    bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                    bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                     kernel.setArg(14, bufWeights);
                 } else {
                     kernel.setArg(14, NULL);
@@ -250,7 +250,7 @@ namespace gpusat {
             kernel.setArg(7, bufStart);
             cl::Buffer bufWeights;
             if (formula.variableWeights != nullptr) {
-                bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                 kernel.setArg(8, bufWeights);
             } else {
                 kernel.setArg(8, NULL);
@@ -401,7 +401,7 @@ namespace gpusat {
                 kernel.setArg(15, bufStartEdge2);
                 cl::Buffer bufWeights;
                 if (formula.variableWeights != nullptr) {
-                    bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                    bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                     kernel.setArg(16, bufWeights);
                 } else {
                     kernel.setArg(16, NULL);
@@ -530,7 +530,7 @@ namespace gpusat {
                 //weights - 17
                 cl::Buffer bufWeights;
                 if (formula.variableWeights != nullptr) {
-                    bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                    bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                     kernel.setArg(17, bufWeights);
                 } else {
                     kernel.setArg(17, NULL);
@@ -603,7 +603,7 @@ namespace gpusat {
             //weights - 6
             cl::Buffer bufWeights;
             if (formula.variableWeights != nullptr) {
-                bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                 kernel.setArg(6, bufWeights);
             } else {
                 kernel.setArg(6, NULL);
@@ -822,7 +822,7 @@ namespace gpusat {
                 //weights - 11
                 cl::Buffer bufWeights;
                 if (formula.variableWeights != nullptr) {
-                    bufWeights= cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
+                    bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
                     kernel.setArg(11, bufWeights);
                 } else {
                     kernel.setArg(11, NULL);

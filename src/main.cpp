@@ -275,7 +275,8 @@ int main(int argc, char *argv[]) {
                     solutions += treeDecomp.bags[0].solution[i];
                 }
             }
-            printf("{\n    \"Model Count\": %e", solutions);
+            std::cout.precision(17);
+            std::cout << "{\n    \"Model Count\": " << solutions;
 #else
             solType solutions(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
