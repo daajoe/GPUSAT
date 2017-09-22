@@ -314,15 +314,6 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
-        for (int i = 0; i < treeDecomp.numb; i++) {
-            delete[] treeDecomp.bags[i].edges;
-        }
-        delete[] treeDecomp.bags[0].solution;
-        delete[] treeDecomp.bags[0].variables;
-        delete[] treeDecomp.bags;
-        delete[] satFormula.clauses;
-        delete[] satFormula.numVarsC;
-
     }
     catch (cl::Error &err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
