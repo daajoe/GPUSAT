@@ -254,9 +254,9 @@ int main(int argc, char *argv[]) {
         time_solving = getTime() - time_solving;
 
         long long int time_model = getTime();
+        solType solutions = 0.0;
         if ((*sol).isSat > 0) {
 #ifdef sType_Double
-            solType solutions = 0.0;
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
                 if (graph == INCIDENCE) {
                     bool sat = true;
@@ -278,7 +278,6 @@ int main(int argc, char *argv[]) {
             std::cout.precision(17);
             std::cout << "{\n    \"Model Count\": " << solutions;
 #else
-            solType solutions(0.0);
             for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
                 if (graph == INCIDENCE) {
                     bool sat = true;
@@ -314,6 +313,11 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}";
+        if (solutions > 0.0) {
+            exit(10);
+        } else {
+            exit(20);
+        }
     }
     catch (cl::Error &err) {
         std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;

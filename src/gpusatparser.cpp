@@ -114,14 +114,14 @@ namespace gpusat {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //p
-        while(i.size()==0) getline(sline, i, ' ');
+        while (i.size() == 0) getline(sline, i, ' ');
         getline(sline, i, ' '); //cnf
-        while(i.size()==0) getline(sline, i, ' ');
+        while (i.size() == 0) getline(sline, i, ' ');
         getline(sline, i, ' '); //num vars
-        while(i.size()==0) getline(sline, i, ' ');
+        while (i.size() == 0) getline(sline, i, ' ');
         satformula.numVars = stoi(i);
         getline(sline, i, ' '); //num clauses
-        while(i.size()==0) getline(sline, i, ' ');
+        while (i.size() == 0) getline(sline, i, ' ');
         satformula.numclauses = stoi(i);
         satformula.numVarsC = new cl_long[satformula.numclauses]();
     }
