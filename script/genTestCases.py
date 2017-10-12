@@ -4,19 +4,22 @@ from os.path import join, isdir
 import json
 from os import makedirs
 
-tiny = False
-small = False
-medium = False
-large = False
-gena = False
-genb = False
-genc = False
+import time
+
+tiny = True
+small = True
+medium = True
+large = True
+big = True
+random.seed(1234)
 
 maxNumModels = pow(10, 40)
 numConnections = 2
 
 numDigits = 4
 
+minSolveTime = 0
+maxSolveTime = 300
 numGraphs = None
 # minimal and maximal number of clauses
 minNumClauses = None
@@ -27,6 +30,7 @@ numTestCases = None
 minClauseSize = None
 # maximal size of a clause
 maxClauseSize = None
+maxNumBags = None
 
 # minimal and maximal tree width
 minTreeWidth = None
@@ -88,6 +92,14 @@ def getModels(sol):
                 else:
                     return int(lines[i].split()[1])
             i += 1
+        i = 0
+        while i < len(lines):
+            if lines[i].startswith("Number of solutions"):
+                if (lines[i].split('\t')[3] == "inf"):
+                    return pow(2, 65)
+                else:
+                    return float(lines[i].split('\t')[3])
+            i += 1
     elif sol.startswith("Solving"):
         i = 0
         lines = sol.split("\n")
@@ -103,14 +115,36 @@ def getModels(sol):
 # check formula
 def checkFormula(formula, resultFile):
     print("    check Formula")
+    solvetime = 0
+    start = time.time()
     # subprocess.call(["./clasp", "--outf=2", "-n", "0", "-q", formula], stdout=resultFile)
     # subprocess.call(["./sharpSAT", formula], stdout=resultFile)
     # subprocess.call(["./cachet", formula], stdout=resultFile)
     try:
-        resultFile.write(subprocess.check_output(["./cachet", formula], timeout=1200).decode('ascii'))
+        resultFile.write(subprocess.check_output(["./cachet", formula], timeout=300).decode('ascii'))
+        solvetime = time.time() - start
     except subprocess.TimeoutExpired:
-        return
+        return solvetime
+    except subprocess.CalledProcessError:
+        return solvetime
+    return solvetime
 
+# check formula
+def checkFormulaWeight(formula, resultFile):
+    print("    check Formula")
+    solvetime = 0
+    start = time.time()
+    # subprocess.call(["./clasp", "--outf=2", "-n", "0", "-q", formula], stdout=resultFile)
+    # subprocess.call(["./sharpSAT", formula], stdout=resultFile)
+    # subprocess.call(["./cachet", formula], stdout=resultFile)
+    try:
+        resultFile.write(subprocess.check_output(["./cachet-wmc", formula], timeout=300).decode('ascii'))
+        solvetime = time.time() - start
+    except subprocess.TimeoutExpired:
+        return solvetime
+    except subprocess.CalledProcessError:
+        return solvetime
+    return solvetime
 
 # generate tree decomposition
 def genTreeDecomp(graph, decompFile):
@@ -119,6 +153,66 @@ def genTreeDecomp(graph, decompFile):
     with open(graph, "r") as infile:
         subprocess.call(["./htd_main", "--opt", "width", "-s", "1234"],
                         stdout=decompFile, stdin=infile)
+
+
+def genIncidenceGraph(formulaFile, graphFile):
+    formula = formulaFile.read()
+    graphEdges = ""
+    graph = set()
+    numRules = 0
+    max_clause_size = 0
+    numVariables = 0
+    for line in formula.splitlines():
+        if len(line) > 0:
+            if line[0] == 'p':
+                numVariables = int(line.split()[2])
+    for line in formula.splitlines():
+        if len(line) > 0:
+            if line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != 'w':
+                numRules += 1
+                lits = line.split()
+                max_clause_size = len(lits) - 1 if (len(lits) - 1) > max_clause_size else max_clause_size
+                for node in lits:
+                    ainode = abs(int(node))
+                    if ainode != 0:
+                        graph |= {(ainode, numRules + numVariables)}
+                        if len(graph) > 50000000:
+                            raise Exception('Incidence Oversize')
+
+    graphFile.write("p tw " + str(numVariables + numRules) + " " + str(len(graph)))
+    for node in graph:
+        graphFile.write("\n" + str(node[0]) + " " + str(node[1]))
+    return max_clause_size
+
+
+def genPrimGraph(formulaFile, graphFile):
+    formula = formulaFile.read()
+    graphEdges = ""
+    graph = set()
+    numVariables = 0
+    for line in formula.splitlines():
+        if len(line) > 0:
+            if line[0] == 'p':
+                numVariables = int(line.split()[2])
+    for line in formula.splitlines():
+        if len(line) > 0:
+            if line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != 'w':
+                for node in line.split():
+                    ainode = abs(int(node))
+                    if ainode != 0:
+                        for node2 in line.split():
+                            ainode2 = abs(int(node2))
+                            if ainode2 != 0 and ainode != node2:
+                                if (ainode < ainode2):
+                                    graph |= {(ainode, ainode2)}
+                                elif (ainode > ainode2):
+                                    graph |= {(ainode2, ainode)}
+                                if len(graph) > 50000000:
+                                    raise Exception('Primal Oversize')
+
+    graphFile.write("p tw " + str(numVariables) + " " + str(len(graph)))
+    for node in graph:
+        graphFile.write("\n" + str(node[0]) + " " + str(node[1]))
 
 
 # generate graph
@@ -187,6 +281,32 @@ def toFormula(graph, resultFile):
     clauses = "p cnf " + str(len(graph.keys())) + " " + str(numClauses) + "\n" + clauses
     resultFile.write(clauses)
 
+# generate formula from primal graph
+def toFormula_Weight(graph, resultFile):
+    print("    gen formula")
+    clauses = ""
+    numClauses = 0
+    for i in range(1, len(graph.keys())):
+        while len(graph[i]) > 0:
+            nodes = [i]
+            for elem in graph[i]:
+                nodes += [elem]
+                if not allConnected(graph, nodes):
+                    del nodes[len(nodes) - 1]
+            numClauses += 1
+            clauses += str(nodes[0] * random.choice([1, -1]))
+            graph[i].discard(nodes[0])
+            graph[nodes[0]].discard(i)
+            for a in range(1, len(nodes)):
+                graph[i].discard(nodes[a])
+                graph[nodes[a]].discard(i)
+                clauses += " " + str(nodes[a] * random.choice([1, -1]))
+            clauses += " 0\n"
+    weights = ""
+    for i in graph.keys():
+        weights+="w " + str(i) + " " + str(random.randint(1,9)/10) + "\n"
+    clauses = "p cnf " + str(len(graph.keys())) + " " + str(numClauses) + "\n" + weights + clauses
+    resultFile.write(clauses)
 
 # generate formula
 def genFormulaFromGraph():
@@ -196,26 +316,48 @@ def genFormulaFromGraph():
     numUNSAT = 0
     while numUNSAT < numUNSATTestCases or numSAT < numSATTestCases:
         print(
-        prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
-            numSAT) + " UNSAT: " + str(numUNSAT))
+            prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
+                numSAT) + " UNSAT: " + str(numUNSAT))
         with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
             graph = genPrimalGraph1(graphFile)
         with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "w") as formulaFile:
             toFormula(graph, formulaFile)
         with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
-            checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+            solveTime = checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+        if (solveTime <= minSolveTime or solveTime >= maxSolveTime):
+            print("    Time: " + str(solveTime))
+            continue
         with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
             ref = resultFile.read()
             if (getModels(ref) == 0 and numUNSAT >= numUNSATTestCases) or (
                             getModels(ref) > 0 and numSAT >= numSATTestCases) or getModels(ref) >= maxNumModels:
                 print("    num Models: " + str(getModels(ref)))
                 continue
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genIncidenceGraph(formulaFile, graphFile)
         with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
             genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
         with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
             line = decompFile.readline()
             if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
-                print ("    width: " + line.split(" ")[3])
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
+                continue
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genPrimGraph(formulaFile, graphFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
+            genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
+            line = decompFile.readline()
+            if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
                 continue
 
         if getModels(ref) == 0:
@@ -295,15 +437,37 @@ def genFormulaFromGraph2():
                 graph = genPrimalGraph2(graphFile)
             with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "w") as formulaFile:
                 toFormula(graph, formulaFile)
+            with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+                with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                    genIncidenceGraph(formulaFile, graphFile)
             with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
                 genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
             with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
                 line = decompFile.readline()
                 if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
-                    print ("    width: " + line.split(" ")[3])
+                    print("    width: " + line.split(" ")[3])
+                    continue
+                if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                    print("    bags: " + line.split(" ")[4])
+                    continue
+            with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+                with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                    genPrimGraph(formulaFile, graphFile)
+            with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
+                genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
+            with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
+                line = decompFile.readline()
+                if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
+                    print("    width: " + line.split(" ")[3])
+                    continue
+                if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                    print("    bags: " + line.split(" ")[4])
                     continue
             with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
-                checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+                solveTime = checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+            if (solveTime <= minSolveTime or solveTime >= maxSolveTime):
+                print("    Time: " + str(solveTime))
+                continue
             with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
                 ref = resultFile.read()
                 if (getModels(ref) > 0):
@@ -319,10 +483,67 @@ def genFormulaFromGraph2():
                 numSAT += 1
             numTry += 1
 
+# generate formula
+def genFormulaFromGraph_Weight():
+    genFolders()
+    numTry = 0
+    numSAT = 0
+    numUNSAT = 0
+    while numUNSAT < numUNSATTestCases or numSAT < numSATTestCases:
+        print(
+            prefix + " " + str(numTry).zfill(numDigits) + "/" + str(numUNSATTestCases + numSATTestCases) + " SAT: " + str(
+                numSAT) + " UNSAT: " + str(numUNSAT))
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            graph = genPrimalGraph1(graphFile)
+        with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "w") as formulaFile:
+            toFormula_Weight(graph, formulaFile)
+        with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
+            solveTime = checkFormulaWeight(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+        if (solveTime <= minSolveTime or solveTime >= maxSolveTime):
+            print("    Time: " + str(solveTime))
+            continue
+        with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
+            ref = resultFile.read()
+            if (getModels(ref) == 0 and numUNSAT >= numUNSATTestCases) or (
+                            getModels(ref) > 0 and numSAT >= numSATTestCases) or getModels(ref) >= maxNumModels:
+                print("    num Models: " + str(getModels(ref)))
+                continue
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genIncidenceGraph(formulaFile, graphFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
+            genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
+            line = decompFile.readline()
+            if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
+                continue
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genPrimGraph(formulaFile, graphFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
+            genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
+            line = decompFile.readline()
+            if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
+                continue
+
+        if getModels(ref) == 0:
+            numUNSAT += 1
+        else:
+            numSAT += 1
+        numTry += 1
 
 # generate graph
 def getPrimalGraph(formula, resultFile, numVariables):
-    print ("    gen primal graph")
+    print("    gen primal graph")
     graphEdges = ""
     graph = {}
     for i in range(1, numVariables + 1):
@@ -369,7 +590,10 @@ def genFormula():
         with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "w") as formulaFile:
             formulaFile.write(formula)
         with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "w") as resultFile:
-            checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+            solveTime = checkFormula(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), resultFile)
+        if (solveTime <= minSolveTime or solveTime >= maxSolveTime):
+            print("    Time: " + str(solveTime))
+            continue
         with open(join(join(dirReference, prefix), str(numTry).zfill(numDigits) + ""), "r") as resultFile:
             ref = resultFile.read()
             if (getModels(ref) == 0 and numUNSAT >= numUNSATTestCases) or (
@@ -378,12 +602,31 @@ def genFormula():
                 continue
         with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
             getPrimalGraph(formula, graphFile, numVars)
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genIncidenceGraph(formulaFile, graphFile)
         with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
             genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
         with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
             line = decompFile.readline()
             if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
-                print ("    width: " + line.split(" ")[3])
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
+                continue
+        with open(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), "w") as graphFile:
+            with open(join(join(dirFormula, prefix), str(numTry).zfill(numDigits) + ".cnf"), "r") as formulaFile:
+                genPrimGraph(formulaFile, graphFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "w") as decompFile:
+            genTreeDecomp(join(join(dirGraphs, prefix), str(numTry).zfill(numDigits) + ".gr"), decompFile)
+        with open(join(join(dirDecomp, prefix), str(numTry).zfill(numDigits) + ".td"), "r") as decompFile:
+            line = decompFile.readline()
+            if int(line.split(" ")[3]) < minTreeWidth or int(line.split(" ")[3]) > maxTreeWidth:
+                print("    width: " + line.split(" ")[3])
+                continue
+            if maxNumBags != None and int(line.split(" ")[4]) > maxNumBags:
+                print("    bags: " + line.split(" ")[4])
                 continue
 
         if getModels(ref) == 0:
@@ -396,15 +639,16 @@ def genFormula():
 ######################################################################################
 ######################################################################################
 
+maxNumBags = 8
 ##########
 # Tiny 0 #
 ##########
-if tiny and gena:
+if tiny and False:
     minClauseSize = 1
-    maxClauseSize = 3
+    maxClauseSize = 4
 
     minTreeWidth = 1
-    maxTreeWidth = 3
+    maxTreeWidth = 4
 
     minNumVariables = 1
     maxNumVariables = 10
@@ -419,12 +663,12 @@ if tiny and gena:
 ##########
 # Tiny 1 #
 ##########
-if tiny and genb:
+if tiny and False:
     minClauseSize = 0
-    maxClauseSize = 3
+    maxClauseSize = 4
 
     minTreeWidth = 1
-    maxTreeWidth = 3
+    maxTreeWidth = 4
 
     minNumVariables = 1
     maxNumVariables = 10
@@ -439,17 +683,18 @@ if tiny and genb:
 
     genFormula()
 
+maxNumBags = 30
 ##########
 # Tiny 2 #
 ##########
-if tiny and genc:
+if tiny and False:
     numGraphs = 5
 
     minClauseSize = 1
-    maxClauseSize = 2
+    maxClauseSize = 4
 
     minTreeWidth = 1
-    maxTreeWidth = 3
+    maxTreeWidth = 4
 
     minNumVariables = 1
     maxNumVariables = 10
@@ -461,13 +706,34 @@ if tiny and genc:
 
     genFormulaFromGraph2()
 
+##########
+# Tiny 0 #
+##########
+if tiny:
+    minClauseSize = 1
+    maxClauseSize = 4
+
+    minTreeWidth = 1
+    maxTreeWidth = 4
+
+    minNumVariables = 1
+    maxNumVariables = 10
+
+    numSATTestCases = 500
+    numUNSATTestCases = 0
+
+    prefix = "d_00_test"
+
+    genFormulaFromGraph_Weight()
+
 ######################################################################################
 ######################################################################################
 
+maxNumBags = None
 ###########
 # Small 0 #
 ###########
-if small and gena:
+if small and False:
     minClauseSize = 1
     maxClauseSize = 11
 
@@ -487,7 +753,7 @@ if small and gena:
 ###########
 # Small 1 #
 ###########
-if small and genb:
+if small and False:
     minClauseSize = 3
     maxClauseSize = 8
 
@@ -510,7 +776,7 @@ if small and genb:
 ###########
 # Small 2 #
 ###########
-if small and genc:
+if small and False:
     numGraphs = 5
 
     minClauseSize = 1
@@ -529,13 +795,33 @@ if small and genc:
 
     genFormulaFromGraph2()
 
+###########
+# Small 0 #
+###########
+if small:
+    minClauseSize = 1
+    maxClauseSize = 11
+
+    minTreeWidth = 4
+    maxTreeWidth = 11
+
+    minNumVariables = 10
+    maxNumVariables = 25
+
+    numSATTestCases = 170
+    numUNSATTestCases = 30
+
+    prefix = "d_01_test"
+
+    genFormulaFromGraph_Weight()
+
 ######################################################################################
 ######################################################################################
 
 ############
 # Medium 0 #
 ############
-if medium and gena:
+if medium and False:
     minClauseSize = 8
     maxClauseSize = 15
 
@@ -555,15 +841,15 @@ if medium and gena:
 ############
 # Medium 1 #
 ############
-if medium and genb:
+if medium and False:
     minClauseSize = 8
-    maxClauseSize = 15
+    maxClauseSize = 16
 
-    minTreeWidth = 12
+    minTreeWidth = 6
     maxTreeWidth = 16
 
-    minNumVariables = 20
-    maxNumVariables = 50
+    minNumVariables = 15
+    maxNumVariables = 25
 
     numSATTestCases = 200
     numUNSATTestCases = 0
@@ -578,7 +864,7 @@ if medium and genb:
 ############
 # Medium 2 #
 ############
-if medium and genc:
+if medium and False:
     numGraphs = 5
 
     minClauseSize = 3
@@ -597,14 +883,33 @@ if medium and genc:
 
     genFormulaFromGraph2()
 
+############
+# Medium 0 #
+############
+if medium:
+    minClauseSize = 8
+    maxClauseSize = 15
+
+    minTreeWidth = 12
+    maxTreeWidth = 16
+
+    minNumVariables = 20
+    maxNumVariables = 50
+
+    numSATTestCases = 130
+    numUNSATTestCases = 70
+
+    prefix = "d_02_test"
+
+    genFormulaFromGraph_Weight()
+
 ######################################################################################
 ######################################################################################
 
-maxNumModels = pow(10, 298)
 ###########
 # Large 0 #
 ###########
-if large and gena:
+if large and False:
     minClauseSize = 1
     maxClauseSize = 5
 
@@ -624,11 +929,11 @@ if large and gena:
 ###########
 # Large 1 #
 ###########
-if large and genb:
+if large and False:
     minClauseSize = 6
     maxClauseSize = 10
 
-    minTreeWidth = 17
+    minTreeWidth = 6
     maxTreeWidth = 22
 
     minNumVariables = 40
@@ -647,7 +952,7 @@ if large and genb:
 ###########
 # Large 2 #
 ###########
-if large and genc:
+if large and False:
     numGraphs = 3
 
     minClauseSize = 1
@@ -666,174 +971,114 @@ if large and genc:
 
     genFormulaFromGraph2()
 
-######################################################################################
-######################################################################################
-
-
-###############
-# benchmark 0 #
-###############
-if False:
-    numGraphs = 50
-
-    numConnections = 15
-
+###########
+# Large 0 #
+###########
+if large:
     minClauseSize = 1
-    maxClauseSize = 3
+    maxClauseSize = 5
 
-    minTreeWidth = 8
-    maxTreeWidth = 20
+    minTreeWidth = 17
+    maxTreeWidth = 22
 
-    minNumVariables = 40
-    maxNumVariables = 80
-
-    numSATTestCases = 5
-    numUNSATTestCases = 15
-
-    prefix = "benchmark"
-
-    genFormulaFromGraph2()
-
-###############
-# benchmark 1 #
-###############
-if False:
-    numGraphs = 10
-
-    numConnections = 12
-
-    minClauseSize = 1
-    maxClauseSize = 3
-
-    minTreeWidth = 8
-    maxTreeWidth = 20
-
-    minNumVariables = 20
-    maxNumVariables = 40
-
-    numSATTestCases = 10
-    numUNSATTestCases = 15
-
-    prefix = "benchmark_small"
-
-    genFormulaFromGraph2()
-
-###############
-# benchmark 0 #
-###############
-if False:
-    numGraphs = 10
-
-    numConnections = 12
-
-    minClauseSize = 1
-    maxClauseSize = 3
-
-    minTreeWidth = 8
-    maxTreeWidth = 20
-
-    minNumVariables = 20
-    maxNumVariables = 40
-
-    numSATTestCases = 8
-    numUNSATTestCases = 22
-
-    prefix = "benchmark_0"
-
-    genFormulaFromGraph2()
-
-###############
-# benchmark 1 #
-###############
-if False:
-    numGraphs = 20
-
-    numConnections = 12
-
-    minClauseSize = 1
-    maxClauseSize = 3
-
-    minTreeWidth = 8
-    maxTreeWidth = 20
-
-    minNumVariables = 20
-    maxNumVariables = 40
-
-    numSATTestCases = 5
-    numUNSATTestCases = 25
-
-    prefix = "benchmark_1"
-
-    genFormulaFromGraph2()
-
-###############
-# benchmark 2 #
-###############
-if True:
-    numGraphs = 50
-
-    numConnections = 16
-
-    minClauseSize = 1
-    maxClauseSize = 3
-
-    minTreeWidth = 8
-    maxTreeWidth = 20
-
-    minNumVariables = 40
-    maxNumVariables = 80
+    minNumVariables = 70
+    maxNumVariables = 90
 
     numSATTestCases = 20
-    numUNSATTestCases = 20
+    numUNSATTestCases = 180
 
-    prefix = "benchmark_2"
+    prefix = "d_03_test"
 
-    genFormulaFromGraph2()
+    genFormulaFromGraph_Weight()
 
-###############
-# benchmark 3 #
-###############
-if True:
-    numGraphs = 70
+######################################################################################
+######################################################################################
 
-    numConnections = 12
-
+###########
+# big 0 #
+###########
+if big and False:
     minClauseSize = 1
-    maxClauseSize = 3
+    maxClauseSize = 5
 
-    minTreeWidth = 8
-    maxTreeWidth = 20
+    minTreeWidth = 23
+    maxTreeWidth = 30
 
-    minNumVariables = 40
+    minNumVariables = 100
+    maxNumVariables = 120
+
+    numSATTestCases = 20
+    numUNSATTestCases = 180
+
+    prefix = "a_04_test"
+
+    genFormulaFromGraph()
+
+###########
+# big 1 #
+###########
+if big and False:
+    minClauseSize = 6
+    maxClauseSize = 10
+
+    minTreeWidth = 6
+    maxTreeWidth = 30
+
+    minNumVariables = 60
     maxNumVariables = 80
 
-    numSATTestCases = 0
-    numUNSATTestCases = 30
+    numSATTestCases = 200
+    numUNSATTestCases = 0
 
-    prefix = "benchmark_3"
+    minNumClauses = 12
+    maxNumClauses = 20
 
-    genFormulaFromGraph2()
+    prefix = "b_04_test"
 
-###############
-# benchmark 4 #
-###############
-if True:
-    numGraphs = 90
+    genFormula()
 
-    numConnections = 12
+###########
+# big 2 #
+###########
+if big and False:
+    numGraphs = 3
 
     minClauseSize = 1
-    maxClauseSize = 3
+    maxClauseSize = 5
 
-    minTreeWidth = 10
-    maxTreeWidth = 20
+    minTreeWidth = 23
+    maxTreeWidth = 30
 
-    minNumVariables = 40
-    maxNumVariables = 80
+    minNumVariables = 100
+    maxNumVariables = 120
 
-    numSATTestCases = 0
-    numUNSATTestCases = 30
+    numSATTestCases = 20
+    numUNSATTestCases = 180
 
-    prefix = "benchmark_4"
+    prefix = "c_04_test"
 
     genFormulaFromGraph2()
+
+###########
+# big 0 #
+###########
+if big:
+    minClauseSize = 1
+    maxClauseSize = 5
+
+    minTreeWidth = 23
+    maxTreeWidth = 30
+
+    minNumVariables = 100
+    maxNumVariables = 120
+
+    numSATTestCases = 20
+    numUNSATTestCases = 180
+
+    prefix = "d_04_test"
+
+    genFormulaFromGraph_Weight()
+
+######################################################################################
+######################################################################################
+

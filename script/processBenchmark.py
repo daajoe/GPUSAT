@@ -1,135 +1,118 @@
 #!/usr/bin/env python
 import csv
-import subprocess
+from multiprocessing import Lock
+from multiprocessing.pool import ThreadPool
 from os.path import join, isdir, isfile
-from os import makedirs, listdir, remove
-from shutil import copyfile
-from subprocess import check_output
-
-maxWidth = 22
-saveWidth = 60
+from os import makedirs, listdir
+from CommonMethods import *
 
 dirRaw = "./benchmarks/raw"
 dirFormula = "./benchmarks/formula"
 dirDecomp = "./benchmarks/decomposition"
-dirResults = "./benchmarks/results"
-dirReference = "./benchmarks/reference"
-dirGraphs = "./benchmarks/graph"
-dirSaveFromula = "./benchmarks/save/formula"
-dirSaveGraph = "./benchmarks/save/graph"
+dirIncidence = "./benchmarks/incidence"
+dirIncidenceDecomp = "./benchmarks/incidenceDecomp"
+dirPrimal = "./benchmarks/primal"
+dirPrimalDecomp = "./benchmarks/primalDecomp"
+preprocessPath = "./benchmarks/preproc"
+dirClean = "./benchmarks/clean"
 
-fieldnames = ['file_name', 'width']
+fieldnames = ['file_name', 'width_primal_s1234', "width_incidence_s1234", "max_clause_size", "max_var_occ", 'width_primal_s1234_satelite',
+              "width_incidence_s1234_satelite", "max_clause_size_satelite", "max_var_occ_satelite", "sat-unsat"]
 
-summaryFile = 'Summary_Benchmark_Width.csv'
+summaryFile = './benchmarks/Summary_Benchmark_Width.csv'
 
-if not isdir(dirRaw):
-    makedirs(dirRaw)
-if not isdir(dirFormula):
-    makedirs(dirFormula)
-if not isdir(dirGraphs):
-    makedirs(dirGraphs)
-if not isdir(dirDecomp):
-    makedirs(dirDecomp)
-if not isdir(dirReference):
-    makedirs(dirReference)
-if not isdir(dirResults):
-    makedirs(dirResults)
-if not isdir(dirSaveFromula):
-    makedirs(dirSaveFromula)
-if not isdir(dirSaveGraph):
-    makedirs(dirSaveGraph)
+lock = Lock()
+
 if not isfile(summaryFile):
     with open(summaryFile, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
+if not isdir(dirFormula):
+    makedirs(dirFormula)
+if not isdir(dirDecomp):
+    makedirs(dirDecomp)
+if not isdir(dirIncidence):
+    makedirs(dirIncidence)
+if not isdir(dirPrimal):
+    makedirs(dirPrimal)
+if not isdir(preprocessPath):
+    makedirs(preprocessPath)
+if not isdir(dirClean):
+    makedirs(dirClean)
+
+with open(summaryFile, "r") as csvfile:
+    contents = csvfile.read()
+total_size = len(listdir(dirRaw))
+processing = 0
 
 
-# check formula
-def checkFormula(formula, resultFile):
-    subprocess.call(["./sharpSAT", "-t", "900", formula], stdout=resultFile)
+def process(testcase):
+    global processing
+    current = processing
+    processing += 1
+    case = testcase[:-4]
+    row = {'file_name': case}
+    row['sat-unsat'] = 'ERROR'
+    row['width_primal_s1234'] = -1
+    row['width_incidence_s1234'] = -1
+    row['max_clause_size'] = -1
+    row['max_var_occ'] = -1
+    row['width_primal_s1234_satelite'] = -1
+    row['width_incidence_s1234_satelite'] = -1
+    row['max_clause_size_satelite'] = -1
+    row['max_var_occ_satelite'] = -1
+    if case not in contents:
+        try:
+            print("%s/%s: %s" % (str(current), str(total_size), testcase))
+
+            with open(join(dirRaw, testcase), "r") as formulaFile:
+                with open(join(dirClean, testcase), "w") as cleanFile:
+                    cleanFile.write(cleanFormula(formulaFile.read()))
 
 
-# generate tree decomposition
-def genTreeDecomp(graph, decompFile):
-    try:
-        decompFile.write(
-            check_output(["./htd_main", "--opt", "width", "-s", "1234"], stdin=graph, timeout=120).decode('ascii'))
-    except subprocess.TimeoutExpired:
-        return
+            with open(join(dirClean, testcase), "r") as formulaFile:
+                formula = formulaFile.read()
+                with open(join(dirPrimal, case + ".gr"), "w")as graphFile:
+                    graphFile.write(genPrimalGraph(formula))
+                with open(join(dirPrimal, case + ".gr"), "r")as graphFile:
+                    row['width_primal_s1234'] = getTreeWidth(graphFile, 1234)
+                with open(join(dirIncidence, case + ".gr"), "w")as graphFile:
+                    graphFile.write(genIncidenceGraph(formula))
+                with open(join(dirIncidence, case + ".gr"), "r")as graphFile:
+                    row['width_incidence_s1234'] = getTreeWidth(graphFile, 1234)
+                row['max_clause_size'] = getMaxClauseSize(formula)
+                row['max_var_occ'] = getMaxVarOcc(formula)
+
+            row['sat-unsat'] = checkSAT(join(dirClean, testcase))
+            preprocessFormula(join(dirClean, testcase), join(preprocessPath, testcase))
+            if isfile(join(preprocessPath, testcase)):
+                with open(join(preprocessPath, testcase), "r") as formulaFile:
+                    formula = formulaFile.read()
+                    with open(join(dirPrimal, case + ".gr"), "w")as graphFile:
+                        graphFile.write(genPrimalGraph(formula))
+                    with open(join(dirPrimal, case + ".gr"), "r")as graphFile:
+                        row['width_primal_s1234_satelite'] = getTreeWidth(graphFile, 1234)
+                    with open(join(dirIncidence, case + ".gr"), "w")as graphFile:
+                        graphFile.write(genIncidenceGraph(formula))
+                    with open(join(dirIncidence, case + ".gr"), "r")as graphFile:
+                        row['width_incidence_s1234_satelite'] = getTreeWidth(graphFile, 1234)
+                    row['max_clause_size_satelite'] = getMaxClauseSize(formula)
+                    row['max_var_occ_satelite'] = getMaxVarOcc(formula)
+
+        except BaseException as ex:
+            test = 1
+        lock.acquire()
+        with open(summaryFile, 'a') as csvf:
+            wr = csv.DictWriter(csvf, fieldnames=fieldnames)
+            wr.writerow(row)
+            csvf.flush()
+        lock.release()
 
 
-def genPrimalGraph(formulaFile, graphFile):
-    formula = formulaFile.read()
-    graphEdges = ""
-    graph = set()
-    for line in formula.splitlines():
-        if len(line) > 0:
-            if line[0] == 'p':
-                numVariables = int(line.split()[2])
-    for line in formula.splitlines():
-        if len(line) > 0:
-            if line[0] != 'p' and line[0] != 'c':
-                for node in line.split():
-                    ainode = abs(int(node))
-                    if ainode != 0:
-                        for node2 in line.split():
-                            ainode2 = abs(int(node2))
-                            if ainode2 != 0 and ainode != node2:
-                                if (ainode < ainode2):
-                                    graph |= {(ainode, ainode2)}
-                                elif (ainode > ainode2):
-                                    graph |= {(ainode2, ainode)}
-                                if len(graph) > 10000000:
-                                    return
-
-    for node in graph:
-            graphEdges += str(node[0]) + " " + str(node[1]) + "\n"
-
-    graphString = "p tw " + str(numVariables) + " " + str(len(graphEdges.split('\n')) - 1) + "\n" + graphEdges[:-1]
-    graphFile.write(graphString)
-
-
-for testcase in listdir(dirRaw):
-    try:
-        case = testcase[:-4]
-        with open(join(dirRaw, testcase), "r") as formula:
-            with open(join(dirFormula, case + ".cnf"), "w") as f:
-                f.write(formula.read())
-
-        print("formula: " + testcase)
-
-        print("    primal graph")
-        # generate the primal graph of the cnf formula
-        with open(join(dirGraphs, case + ".gr"), "w") as graph:
-            with open(join(dirFormula, case + ".cnf"), "r") as formula:
-                genPrimalGraph(formula, graph)
-
-        print("    gen decomp")
-        # generate the tree decomposition
-        with open(join(dirDecomp, case + ".td"), "w") as decomp:
-            with open(join(dirGraphs, case + ".gr"), "r") as graph:
-                genTreeDecomp(graph, decomp)
-
-        # check decomposition
-        with open(join(dirDecomp, case + ".td"), "r") as decomp:
-            line = decomp.readline()
-            if int(line.split(" ")[3]) > maxWidth:
-                print("width: " + line.split(" ")[3])
-                if int(line.split(" ")[3]) <= saveWidth:
-                    copyfile(join(dirFormula, case + ".cnf"), join(dirSaveFromula, case + ".cnf"))
-                    copyfile(join(dirGraphs, case + ".gr"), join(dirSaveGraph, case + ".gr"))
-                remove(join(dirFormula, case + ".cnf"))
-                remove(join(dirGraphs, case + ".gr"))
-                remove(join(dirDecomp, case + ".td"))
-
-            with open('Summary_Benchmark_Width.csv', 'a') as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                writer.writerow({'file_name': case, 'width': line.split(" ")[3]})
-    except:
-        print("Error")
-        if isfile(join(dirFormula, case + ".cnf")):
-            remove(join(dirFormula, case + ".cnf"))
-        if isfile(join(dirGraphs, case + ".gr")):
-            remove(join(dirGraphs, case + ".gr"))
-        if isfile(join(dirDecomp, case + ".td")):
-            remove(join(dirDecomp, case + ".td"))
+numFiles = listdir(dirRaw)
+pool = ThreadPool(4)
+for i in numFiles:
+    pool.apply_async(process, [i])
+    # process(i)
+pool.close()
+pool.join()

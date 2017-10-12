@@ -1,116 +1,170 @@
 #!/usr/bin/env python2.7
+import csv
 import json
 from os import listdir
 import subprocess, getpass
-from os.path import join, isdir
+from os.path import join, isdir, isfile
 from os import makedirs
 import datetime
+from  CommonMethods import *
+
+import math
+
+import itertools
 
 dirFormula = "./new_problems/formula"
 dirDecomp = "./new_problems/decomposition"
 dirResults = "./new_problems/results"
 dirReference = "./new_problems/reference"
+dirGraphs = "./new_problems/graph"
 
-testCasesStrings = ["a_00_test", "b_00_test", "c_00_test","a_01_test", "b_01_test", "c_01_test","a_02_test", "b_02_test", "c_02_test","a_03_test", "b_03_test", "c_03_test",
-                    "benchmark_0","benchmark_1","benchmark_2"]
+summaryFile = './Summary.csv'
 
+testCasesStrings = [
+    # "a_00_test",  "b_00_test", "c_00_test", "d_00_test",
+    # "a_01_test",  "b_01_test", "c_01_test", "d_01_test",
+    "a_02_test", "c_02_test",  # "b_02_test", "d_02_test",
+    "a_03_test", "c_03_test",  # "b_03_test", "d_03_test",
+    "a_04_test", "c_04_test", "#b_04_test", "d_04_test",
+    # "Tests"
+]
 
-def getTime(sol):
-    if sol[0] == "{":
-        return json.loads(sol)['Time']['Total']
-    elif sol.startswith("cachet"):
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if lines[i].startswith("Total Run Time "):
-                return float(lines[i].split()[3])
-            i += 1
-    else:
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if "time: " in lines[i]:
-                return float(lines[i].split(" ")[1][:-1])
-            i += 1
+fieldnames = ['Case', "Success", 'Graph', "Precision", "Combine Width", "Model Count", 'Model Count Reference', "Total Time", "Solving Time", "Command"]
 
-
-def getModels(sol):
-    if sol[0] == "{":
-        return json.loads(sol)['Models']['Number']
-    elif sol.startswith("cachet"):
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if lines[i].startswith("s "):
-                return int(lines[i].split()[1])
-            i += 1
-    else:
-        i = 0
-        lines = sol.split("\n")
-        while i < len(lines):
-            if "# solutions" in lines[i]:
-                return int(lines[i + 1])
-            i += 1
+if not isfile(summaryFile):
+    with open(summaryFile, 'w', newline='\n') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+if not isdir(dirFormula):
+    makedirs(dirFormula)
+if not isdir(dirGraphs):
+    makedirs(dirGraphs)
+if not isdir(dirDecomp):
+    makedirs(dirDecomp)
+if not isdir(dirReference):
+    makedirs(dirReference)
+if not isdir(dirResults):
+    makedirs(dirResults)
 
 
-def check_model(model, clauses):
-    for line in clauses:
-        sat = False
-        for var in line[:-1]:
-            if var in model:
-                sat = True
-                break
-        if not sat:
-            return False
-    return True
+# generate tree decomposition
+def genTreeDecomp(graph, decompFile):
+    decompFile.write(
+        subprocess.check_output(["./htd_main", "--opt", "width", "-s", "1234"], stdin=graph, timeout=300).decode('ascii').replace("\r", ""))
 
 
 for case in testCasesStrings:
     if not isdir(join(dirResults, case)):
         makedirs(join(dirResults, case))
+    if not isdir(join(dirDecomp, case)):
+        makedirs(join(dirDecomp, case))
+    if not isdir(join(dirGraphs, case)):
+        makedirs(join(dirGraphs, case))
     numElements = len(listdir(join(dirReference, case)))
     currentElement = 0
     for testcase in listdir(join(dirReference, case)):
         currentElement += 1
-        if not testcase in listdir(join(dirResults, case)):
-            with open("./Summary.txt", "a") as summaryFile:
-                summaryFile.write(
-                    "Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + "\n")
-                summaryFile.flush()
-                print(
-                "Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + " " + str(
-                    datetime.datetime.now().time()))
+        if not isfile(join(join(dirResults, case), testcase)):
+            open(join(dirResults, case) + "/" + testcase, "w").close()
+            for wi, gr, prec in itertools.product([0], [0, 1], [0, 1]):
+                row = {'Case': case + "/" + testcase}
+                print("Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + " " + str(datetime.datetime.now().time()))
+                if gr == 0:
+                    postfix = "_i"
+                    print("    Incidence Graph")
+                    row['Graph'] = "incidence"
+                if gr == 1:
+                    postfix = "_p"
+                    print("    Primal Graph")
+                    row['Graph'] = "primal"
+                if prec == 0:
+                    postfix_prec = "_d4"
+                    print("    d4")
+                    row['Precision'] = "d4"
+                if prec == 1:
+                    postfix_prec = "_d"
+                    print("    double")
+                    row['Precision'] = "double"
+                print("    wi 0" + str(wi))
+                row['Combine Width'] = str(wi)
 
-                # generate output
-                with open(join(join(dirResults, case), testcase), "w") as resultFile:
-                    subprocess.call(
-                        ["./gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + ".td", "-s",
-                         dirFormula + "/" + case + "/" + testcase + ".cnf"],
-                        stdout=resultFile, stderr=resultFile)
-                # check results
-                with open(join(dirResults, case) + "/" + testcase, "r") as resultFile:
-                    with open(join(dirReference, case) + "/" + testcase, "r") as referenceFile:
+                if False:
+                    # generate Graph
+                    with open(dirFormula + "/" + case + "/" + testcase + ".cnf", 'r')as formulaFile:
+                        with open(dirGraphs + "/" + case + "/" + testcase + postfix + ".gr", 'w')as graphFile:
+                            if gr == 0:
+                                graphFile.write(genIncidenceGraph(formulaFile.read()))
+                                print("    Incidence Graph")
+                            if gr == 1:
+                                graphFile.write(genPrimalGraph(formulaFile.read()))
+                                print("    Primal Graph")
+
+                    # generate decomposition
+                    with open(dirGraphs + "/" + case + "/" + testcase + postfix + ".gr", 'r')as graphFile:
+                        with open(dirDecomp + "/" + case + "/" + testcase + postfix + ".td", 'w')as decompFile:
+                            genTreeDecomp(graphFile, decompFile)
+                if True:
+                    try:
+                        # generate output
+                        with open(join(join(dirResults, case), testcase + postfix + postfix_prec), "w") as resultFile:
+                            if prec == 0:
+                                subprocess.call(["../build_mingw_d4/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
+                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", "18"], timeout=30,
+                                                stdout=resultFile, stderr=resultFile)
+                                row[
+                                    'Command'] = "../build_mingw_d4/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
+                                    wi) + " -m 18"
+                            if prec == 1:
+                                subprocess.call(["../build_mingw_double/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
+                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", "18"], timeout=30,
+                                                stdout=resultFile, stderr=resultFile)
+                                row[
+                                    'Command'] = "../build_mingw_double/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
+                                    wi) + " -m 18"
+
+                        weighted = False
+                        with open(dirFormula + "/" + case + "/" + testcase + ".cnf") as formulaFile:
+                            weighted = "\nw" in formulaFile.read()
+                        # check results
                         try:
-                            data = resultFile.read()
+                            with open(join(dirResults, case) + "/" + testcase + postfix + postfix_prec, "r") as resultFile:
+                                data = resultFile.read()
                             d = json.loads(data)
-                            ref = str(referenceFile.read())
-                            summaryFile.write("    ModelCount: ")
-                            numModels = getModels(ref)
-                            if d['Model Count'] == getModels(ref):
-                                summaryFile.write("OK\n")
-                                print("    ModelCount: OK")
+                            with open(join(dirReference, case) + "/" + testcase, "r") as referenceFile:
+                                ref = str(referenceFile.read())
+                            row['Model Count'] = d['Model Count']
+                            if (weighted):
+                                numModels = getModelsW(ref)
+                                row['Model Count Reference'] = numModels
+                                if (numModels == d['Model Count']) or (
+                                                    numModels != 0 and d['Model Count'] != 0 and round(d['Model Count'],
+                                                                                                       int(math.log10(d['Model Count'])) + 5) == round(
+                                            numModels, int(math.log10(numModels)) + 5)):
+                                    row['Success'] = "OK"
+                                    print("    ModelCount: OK")
+                                else:
+                                    row['Success'] = "Failure"
+                                    print("    ModelCount: Failure " + str(numModels) + "/" + str(d['Model Count']))
                             else:
-                                summaryFile.write("Failure\n")
-                                print("    ModelCount: Failure")
-                            summaryFile.write(
-                                "    Time Total: " + str(d['Time']['Total']) + "\n    Time Solving: " + str(
-                                    d['Time']['Solving']) + "\n    Time Init_OpenCL: " + str(
-                                    d['Time']['Init_OpenCL']) + "\n    Time without Init_OpenCL: " + str(
-                                    d['Time']['Total'] - d['Time']['Init_OpenCL']) + "\n    Time Clasp: " + str(
-                                    getTime(ref)) + "\n")
+                                numModels = getModels(ref)
+                                row['Model Count Reference'] = numModels
+                                if d['Model Count'] == numModels:
+                                    row['Success'] = "OK"
+                                    print("    ModelCount: OK")
+                                else:
+                                    row['Success'] = "Failure"
+                                    print("    ModelCount: Failure " + str(numModels) + "/" + str(d['Model Count']))
                             print("    Time Total: " + str(d['Time']['Total']) + " Init: " + str(
-                                d['Time']['Total'] - d['Time']['Init_OpenCL']) + " Time Reference: " + str(
-                                getTime(ref)))
-                        except ValueError:
-                            summaryFile.write("    Error\n")
+                                d['Time']['Total'] - d['Time']['Init_OpenCL']) + " Time Reference: " + str(getTime(ref)))
+                            row['Total Time'] = d['Time']['Total']
+                            row['Solving Time'] = d['Time']['Solving']
+                        except ValueError as ex:
+                            row['Success'] = "Error"
                             print("    Error")
+                    except subprocess.TimeoutExpired:
+                        row['Success'] = "Timeout"
+                        print("    Timeout")
+                    with open(summaryFile, 'a', newline='\n') as csvf:
+                        wr = csv.DictWriter(csvf, fieldnames=fieldnames)
+                        wr.writerow(row)
+                        csvf.flush()
