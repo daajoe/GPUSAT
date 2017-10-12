@@ -26,6 +26,7 @@ namespace gpusat {
         }
     }
 
+/*
     void GPUSATUtils::printSolutions(treedecType decomp) {
         cl_long size = decomp.numb;
         for (int i = 0; i < size; i++) {
@@ -37,12 +38,13 @@ namespace gpusat {
             //printSol(numS, numVariables, vars, sol);
             std::cout << "\n";
         }
-    }
+    }*/
 
-    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType *sol, satformulaType &formula) {
+    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, std::vector<std::pair<cl_long, solType>> *sol, satformulaType &formula) {
         std::cout << "solutions: \n";
+        std::cout.flush();
         for (int a = 0; a < numS; a++) {
-            std::cout << a << ": ";
+            std::cout << sol->at(a).first << ": ";
             int b = 0, c = 0;
             for (b = 0; vars[b] <= formula.numVars && b < numVariables; b++) {
                 cl_long asdf = vars[b];
@@ -55,11 +57,13 @@ namespace gpusat {
                 std::cout << (((a >> (c + d)) & 1) == 0 ? "-" : " ") << vars[d] << " ";
             }
 #ifdef sType_Double
-            printf("%e\n", sol[a]);
+            printf("%e\n", sol->at(a).second);
 #else
-            std::cout << d4_to_string(sol[a]) << "\n";
+            std::cout << d4_to_string(sol->at(a).second) << "\n";
 #endif
         }
+        std::cout << "solutions_end\n";
+        std::cout.flush();
     }
 
     void GPUSATUtils::printFormula(satformulaType formula) {

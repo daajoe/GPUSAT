@@ -8,7 +8,6 @@
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node) {
         if (isSat > 0) {
-            node.solution = new solType[node.numSol]();
             if (node.numEdges == 0) {
                 solveLeaf(formula, node);
             } else if (node.numEdges == 1) {
@@ -17,7 +16,7 @@ namespace gpusat {
                 if (isSat == 1) {
                     bagType &next = decomp.bags[node.edges[0] - 1];
                     solveForgIntroduce(formula, node, next);
-                    delete[] next.solution;
+                    delete next.solution;
                     delete[] next.variables;
                 }
             } else if (node.numEdges > 1) {
@@ -36,9 +35,8 @@ namespace gpusat {
                     edge1_.variables = &v1[0];
                     edge1_.numVars = v1.size();
                     edge1_.numSol = static_cast<cl_long>(pow(2, edge1_.numVars));
-                    edge1_.solution = new solType[edge1_.numSol]();
                     solveForget(edge1_, edge1, formula);
-                    delete[] edge1.solution;
+                    delete edge1.solution;
                     delete[] edge1.variables;
 
                     for (int i = 1; i < node.numEdges; i++) {
@@ -55,9 +53,8 @@ namespace gpusat {
                         edge2_.variables = &v2[0];
                         edge2_.numVars = v2.size();
                         edge2_.numSol = static_cast<cl_long>(pow(2, edge2_.numVars));
-                        edge2_.solution = new solType[edge2_.numSol]();
                         solveForget(edge2_, edge2, formula);
-                        delete[] edge2.solution;
+                        delete edge2.solution;
                         delete[] edge2.variables;
 
                         std::vector<cl_long> vt(static_cast<unsigned long long int>(edge1_.numVars + edge2_.numVars));
@@ -68,11 +65,10 @@ namespace gpusat {
                         memcpy(tmp.variables, &vt[0], vt.size() * sizeof(cl_long));
                         tmp.numVars = vt.size();
                         tmp.numSol = static_cast<cl_long>(pow(2, tmp.numVars));
-                        tmp.solution = new solType[tmp.numSol]();
                         solveJoin(tmp, edge1_, edge2_, formula);
 
-                        delete[] edge1_.solution;
-                        delete[] edge2_.solution;
+                        delete edge1_.solution;
+                        delete edge2_.solution;
 
                         if (i > 1) {
                             delete[] edge1_.variables;
@@ -83,17 +79,17 @@ namespace gpusat {
                             if (inci) {
                                 if (node.numVars != tmp.numVars) {
                                     solveIntroduce(formula, node, tmp);
-                                    delete[] tmp.solution;
+                                    delete tmp.solution;
                                     delete[] tmp.variables;
                                 } else {
-                                    delete[] node.solution;
+                                    delete node.solution;
                                     delete[] node.variables;
                                     node.solution = tmp.solution;
                                     node.variables = tmp.variables;
                                 }
                             } else {
                                 solveIntroduce(formula, node, tmp);
-                                delete[] tmp.solution;
+                                delete tmp.solution;
                                 delete[] tmp.variables;
                             }
                         }
@@ -125,23 +121,31 @@ namespace gpusat {
             edge.numVars = vect.size();
             edge.variables = &vect[0];
             edge.numSol = static_cast<cl_long>(pow(2, vect.size()));
-            edge.solution = new solType[edge.numSol]();
 
             solveForget(edge, next, formula);
             solveIntroduce(formula, node, edge);
-            delete[] edge.solution;
+            delete edge.solution;
         }
     }
 
     void Solver_Primal::solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
+#ifdef DEBUG
+        std::cout << "Solver_Primal::solveIntroduce:\n";
+        std::cout.flush();
+#endif
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         cl_long bagSizeEdge = static_cast<cl_long>(pow(2, std::min(maxWidth, edge.numVars)));
         cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
+        solType *eSols = new solType[bagSizeNode]();
         isSat = 0;
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagSizeNode;
-            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+            solType *sols = new solType[bagSizeNode]();
+            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), sols);
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, edge.numVars - maxWidth)));
+            cl_long d = 0;
             for (int b = 0; b < numSubIterations; b++) {
                 cl_long startIdEdge = b * bagSizeEdge;
                 kernel = cl::Kernel(program, "solveIntroduce");
@@ -166,7 +170,15 @@ namespace gpusat {
                 } else {
                     kernel.setArg(1, NULL);
                 }
-                cl::Buffer bufSolNext(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), &edge.solution[b * bagSizeEdge]);
+                for (int i = 0; i < bagSizeEdge; i++) {
+                    if (edge.solution->size() > d && edge.solution->at(d).first == b * bagSizeEdge + i) {
+                        eSols[i] = edge.solution->at(d).second;
+                        d++;
+                    } else {
+                        eSols[i] = 0.0;
+                    }
+                }
+                cl::Buffer bufSolNext(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), eSols);
                 cl::Buffer bufNextVars;
                 if (edge.numVars > 0) {
                     bufNextVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (edge.numVars), edge.variables);
@@ -201,19 +213,31 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
                 queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Introduce:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Primal::solveLeaf(satformulaType &formula, bagType &node) {
+#ifdef DEBUG
+        std::cout << "Solver_Primal::solveLeaf:\n";
+        std::cout.flush();
+#endif
         cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         isSat = 0;
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagSizeNode;
@@ -258,27 +282,51 @@ namespace gpusat {
 
             queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
             queue.finish();
-            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+            solType *sols = new solType[bagSizeNode];
+            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
             queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Leaf:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Primal::solveForget(bagType &node, bagType &edge, satformulaType &formula) {
+#ifdef DEBUG
+        std::cout << "Solver_Primal::solveForget:\n";
+        std::cout.flush();
+#endif
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         cl_long bagSizeEdge = static_cast<cl_long>(pow(2, std::min(maxWidth, edge.numVars)));
         cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
+        solType *eSols = new solType[bagSizeEdge]();
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagSizeNode;
-            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+            solType *sols = new solType[bagSizeNode]();
+            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), sols);
+            cl_long d = 0;
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, edge.numVars - maxWidth)));
             for (int b = 0; b < numSubIterations; b++) {
                 cl_long startIdEdge = b * bagSizeEdge;
                 kernel = cl::Kernel(program, "solveForget");
-                cl::Buffer bufNextSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), &edge.solution[b * bagSizeEdge]);
+                for (int i = 0; i < bagSizeEdge; i++) {
+                    if (edge.solution->size() > d && edge.solution->at(d).first == b * bagSizeEdge + i) {
+                        eSols[i] = edge.solution->at(d).second;
+                        d++;
+                    } else {
+                        eSols[i] = 0.0;
+                    }
+                }
+                cl::Buffer bufNextSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), eSols);
                 cl::Buffer bufSolVars;
                 if (node.numVars > 0) {
                     bufSolVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.numVars, node.variables);
@@ -311,38 +359,61 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Forget:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
+#ifdef DEBUG
+        std::cout << "Solver_Primal::solveJoin:\n";
+        std::cout.flush();
+#endif
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         cl_long bagSizeEdge1 = static_cast<cl_long>(pow(2, std::min(maxWidth, edge1.numVars)));
         cl_long bagSizeEdge2 = static_cast<cl_long>(pow(2, std::min(maxWidth, edge2.numVars)));
         cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
-        for (cl_long i = 0; i < node.numSol; i++) {
-            node.solution[i] = 1.0;
-        }
+        solType *eSols1 = new solType[bagSizeNode]();
+        solType *eSols2 = new solType[bagSizeNode]();
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
         for (int a = 0; a < numIterations; a++) {
             cl_long startIdNode = a * bagSizeNode;
             cl_long startIdEdge1;
             cl_long startIdEdge2;
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, std::max(edge1.numVars - maxWidth, edge2.numVars - maxWidth))));
+            cl_ulong d = 0, e = 0;
+            solType *sols = new solType[bagSizeNode]();
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                sols[i] = 1.0;
+            }
             for (int b = 0; b < numSubIterations; b++) {
-                cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+                cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), sols);
                 startIdEdge1 = b * bagSizeEdge1;
                 startIdEdge2 = b * bagSizeEdge2;
                 kernel = cl::Kernel(program, "solveJoin");
                 cl_long es1 = (b < pow(2, std::max((cl_long) 0, edge1.numVars - maxWidth))) || b == 0 ? bagSizeEdge1 : 0;
                 cl::Buffer bufSol1;
                 if (es1 > 0) {
-                    bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es1),
-                                         &edge1.solution[(b < pow(2, std::max((cl_long) 0, edge1.numVars - maxWidth)) ? b : 0) * bagSizeEdge1]);
+                    for (int i = 0; i < es1; i++) {
+                        if (edge1.solution->size() > d && edge1.solution->at(d).first == bagSizeEdge1 * b + i) {
+                            eSols1[i] = edge1.solution->at(d).second;
+                            d++;
+                        } else {
+                            eSols1[i] = 0.0;
+                        }
+                    }
+                    bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es1), eSols1);
                     kernel.setArg(1, bufSol1);
                 } else {
                     kernel.setArg(1, NULL);
@@ -350,8 +421,16 @@ namespace gpusat {
                 cl_long es2 = (b < pow(2, std::max((cl_long) 0, edge2.numVars - maxWidth))) || b == 0 ? bagSizeEdge2 : 0;
                 cl::Buffer bufSol2;
                 if (es2 > 0) {
-                    bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es2),
-                                         &edge2.solution[(b < pow(2, std::max((cl_long) 0, edge2.numVars - maxWidth)) ? b : 0) * bagSizeEdge2]);
+                    for (int i = 0; i < es2; i++) {
+                        if (edge2.solution->size() > e && edge2.solution->at(e).first == bagSizeEdge2 * b + i) {
+                            solType s = edge2.solution->at(e).second;
+                            eSols2[i] = edge2.solution->at(e).second;
+                            e++;
+                        } else {
+                            eSols2[i] = 0.0;
+                        }
+                    }
+                    bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es2), eSols2);
                     kernel.setArg(2, bufSol2);
                 } else {
                     kernel.setArg(2, NULL);
@@ -409,16 +488,30 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
+        delete[]eSols1;
+        delete[]eSols2;
 #ifdef DEBUG
-        std::cout << "Join:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Incidence::solveIntroduce(satformulaType &formula, bagType &node, bagType &edge) {
+#ifdef DEBUG
+        std::cout << "Solver_Incidence::solveIntroduce:\n";
+        std::cout.flush();
+#endif
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         cl_long bagSizeEdge = static_cast<cl_long>(pow(2, std::min(maxWidth, edge.numVars)));
         cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
@@ -461,16 +554,27 @@ namespace gpusat {
         }
         eVars.push_back(0);
         eClauses.push_back(0);
+        solType *eSols = new solType[bagSizeNode]();
 
         for (int a = 0; a < numIterations; a++) {
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, edge.numVars - maxWidth)));
+            solType *sols = new solType[bagSizeNode]();
+            cl_long d = 0;
             for (int b = 0; b < numSubIterations; b++) {
                 kernel = cl::Kernel(program, "solveIntroduce");
                 //node solutions - 0
-                cl::Buffer bufNSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+                cl::Buffer bufNSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), sols);
                 kernel.setArg(0, bufNSol);
                 //edge solutions - 1
-                cl::Buffer bufESol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), &edge.solution[b * bagSizeEdge]);
+                for (int i = 0; i < bagSizeEdge; i++) {
+                    if (edge.solution->size() > d && edge.solution->at(d).first == b * bagSizeEdge + i) {
+                        eSols[i] = edge.solution->at(d).second;
+                        d++;
+                    } else {
+                        eSols[i] = 0.0;
+                    }
+                }
+                cl::Buffer bufESol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), eSols);
                 kernel.setArg(1, bufESol);
                 //clauses - 2
                 cl::Buffer bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauseVector.size()),
@@ -538,19 +642,31 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufNSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufNSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
                 queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Introduce:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Incidence::solveLeaf(satformulaType &formula, bagType &node) {
+#ifdef DEBUG
+        std::cout << "Solver_Incidence::solveLeaf:\n";
+        std::cout.flush();
+#endif
         auto bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
         isSat = 0;
 
         std::vector<cl_long> clauseVector;
@@ -611,19 +727,32 @@ namespace gpusat {
 
             queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
             queue.finish();
-            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+            solType *sols = new solType[bagSizeNode];
+            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
             queue.enqueueReadBuffer(bufSAT, CL_TRUE, 0, sizeof(cl_long), &isSat);
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Leaf:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Incidence::solveForget(bagType &node, bagType &edge, satformulaType &formula) {
+#ifdef DEBUG
+        std::cout << "Solver_Incidence::solveForget:\n";
+        std::cout.flush();
+#endif
         auto bagSizeEdge = static_cast<cl_long>(pow(2, std::min(maxWidth, edge.numVars)));
         auto bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
 
         std::vector<cl_long> nVars;
         std::vector<cl_long> nClauses;
@@ -648,16 +777,30 @@ namespace gpusat {
         }
         eVars.push_back(0);
         eClauses.push_back(0);
+        solType *eSols = new solType[bagSizeEdge]();
 
         for (int a = 0; a < numIterations; a++) {
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, edge.numVars - maxWidth)));
+            cl_long d = 0;
+            solType *sols = new solType[bagSizeNode]();
+
             for (int b = 0; b < numSubIterations; b++) {
                 kernel = cl::Kernel(program, "solveForget");
                 //node solutions - 0
-                cl::Buffer bufNodeSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+                cl::Buffer bufNodeSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), sols);
                 kernel.setArg(0, bufNodeSol);
                 //edge solutions - 1
-                cl::Buffer bufEdgeSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), &edge.solution[b * bagSizeEdge]);
+
+                for (int i = 0; i < bagSizeEdge; i++) {
+                    if (edge.solution->size() > d && edge.solution->at(d).first == b * bagSizeEdge + i) {
+                        eSols[i] = edge.solution->at(d).second;
+                        d++;
+                    } else {
+                        eSols[i] = 0.0;
+                    }
+                }
+
+                cl::Buffer bufEdgeSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeEdge), eSols);
                 kernel.setArg(1, bufEdgeSol);
                 //node variables - 2
                 cl::Buffer bufNodeVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * nVars.size(), &nVars[0]);
@@ -706,23 +849,34 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufNodeSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufNodeSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), sols);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (sols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, sols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] sols;
         }
 #ifdef DEBUG
-        std::cout << "Forget:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }
 
     void Solver_Incidence::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
+#ifdef DEBUG
+        std::cout << "Solver_Incidence::solveJoin:\n";
+        std::cout.flush();
+#endif
+        node.solution = new std::vector<std::pair<cl_long, solType>>();
+        node.numSol = 0;
 
         bagType edge1_;
         edge1_.variables = node.variables;
         edge1_.numVars = node.numVars;
         edge1_.numSol = node.numSol;
         if (node.numVars != edge1.numVars) {
-            edge1_.solution = new solType[node.numSol]();
             solveIntroduce(formula, edge1_, edge1);
         } else {
             edge1_.solution = edge1.solution;
@@ -733,7 +887,6 @@ namespace gpusat {
         edge2_.numVars = node.numVars;
         edge2_.numSol = node.numSol;
         if (node.numVars != edge2.numVars) {
-            edge2_.solution = new solType[node.numSol]();
             solveIntroduce(formula, edge2_, edge2);
         } else {
             edge2_.solution = edge2.solution;
@@ -742,9 +895,6 @@ namespace gpusat {
         auto bagSizeEdge1 = static_cast<cl_long>(pow(2, std::min(maxWidth, edge1_.numVars)));
         auto bagSizeEdge2 = static_cast<cl_long>(pow(2, std::min(maxWidth, edge2_.numVars)));
         auto bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
-        for (cl_long i = 0; i < node.numSol; i++) {
-            node.solution[i] = 0.0;
-        }
 
         std::vector<cl_long> nClausesVector;
         std::vector<cl_long> nVars;
@@ -757,31 +907,50 @@ namespace gpusat {
         }
         nVars.push_back(0);
         nClausesVector.push_back(0);
-
+        solType *eSols1 = new solType[bagSizeEdge1]();
+        solType *eSols2 = new solType[bagSizeEdge2]();
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
         for (int a = 0; a < numIterations; a++) {
+            solType *nSols = new solType[bagSizeNode]();
             cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, std::max(edge1_.numVars - maxWidth, edge2_.numVars - maxWidth))));
+            cl_long d = 0, e = 0;
             for (int b = 0; b < numSubIterations; b++) {
                 kernel = cl::Kernel(program, "solveJoin");
                 //node solutions - 0
-                cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), &node.solution[a * bagSizeNode]);
+                cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeNode), nSols);
                 kernel.setArg(0, bufSol);
                 //edge1 solutions - 1
                 cl_long es1 = (b < pow(2, std::max((cl_long) 0, edge1_.numVars - maxWidth))) || b == 0 ? bagSizeEdge1 : 0;
+                for (int i = 0; i < es1; i++) {
+                    if (edge1_.solution->size() > d && edge1_.solution->at(d).first == bagSizeEdge1 * b + i) {
+                        eSols1[i] = edge1_.solution->at(d).second;
+                        d++;
+                    } else {
+                        eSols1[i] = 0.0;
+                    }
+                }
                 cl::Buffer bufSol1;
                 if (es1 > 0) {
                     bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es1),
-                                         &edge1_.solution[(b < pow(2, std::max((cl_long) 0, edge1_.numVars - maxWidth)) ? b : 0) * bagSizeEdge1]);
+                                         eSols1);
                     kernel.setArg(1, bufSol1);
                 } else {
                     kernel.setArg(1, NULL);
                 }
                 //edge2 solutions - 2
                 cl_long es2 = (b < pow(2, std::max((cl_long) 0, edge2_.numVars - maxWidth))) || b == 0 ? bagSizeEdge2 : 0;
+                for (int i = 0; i < es2; i++) {
+                    if (edge2_.solution->size() > e && edge2_.solution->at(e).first == bagSizeEdge2 * b + i) {
+                        eSols2[i] = edge2_.solution->at(e).second;
+                        e++;
+                    } else {
+                        eSols2[i] = 0.0;
+                    }
+                }
                 cl::Buffer bufSol2;
                 if (es2 > 0) {
                     bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (es2),
-                                         &edge2_.solution[(b < pow(2, std::max((cl_long) 0, edge2_.numVars - maxWidth)) ? b : 0) * bagSizeEdge2]);
+                                         eSols2);
                     kernel.setArg(2, bufSol2);
                 } else {
 
@@ -833,11 +1002,17 @@ namespace gpusat {
 
                 queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(startIdNode)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
                 queue.finish();
-                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), &node.solution[startIdNode]);
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), nSols);
             }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                if (nSols[i] != 0) {
+                    node.solution->push_back(std::pair<cl_long, solType>(i + a * bagSizeNode, nSols[i]));
+                    node.numSol++;
+                }
+            }
+            delete[] nSols;
         }
 #ifdef DEBUG
-        std::cout << "Join:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula);
 #endif
     }

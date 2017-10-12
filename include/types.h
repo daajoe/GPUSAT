@@ -73,7 +73,7 @@ namespace gpusat {
         cl_long numSol = 0;
         cl_long *variables = nullptr;
         cl_long *edges = nullptr;
-        solType *solution = nullptr;
+        std::vector<std::pair<cl_long,solType>> *solution = nullptr;
     };
 
     /// type for saving a tree decomposition
