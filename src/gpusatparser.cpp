@@ -78,7 +78,7 @@ namespace gpusat {
         }
 
         if (!weights.empty()) {
-            ret.variableWeights = new solType[(ret.numVars + 1) * 2];
+            ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
             for (int i = 0; i <= ret.numVars; i++) {
@@ -214,10 +214,10 @@ namespace gpusat {
             id++;
         }
         for (int a = 0; a < ret.numb; a++) {
-            delete[] ret.bags[a].edges;
-            delete[] ret.bags[a].variables;
+            //delete[] ret.bags[a].edges;
+            //delete[] ret.bags[a].variables;
         }
-        delete[] ret.bags;
+        //delete[] ret.bags;
         ret_.numVars = ret.numVars;
         return ret_;
     }
@@ -245,6 +245,10 @@ namespace gpusat {
             edges.push_back(edge);
         }
         getline(sline, i, ' '); //width
+        if (stoi(i) > 35) {
+            std::cerr << "error treewidth oversize, exiting.\n";
+            exit(1);
+        };
         getline(sline, i, ' '); //num vars
         ret.numVars = stoi(i);
     }

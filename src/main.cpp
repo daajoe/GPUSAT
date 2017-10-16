@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
                         }
                     }
                     if (sat) {
-                        solutions += treeDecomp.bags[0].solution[i];
+                        solutions = solutions + treeDecomp.bags[0].solution[i];
                     }
                 } else {
                     solutions += treeDecomp.bags[0].solution[i];
@@ -302,6 +302,9 @@ int main(int argc, char *argv[]) {
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }
+        delete[] treeDecomp.bags[0].solution;
+        delete[] treeDecomp.bags[0].variables;
+        delete[] satFormula.clauses;
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
         std::cout << "\n    ,\"Time\":{";

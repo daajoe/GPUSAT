@@ -4,6 +4,7 @@
 
 #ifndef GPUSAT_D4_UTILS_H
 #define GPUSAT_D4_UTILS_H
+#define alloca __builtin_alloca
 
 #include <types.h>
 #include <iostream>
