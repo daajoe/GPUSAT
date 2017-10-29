@@ -48,12 +48,17 @@ void solveIntroduce_(long numV, __global d4_Type *edge, long numVE, __global lon
         }
     }
 
-    if (otherId >= (*minId) && otherId < (*maxId)) {
+    if (edge!=0 && otherId >= (*minId) && otherId < (*maxId)) {
         ret->x[0] = edge[otherId - (*startIDEdge)].x[0];
         ret->x[1] = edge[otherId - (*startIDEdge)].x[1];
         ret->x[2] = edge[otherId - (*startIDEdge)].x[2];
         ret->x[3] = edge[otherId - (*startIDEdge)].x[3];
         d4_mul_w_(&weight, ret, ret);
+    } else if (edge ==0 && otherId >= (*minId) && otherId < (*maxId)) {
+        ret->x[0] = 0.0;
+        ret->x[1] = 0.0;
+        ret->x[2] = 0.0;
+        ret->x[3] = 0.0;
     } else {
         ret->x[0] = -1.0;
         ret->x[1] = 0.0;
@@ -139,13 +144,15 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
 __kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __global d4_Type *edge2, __global long *variables, __global long *edgeVariables1,
                         __global long *edgeVariables2, long numV, long numVE1, long numVE2, __global long *minId1, __global long *maxId1, __global long *minId2,
                         __global long *maxId2, __global long *startIDNode, __global long *startIDEdge1, __global long *startIDEdge2, __global
-                        d4_Type *weights) {
+                        d4_Type *weights, __global int *sols) {
     long id = get_global_id(0);
     d4_Type tmp, tmp_;
+    tmp.x[0]=-1.0;
+    tmp_.x[0]=-1.0;
     d4_Type weight;
     to_d4(1.0, &weight);
-    solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, &tmp, minId1, maxId1, startIDEdge1, weights);
-    solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, &tmp_, minId2, maxId2, startIDEdge2, weights);
+        solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, &tmp, minId1, maxId1, startIDEdge1, weights);
+        solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, &tmp_, minId2, maxId2, startIDEdge2, weights);
     if (weights != 0) {
         for (int a = 0; a < numV; a++) {
             d4_mul_w(&weight, &weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1], &weight);
@@ -158,6 +165,9 @@ __kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __
 
     if (tmp_.x[0] >= 0.0) {
         d4_mul(&tmp_, &solutions[id - (*startIDNode)], &solutions[id - (*startIDNode)]);
+    }
+    if (solutions[id - (*startIDNode)].x[0] > 0) {
+        *sols = 1;
     }
 }
 
@@ -181,7 +191,7 @@ __kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __
  */
 __kernel void solveForget(__global d4_Type *solutions, __global long *variablesCurrent, __global d4_Type *edge, long numVarsEdge, __global long *variablesEdge,
                           long combinations, long numVarsCurrent, __global long *minId, __global long *maxId, __global long *startIDNode, __global
-                          long *startIDEdge) {
+                          long *startIDEdge, __global int *sols) {
     long id = get_global_id(0), i = 0, a = 0, templateId = 0, test = 0;
     for (i = 0; i < numVarsEdge && a < numVarsCurrent; i++) {
         if (variablesEdge[i] == variablesCurrent[a]) {
@@ -218,6 +228,9 @@ __kernel void solveForget(__global d4_Type *solutions, __global long *variablesC
             solutions[id - (*startIDNode)].x[3] = tmp.x[3];
         }
     }
+    if (solutions[id - (*startIDNode)].x[0] > 0) {
+        *sols = 1;
+    }
 }
 
 /**
@@ -237,7 +250,7 @@ __kernel void solveForget(__global d4_Type *solutions, __global long *variablesC
  *      array containing the ids of the variables in the bag
  */
 __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long numclauses, __global d4_Type *solutions, long numV, __global long *variables,
-                        __global long *models, __global long *startID, __global d4_Type *weights) {
+                        __global long *models, __global long *startID, __global d4_Type *weights, __global int *sols) {
     long id = get_global_id(0);
     int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
     d4_Type weight;
@@ -258,6 +271,9 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
         solutions[id - (*startID)].x[1] = 0.0;
         solutions[id - (*startID)].x[2] = 0.0;
         solutions[id - (*startID)].x[3] = 0.0;
+    }
+    if (solutions[id - (*startID)].x[0] > 0) {
+        *sols = 1;
     }
 }
 
@@ -286,7 +302,7 @@ __kernel void solveLeaf(__global long *clauses, __global long *numVarsC, long nu
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global d4_Type *solutions, long numV, __global d4_Type *edge,
                              long numVE, __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global
                              long *maxId,
-                             __global long *startIDNode, __global long *startIDEdge, __global d4_Type *weights) {
+                             __global long *startIDNode, __global long *startIDEdge, __global d4_Type *weights, __global int *sols) {
     long id = get_global_id(0);
     d4_Type tmp;
     solveIntroduce_(numV, edge, numVE, variables, edgeVariables, &tmp, minId, maxId, startIDEdge, weights);
@@ -309,6 +325,9 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
         solutions[id - (*startIDNode)].x[1] = 0.0;
         solutions[id - (*startIDNode)].x[2] = 0.0;
         solutions[id - (*startIDNode)].x[3] = 0.0;
+    }
+    if (solutions[id - (*startIDNode)].x[0] > 0) {
+        *sols = 1;
     }
 }
 

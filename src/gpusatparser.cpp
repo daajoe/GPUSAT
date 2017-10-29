@@ -245,7 +245,7 @@ namespace gpusat {
             edges.push_back(edge);
         }
         getline(sline, i, ' '); //width
-        if (stoi(i) > 35) {
+        if (stoi(i) > 32) {
             std::cerr << "error treewidth oversize, exiting.\n";
             exit(1);
         };

@@ -56,7 +56,7 @@ __kernel void solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __globa
                         __global unsigned long *minIDe2, __global unsigned long *maxIDe2,
                         __global unsigned long *startIDn, __global unsigned long *startIDe1, __global unsigned long *startIDe2,
                         __global unsigned long *numClauses, __global d4_Type *weights,
-                        __global unsigned long *nVars) {
+                        __global unsigned long *nVars, __global int *sols) {
     unsigned long id = get_global_id(0);
     unsigned long mask = id & (((unsigned long) exp2((double) *numClauses)) - 1);
     unsigned long combinations = ((unsigned long) exp2((double) *numClauses));
@@ -89,6 +89,9 @@ __kernel void solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __globa
     if (tmpSol.x[0] != 0.0) {
         d4_div(&tmpSol, &weight, &tmpSol);
         d4_add2(&nSol[id - (*startIDn)], &tmpSol, &nSol[id - (*startIDn)]);
+    }
+    if (nSol[id - (*startIDn)].x[0] > 0) {
+        *sols = 1;
     }
 }
 
@@ -130,7 +133,7 @@ __kernel void solveForget(__global d4_Type *nSol, __global d4_Type *eSol,
                           __global unsigned long *nClauses, __global unsigned long *eClauses,
                           __global unsigned long *numNC, __global unsigned long *numEC,
                           __global unsigned long *startIDn, __global unsigned long *startIDe,
-                          __global unsigned long *minID, __global unsigned long *maxID) {
+                          __global unsigned long *minID, __global unsigned long *maxID, __global int *sols) {
     unsigned long id = get_global_id(0);
     unsigned long a = 0, b = 0, templateId = 0, i = 0;
     unsigned long combinations = (unsigned long) exp2((double) *numEVars - *numNVars);
@@ -165,6 +168,9 @@ __kernel void solveForget(__global d4_Type *nSol, __global d4_Type *eSol,
             d4_add(&nSol[id - (*startIDn)], &eSol[otherId - (*startIDe)], &nSol[id - (*startIDn)]);
         }
     }
+    if (nSol[id - (*startIDn)].x[0] > 0) {
+        *sols = 1;
+    }
 }
 
 /**
@@ -188,7 +194,7 @@ __kernel void solveLeaf(__global d4_Type *nSol,
                         __global unsigned long *nVars,
                         __global unsigned long *numNC,
                         __global unsigned long *startID,
-                        __global unsigned long *models, __global d4_Type *weights) {
+                        __global unsigned long *models, __global d4_Type *weights, __global int *sols) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> *numNC;
     unsigned long i = 0, a = 0;
@@ -217,6 +223,9 @@ __kernel void solveLeaf(__global d4_Type *nSol,
     nSol[id - *startID].x[1] = weight.x[1];
     nSol[id - *startID].x[2] = weight.x[2];
     nSol[id - *startID].x[3] = weight.x[3];
+    if (nSol[id - (*startID)].x[0] > 0) {
+        *sols = 1;
+    }
 }
 
 /**
@@ -265,7 +274,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
                              __global unsigned long *numNC, __global unsigned long *numEC,
                              __global unsigned long *startIDn, __global unsigned long *startIDe,
                              __global unsigned long *minIDe, __global unsigned long *maxIDe,
-                             __global unsigned long *isSAT, __global d4_Type *weights) {
+                             __global unsigned long *isSAT, __global d4_Type *weights, __global int *sols) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> *numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
@@ -388,6 +397,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
 
     if (nSol[id - (*startIDn)].x[0] > 0) {
         *isSAT = 1;
+        *sols = 1;
     }
 
 }

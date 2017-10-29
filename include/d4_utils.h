@@ -193,6 +193,14 @@ namespace gpusat {
         return d4_l(a, b) || d4_l(b, a);
     }
 
+    inline bool operator!=(double a, d4_Type b) {
+        return d4_l(a, b) || d4_l(b, a);
+    }
+
+    inline bool operator!=(d4_Type a, double b) {
+        return d4_l(a, b) || d4_l(b, a);
+    }
+
     inline bool operator==(d4_Type a, d4_Type b) {
         return !d4_l(a, b) && !d4_l(b, a);
     }

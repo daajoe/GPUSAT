@@ -53,7 +53,7 @@ namespace gpusat {
          * @param sol
          *      array ontaining the number of models for each assignment
          */
-        static void printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType *sol, satformulaType &type);
+        static void printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType **sol, satformulaType &type, cl_long i);
 
         /**
          * reads a binary file from @path and retuns the contents in a string

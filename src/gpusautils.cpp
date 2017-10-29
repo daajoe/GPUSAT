@@ -33,32 +33,33 @@ namespace gpusat {
             cl_long numS = decomp.bags[i].numSol;
             cl_long numVariables = decomp.bags[i].numVars;
             cl_long *vars = decomp.bags[i].variables;
-            solType *sol = decomp.bags[i].solution;
+            //solType *sol = decomp.bags[i].solution;
             //printSol(numS, numVariables, vars, sol);
             std::cout << "\n";
         }
     }
 
-    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType *sol, satformulaType &formula) {
+    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType **sol, satformulaType &formula, cl_long bagSize) {
         std::cout << "solutions: \n";
-        for (int a = 0; a < numS; a++) {
-            std::cout << a << ": ";
-            int b = 0, c = 0;
-            for (b = 0; vars[b] <= formula.numVars && b < numVariables; b++) {
-                cl_long asdf = vars[b];
-                int xyz = 0;
-            };
-            for (c = 0; b + c < numVariables; c++) {
-                std::cout << (((a >> c) & 1) == 0 ? "-" : " ") << vars[b + c] << " ";
+        for (int i = 0; i < numS / bagSize; i++) {
+            if (sol[i] == nullptr) {
+                continue;
             }
-            for (int d = 0; d < b; d++) {
-                std::cout << (((a >> (c + d)) & 1) == 0 ? "-" : " ") << vars[d] << " ";
-            }
+            for (int a = 0; a < bagSize; a++) {
+                int b = 0, c = 0;
+                for (b = 0; vars[b] <= formula.numVars && b < numVariables; b++) {
+                    cl_long asdf = vars[b];
+                    int xyz = 0;
+                };
+                if (sol[i][a] != 0.0) {
+                    std::cout << i * bagSize + a << ": ";
 #ifdef sType_Double
-            printf("%e\n", sol[a]);
+                    std::cout << sol[i][a] << "\n";
 #else
-            std::cout << d4_to_string(sol[a]) << "\n";
+                    std::cout << d4_to_string(sol[i][a]) << "\n";
 #endif
+                }
+            }
         }
     }
 

@@ -184,48 +184,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-            //create kernel binary if it doesn't exist
-            std::string sourcePath;
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
 #ifdef sType_Double
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+        }
 #else
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d4_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d4_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d4_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d4_inci.cl";
+                break;
+        }
 #endif
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
@@ -256,55 +256,40 @@ int main(int argc, char *argv[]) {
         long long int time_model = getTime();
         solType solutions = 0.0;
         if ((*sol).isSat > 0) {
-#ifdef sType_Double
-            for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                if (graph == INCIDENCE) {
-                    bool sat = true;
-                    int b = 0, c = 0;
-                    for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
-                    };
-                    for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
-                        if (((i >> c) & 1) == 0) {
-                            sat = false;
+            cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, treeDecomp.bags[0].numVars)));
+            for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
+                if (treeDecomp.bags[0].solution[a] == nullptr) {
+                    continue;
+                }
+                for (cl_long i = 0; i < bagSizeNode; i++) {
+                    if (graph == INCIDENCE) {
+                        bool sat = true;
+                        int b = 0, c = 0;
+                        for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
+                        };
+                        for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
+                            if (((i >> c) & 1) == 0) {
+                                sat = false;
+                            }
                         }
+                        if (sat) {
+                            solutions = solutions + treeDecomp.bags[0].solution[a][i];
+                        }
+                    } else {
+                        solutions = solutions + treeDecomp.bags[0].solution[a][i];
                     }
-                    if (sat) {
-                        solutions = solutions + treeDecomp.bags[0].solution[i];
-                    }
-                } else {
-                    solutions += treeDecomp.bags[0].solution[i];
                 }
             }
+#ifdef sType_Double
             std::cout.precision(17);
             std::cout << "{\n    \"Model Count\": " << solutions;
 #else
-            for (cl_long i = 0; i < treeDecomp.bags[0].numSol; i++) {
-                if (graph == INCIDENCE) {
-                    bool sat = true;
-                    int b = 0, c = 0;
-                    for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
-                    };
-                    for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
-                        if (((i >> c) & 1) == 0) {
-                            sat = false;
-                        }
-                    }
-                    if (sat) {
-                        solutions = d4_add(solutions, treeDecomp.bags[0].solution[i]);
-                    }
-                } else {
-                    solutions = d4_add(solutions, treeDecomp.bags[0].solution[i]);
-                }
-            }
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
 #endif
 
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
         }
-        delete[] treeDecomp.bags[0].solution;
-        delete[] treeDecomp.bags[0].variables;
-        delete[] satFormula.clauses;
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
         std::cout << "\n    ,\"Time\":{";
