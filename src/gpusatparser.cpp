@@ -221,11 +221,6 @@ namespace gpusat {
             std::sort(ret_.bags[id].edges, ret_.bags[id].edges + ret_.bags[id].numEdges);
             id++;
         }
-        for (int a = 0; a < ret.numb; a++) {
-            //delete[] ret.bags[a].edges;
-            //delete[] ret.bags[a].variables;
-        }
-        //delete[] ret.bags;
         ret_.numVars = ret.numVars;
         return ret_;
     }
@@ -236,7 +231,7 @@ namespace gpusat {
                 removeEdges(node, node[id][b] - 1, id);
             }
         }
-        const std::vector<long long int>::iterator &it = std::find(node[id].begin(), node[id].end(), preID+1);
+        std::vector<cl_long>::iterator it = std::find(node[id].begin(), node[id].end(), preID + 1);
         if (it != node[id].end()) {
             node[id].erase(it);
         }
