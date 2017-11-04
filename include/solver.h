@@ -18,14 +18,23 @@ namespace gpusat {
         cl_long inci;
 
     public:
-        int isSat = 1;
+        cl_long isSat = 1;
+        cl_long getStats = 1;
+        cl_long numJoin = 0;
+        cl_long numIntroduce = 0;
+        cl_long numForget = 0;
+        cl_long numLeafs = 0;
+        std::vector<cl_long> numHoldPaths;
+        std::vector<cl_long> numSolPaths;
 
         /**
          * TODO
          */
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-               cl::Kernel &kernel_, int width, bool incidence) : platforms(platforms_), context(context_), devices(devices_), queue(queue_), program(program_),
-                                                                 kernel(kernel_), maxWidth(width), inci(incidence) {}
+               cl::Kernel &kernel_, int width, bool incidence, int getStats) : platforms(platforms_), context(context_), devices(devices_), queue(queue_), program(program_),
+                                                                 kernel(kernel_), maxWidth(width), inci(incidence),getStats(getStats) {
+            int test =1;
+        }
 
         /**
          * function to solve the sat problem
@@ -96,7 +105,7 @@ namespace gpusat {
     class Solver_Primal : public Solver {
     public:
         Solver_Primal(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-                      cl::Kernel &kernel_, int width, bool inzi) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi) {}
+                      cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,getStats) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
@@ -111,7 +120,7 @@ namespace gpusat {
     class Solver_Incidence : public Solver {
     public:
         Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-                         cl::Kernel &kernel_, int width, bool inzi) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi) {}
+                         cl::Kernel &kernel_, int width, bool inzi,int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,getStats) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);

@@ -103,6 +103,8 @@ namespace gpusat {
         void preprocessDecomp(preebagType *decomp);
 
         int combineWidth;
+
+        void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
     };
 }
 #endif //GPUSAT_PARSER_H

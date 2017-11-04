@@ -115,6 +115,8 @@ namespace gpusat {
         cl_long numSubIterations = (cl_long) ceil(edge.numSol / bagSizeEdge);
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
         isSat = 0;
+        cl_long numHpath = pow(2, node.numVars);
+        this->numIntroduce++;
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeNode]();
@@ -193,6 +195,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -200,6 +203,20 @@ namespace gpusat {
                 delete[] edge.solution[a];
                 edge.solution[a] = nullptr;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Introduce:\n";
@@ -212,6 +229,8 @@ namespace gpusat {
         cl_long numIterations = (cl_long) ceil(node.numSol / bagSizeNode);
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
         isSat = 0;
+        cl_long numHpath = pow(2, node.numVars);
+        this->numLeafs++;
         for (int a = 0; a < numIterations; a++) {
             node.solution[a] = new solType[bagSizeNode]();
             cl_long startIdNode = a * bagSizeNode;
@@ -265,7 +284,22 @@ namespace gpusat {
             if (bagsolutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Leaf:\n";
@@ -279,6 +313,8 @@ namespace gpusat {
         cl_long numIterations = (cl_long) ceil(node.numSol / bagSizeNode);
         cl_long numSubIterations = (cl_long) ceil(edge.numSol / bagSizeEdge);
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
+        cl_long numHpath = pow(2, node.numVars);
+        this->numForget++;
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeNode]();
@@ -333,6 +369,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -340,6 +377,20 @@ namespace gpusat {
                 delete[] edge.solution[a];
                 edge.solution[a] = nullptr;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Forget:\n";
@@ -355,6 +406,8 @@ namespace gpusat {
         cl_long numIterations = (cl_long) ceil(node.numSol / bagSizeNode);
         cl_long numIterationsEdge1 = (cl_long) ceil(edge1.numSol / bagSizeEdge1);
         cl_long numIterationsEdge2 = (cl_long) ceil(edge2.numSol / bagSizeEdge2);
+        cl_long numHpath = pow(2, node.numVars);
+        this->numJoin++;
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeNode]();
@@ -446,6 +499,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         for (cl_long a = 0; a < edge1.numSol / bagSizeEdge1; a++) {
@@ -460,6 +514,20 @@ namespace gpusat {
                 edge2.solution[a] = nullptr;
             }
         }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
+        }
 #ifdef DEBUG
         std::cout << "Join:\n";
         GPUSATUtils::printSol(node.numSol, node.numVars, node.variables, node.solution, formula, bagSizeNode);
@@ -472,6 +540,8 @@ namespace gpusat {
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
         isSat = 0;
+        cl_long numHpath = pow(2, node.numVars);
+        this->numIntroduce++;
 
         std::vector<cl_long> clauseVector;
         for (int i = 0, a = 0, b = 0; i < node.numVars; i++) {
@@ -605,6 +675,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -612,6 +683,20 @@ namespace gpusat {
                 delete[] edge.solution[a];
                 edge.solution[a] = nullptr;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Introduce:\n";
@@ -624,6 +709,8 @@ namespace gpusat {
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
         isSat = 0;
+        cl_long numHpath = pow(2, node.numVars);
+        this->numLeafs++;
 
         std::vector<cl_long> clauseVector;
         for (int i = 0, a = 0, b = 0; i < node.numVars; i++) {
@@ -696,7 +783,22 @@ namespace gpusat {
             } else {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Leaf:\n";
@@ -709,6 +811,8 @@ namespace gpusat {
         auto bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, node.numVars)));
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, node.numVars - maxWidth)));
         node.solution = new solType *[(cl_long) ceil(node.numSol / bagSizeNode)];
+        cl_long numHpath = pow(2, node.numVars);
+        this->numForget++;
 
         std::vector<cl_long> nVars;
         std::vector<cl_long> nClauses;
@@ -808,6 +912,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -815,6 +920,20 @@ namespace gpusat {
                 delete[] edge.solution[a];
                 edge.solution[a] = nullptr;
             }
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Forget:\n";
@@ -824,6 +943,8 @@ namespace gpusat {
 
     void Solver_Incidence::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
         bagType edge1_;
+        cl_long numHpath = pow(2, node.numVars);
+        this->numJoin++;
         edge1_.variables = node.variables;
         edge1_.numVars = node.numVars;
         edge1_.numSol = node.numSol;
@@ -956,6 +1077,7 @@ namespace gpusat {
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
+                numHpath -= bagSizeNode;
             }
         }
         if (node.numVars != edge1.numVars) {
@@ -988,6 +1110,20 @@ namespace gpusat {
                 }
             }
 
+        }
+        if (this->getStats) {
+            cl_long numSpath = 0;
+            this->numHoldPaths.push_back(numHpath);
+            for (cl_long a = 0; a < numIterations; a++) {
+                if (node.solution[a] != nullptr) {
+                    for (cl_long b = 0; b < bagSizeNode; b++) {
+                        if (node.solution[a][b] > 0) {
+                            numSpath++;
+                        }
+                    }
+                }
+            }
+            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Join:\n";

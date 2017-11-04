@@ -27,6 +27,7 @@ int main(int argc, char *argv[]) {
     int opt, combineWidth = 12, maxBag = 22;
     std::string kernelPath = "./kernel/";
     graphTypes graph = INCIDENCE;
+    cl_long getStats = 0;
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -34,9 +35,10 @@ int main(int argc, char *argv[]) {
             {"maxBagSize",    required_argument, 0, 'm'},
             {"kernelDir",     required_argument, 0, 'c'},
             {"help",          no_argument,       0, 'h'},
+            {"getStats",      no_argument,       0, 'a'},
             {0,               0,                 0, 0}
     };
-    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:h", flags, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "f:s:c:w:m:ah", flags, NULL)) != -1) {
         switch (opt) {
             case 'f': {
                 // input tree decomposition file
@@ -68,6 +70,10 @@ int main(int argc, char *argv[]) {
             }
             case 'm': {
                 maxBag = std::atoi(optarg);
+                break;
+            }
+            case 'a': {
+                getStats = 1;
                 break;
             }
             case 'h': {
@@ -243,10 +249,10 @@ int main(int argc, char *argv[]) {
         Solver *sol;
         switch (graph) {
             case PRIMAL:
-                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false);
+                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false, getStats);
                 break;
             case INCIDENCE:
-                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true);
+                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true, getStats);
                 break;
         }
         long long int time_solving = getTime();
@@ -292,6 +298,8 @@ int main(int argc, char *argv[]) {
         }
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
+        std::sort(sol->numSolPaths.begin(), sol->numSolPaths.end());
+        std::sort(sol->numHoldPaths.begin(), sol->numHoldPaths.end());
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
         std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
@@ -299,6 +307,25 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / 1000;
         std::cout << "\n        ,\"Init_OpenCL\": " << ((float) time_init_opencl) / 1000;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        std::cout << "\n    }";
+        std::cout << "\n    ,\"Statistics\":{";
+        std::cout << "\n        \"Num Join\": " << sol->numJoin;
+        std::cout << "\n        ,\"Num Forget\": " << sol->numForget;
+        std::cout << "\n        ,\"Num Introduce\": " << sol->numIntroduce;
+        std::cout << "\n        ,\"Num Leaf\": " << sol->numLeafs;
+
+        if (getStats) {
+            std::cout << "\n        ,\"Actual Paths\":{";
+            std::cout << "\n            \"min\": " << sol->numSolPaths[0];
+            std::cout << "\n            ,\"max\": " << sol->numSolPaths[sol->numSolPaths.size() - 1];
+            std::cout << "\n            ,\"mean\": " << sol->numSolPaths[sol->numSolPaths.size() / 2];
+            std::cout << "\n        }";
+            std::cout << "\n        ,\"Current Paths\":{";
+            std::cout << "\n            \"min\": " << sol->numHoldPaths[0];
+            std::cout << "\n            ,\"max\": " << sol->numHoldPaths[sol->numHoldPaths.size() - 1];
+            std::cout << "\n            ,\"mean\": " << sol->numHoldPaths[sol->numHoldPaths.size() / 2];
+            std::cout << "\n        }";
+        }
         std::cout << "\n    }";
         std::cout << "\n}";
         if (solutions > 0.0) {

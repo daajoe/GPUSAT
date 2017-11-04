@@ -76,6 +76,8 @@ namespace gpusat {
          *      the size of the data
          */
         static void writeBinary(char *data, size_t size, std::string path);
+
+        static void printTreeD(preetreedecType decomp);
     };
 }
 #endif //GPUSAT_GPUSAUTILS_H

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <gpusatparser.h>
 #include <d4_utils.h>
+#include <gpusautils.h>
 
 namespace gpusat {
 
@@ -167,6 +168,13 @@ namespace gpusat {
         }
 
         if (!edges.empty()) {
+            for (int a = 0; a < edges.size(); a++) {
+                std::sort(edges[a].begin(), edges[a].end());
+            }
+            removeEdges(edges, 0, 0);
+        }
+
+        if (!edges.empty()) {
             for (int a = 0; a < ret.numb; a++) {
                 ret.bags[a].edges = new preebagType *[edges[a].size()]();
                 int b = 0;
@@ -222,6 +230,18 @@ namespace gpusat {
         return ret_;
     }
 
+    void TDParser::removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID) {
+        for (int b = 0; b < node[id].size(); b++) {
+            if (preID != (node[id][b] - 1)) {
+                removeEdges(node, node[id][b] - 1, id);
+            }
+        }
+        const std::vector<long long int>::iterator &it = std::find(node[id].begin(), node[id].end(), preID+1);
+        if (it != node[id].end()) {
+            node[id].erase(it);
+        }
+    }
+
     void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {
         std::stringstream sline(item);
         std::string i;
@@ -230,6 +250,7 @@ namespace gpusat {
         getline(sline, i, ' '); //end
         cl_long end = stoi(i);
         edges[start - 1].push_back(end);
+        edges[end - 1].push_back(start);
     }
 
     void TDParser::parseStartLine(preetreedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges) {
@@ -292,7 +313,7 @@ namespace gpusat {
             for (int a = 0; a < decomp->numEdges && !changed; a++) {
                 for (int b = 0; b < decomp->numEdges && !changed; b++) {
                     if (a != b && decomp->edges[a]->numVariables < combineWidth &&
-                        decomp->edges[b]->numVariables < combineWidth) {
+                        decomp->edges[b]->numVariables < combineWidth && decomp->numEdges > 1) {
                         std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables + decomp->edges[b]->numVariables));
                         std::vector<cl_long>::iterator it;
                         it = std::set_union(decomp->edges[a]->variables, decomp->edges[a]->variables + decomp->edges[a]->numVariables,
@@ -360,7 +381,6 @@ namespace gpusat {
                 }
             }
         }
-
 
         // process child nodes
         for (int i = 0; i < decomp->numEdges; i++) {

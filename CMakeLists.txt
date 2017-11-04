@@ -10,7 +10,7 @@ if (double)
 endif (double)
 
 if (debug)
-    #add_definitions(-DDEBUG)
+    add_definitions(-DDEBUG)
 endif (debug)
 
 if (valgrind)

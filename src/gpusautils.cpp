@@ -26,6 +26,25 @@ namespace gpusat {
         }
     }
 
+    void GPUSATUtils::printTreeD(preetreedecType decomp) {
+        cl_long size = decomp.numb;
+        for (int i = 0; i < size; i++) {
+            std::cout << "\nbagnum: " << i + 1 << "\n";
+            cl_long vsize = decomp.bags[i].numVariables;
+            std::cout << "variables: ";
+            for (int a = 0; a < vsize; a++) {
+                std::cout << decomp.bags[i].variables[a] << " ";
+            }
+            std::cout << "\n";
+            cl_long esize = decomp.bags[i].numEdges;
+            std::cout << "edgeschild nodes: ";
+            for (int a = 0; a < esize; a++) {
+                std::cout << decomp.bags[i].edges[a]->id+1 << " ";
+            }
+            std::cout << "\n";
+        }
+    }
+
     void GPUSATUtils::printSolutions(treedecType decomp) {
         cl_long size = decomp.numb;
         for (int i = 0; i < size; i++) {
