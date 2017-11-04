@@ -1,8 +1,11 @@
 import json
+import re
 import subprocess
 import time
 
 from subprocess import check_output
+
+from os import remove
 
 
 def genPrimalGraph(formula):
@@ -43,10 +46,45 @@ def genPrimalGraph(formula):
 
 
 # generate tree decomposition
-def getTreeWidth(graphFile, seed):
+def genTreeDecomp(graphFile, decompFile):
+    subprocess.call(["./htd_main", "--opt", "width", "-s", "1234"], stdout=decompFile, stdin=graphFile)
+
+
+def getBestTreeDecomp(graphPath, decompPath, numTries):
+    currentWidth=-1
     try:
-        decomp = check_output(["./htd_main", "--opt", "width", "-s", str(seed)], stdin=graphFile, timeout=300).decode('ascii')
-        return decomp.splitlines()[0].split(" ")[3]
+        with open(decompPath, "w") as decompFile:
+            with open(graphPath, "r")as graphFile:
+                subprocess.call(["./htd_main", "--opt", "width"], timeout=300, stdout=decompFile, stdin=graphFile)
+        with open(decompPath, "r")as currentDecomp:
+            decomp = currentDecomp.read()
+            currentWidth = int([x for x in decomp.splitlines() if len(x) > 0 and x[0] == 's'][0].split()[3]) - 1
+        for i in range(1, numTries):
+            with open(decompPath + str(i), "w") as decompFile:
+                with open(graphPath, "r")as graphFile:
+                    subprocess.call(["./htd_main", "--opt", "width"], timeout=300, stdout=decompFile, stdin=graphFile)
+            with open(decompPath + str(i), "r")as currentDecomp:
+                decomp = currentDecomp.read()
+            remove(decompPath + str(i))
+            width = int([x for x in decomp.splitlines() if len(x) > 0 and x[0] == 's'][0].split()[3]) - 1
+            if width < currentWidth:
+                currentWidth = width
+                with open(decompPath, "w")as decompFile:
+                    decompFile.write(decomp)
+        return currentWidth
+    except subprocess.TimeoutExpired as tim:
+        print("        TIMEOUT: htd - " + str(type(tim)) + " " + str(tim.args))
+        return currentWidth
+
+
+# get width
+def getTreeWidth(graphPath, decompPath, seed):
+    try:
+        with open(decompPath, "w") as decompFile:
+            with open(graphPath, "r")as graphFile:
+                decomp = check_output(["./htd_main", "--opt", "width", "-s", str(seed)], stdin=graphFile, timeout=300).decode('ascii')
+                decompFile.write(decomp)
+                return decomp.splitlines()[0].split(" ")[3]
     except subprocess.TimeoutExpired as tim:
         print("        TIMEOUT: htd - " + str(type(tim)) + " " + str(tim.args))
         return -1
@@ -84,8 +122,13 @@ def preprocessFormula(formualFile, preprocFile):
 
 
 def cleanFormula(formula):
-    return '\n'.join([x for x in formula.splitlines() if len(x) > 0 and x[0] != 'c' and x[0] != 'w']).replace("\t", " ").replace("\n 0\n", " 0\n").replace("\n0\n",
-                                                                                                                                                           " 0\n")
+    formula = re.sub(r' +', ' ', re.sub('\s*%\s*0\s*', ' ', formula.replace("\t", " ")))
+    formula_ = " ".join([a for a in formula.splitlines() if len(a) > 0 and a[0] != "c" and a[0] != "p" and a[0] != "w"]).replace(" 0 ", " 0\n")
+    problemLine = [a for a in formula.splitlines() if len(a) > 0 and a[0] == "p"]
+    if len(problemLine) > 0:
+        problemLine = problemLine[0] + "\n"
+        return re.sub(r' +', ' ', re.sub(r'\n +', '\n', re.sub(r'\n+', '\n', (problemLine + formula_ + '\n'))))
+    return ""
 
 
 def genIncidenceGraph(formula):
@@ -169,66 +212,44 @@ def getModelsW(sol):
 
 
 def getMaxVarOcc(formula):
-    numVariables = 0
-    for line in formula.splitlines():
-        if len(line) > 0:
-            if line[0] == 'p':
-                numVariables = int(line.split()[2])
-    varOcc = [0] * (numVariables + 1)
-    for line in formula.splitlines():
-        if len(line) > 0:
-            if line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != '%' and line[0] != 'w':
-                lits = line.split()
-                for node in lits:
-                    ainode = abs(int(node))
-                    if ainode != 0:
-                        varOcc[ainode] += 1
-    maxOcc = 0
-    for i in varOcc:
-        if i > maxOcc:
-            maxOcc = i
-    return maxOcc
+    occurences = {}
+    for i in range(1,int(getNumVariables(formula))+1):
+        occurences[str(i)]=0
+    newFormula = formula.replace("-","")
+    for line in newFormula.splitlines():
+        if len(line) > 0 and line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != '%':
+            for item in line.split():
+                if item!="0":
+                    occurences[item]+=1
+    return max(occurences.items(), key=lambda k: k[1])[1]
+
+
+def getNumVariables(formula):
+    return [x for x in formula.splitlines() if len(x) > 0 and x[0] == 'p'][0].split()[2]
+
+
+def getNumClauses(formula):
+    return [x for x in formula.splitlines() if len(x) > 0 and x[0] == 'p'][0].split()[3]
 
 
 def getMaxClauseSize(formula):
-    max_clause_size = 0
-    clauses = []
-    clause = []
-    for line in formula.splitlines():
-        if len(line) > 0 and line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != 'w' and line[0] != '%':
-            for lit in [int(x) for x in line.split(" ") if len(x) != 0]:
-                if lit == 0 and len(clause) > 0:
-                    clauses += [clause]
-                    clause = []
-                else:
-                    clause += [lit]
-    for lits in clauses:
-        max_clause_size = len(lits) - 1 if (len(lits) - 1) > max_clause_size else max_clause_size
-    return max_clause_size
+    return max([len(x.split()) - 1 for x in formula.splitlines() if len(x) > 0 and x[0] != "p"])
 
 
-def simplePreproc(formula, timelimit=30):
-    start = time.time()
-    newFormula = formula.replace("\t", " ").splitlines()
-    startline = [x for x in newFormula if len(x) > 0 and x[0] == 'p']
-    newFormula = [list(map(int, [y for y in x.split(" ") if y])) for x in newFormula if
+def getNumAtoms(formula):
+    newFormula = [[y for y in x.split(" ") if y] for x in formula.splitlines() if len(x) > 0 and x[0] != 'p' and x[0] != 'c' and x[0] != 's' and x[0] != '%']
+    return len([y for x in newFormula for y in x if len(y) > 0 and y != "0"])
+
+
+def simplePreproc(formula):
+    newFormula = [list(map(int, [y for y in x.split(" ") if y])) for x in formula.splitlines() if
                   len(x) > 0 and x[0] != 'p' and x[0] != 'c' and x[0] != 's' and x[0] != '%']
-    allElems = []
-    contradict = [x for x in newFormula if len([y for y in x if y != 0 and (-y) in x]) > 0]
-    if len(contradict) > 0:
-        return "p cnf 1 1\n1 -1 0\n"
-    singleElems = [x[0] for x in newFormula if len(x) == 2]
-    if timelimit <= (time.time() - start):
-        return '\n'.join(startline + [' '.join(map(str, x)) for x in newFormula]) + '\n'
-    while len(singleElems) > 0:
-        newFormula = [x for x in newFormula if len([y for y in x if y in singleElems]) == 0]
-        for i in range(0, len(newFormula)):
-            if len(newFormula[i]) > 2:
-                newFormula[i] = [x for x in newFormula[i] if not ((x * -1) in singleElems)]
-        if timelimit <= (time.time() - start):
-            return '\n'.join(startline + [' '.join(map(str, x)) for x in newFormula]) + '\n'
-        allElems += singleElems
-        singleElems = [x[0] for x in newFormula if len(x) == 2 and x not in allElems]
-        if timelimit <= (time.time() - start):
-            return '\n'.join(startline + [' '.join(map(str, x)) for x in newFormula]) + '\n'
-    return '\n'.join(startline + [' '.join(map(str, x)) for x in newFormula]) + '\n'
+    currentFacts = [x[0] for x in newFormula if len(x) == 2]
+    oldFacts = currentFacts
+    while len(currentFacts) > 0:
+        newFormula = [list([y for y in x if len(x) == 2 or not ((y * -1) in currentFacts)]) for x in newFormula if
+                      len(x) == 2 or len([y for y in x if y in currentFacts]) == 0]
+        currentFacts = [x[0] for x in newFormula if len(x) == 2 and x[0] not in oldFacts]
+        oldFacts += currentFacts
+    variables = [x for x in formula.splitlines() if len(x) > 0 and x[0] == 'p'][0].split()[2]
+    return '\n'.join(["p cnf " + str(variables) +" "+ str(len(newFormula))] + [' '.join(map(str, x)) for x in newFormula]) + '\n'

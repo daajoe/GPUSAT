@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 import csv
 import json
 from os import listdir
@@ -19,13 +19,15 @@ dirReference = "./new_problems/reference"
 dirGraphs = "./new_problems/graph"
 
 summaryFile = './Summary.csv'
-
+splitWidth = "4"
+pathToExeD4 = "../build_mingw_d4"
+pathToExeDouble = "../build_mingw_double"
 testCasesStrings = [
-    # "a_00_test",  "b_00_test", "c_00_test", "d_00_test",
-    # "a_01_test",  "b_01_test", "c_01_test", "d_01_test",
-    "a_02_test", "c_02_test",  # "b_02_test", "d_02_test",
-    "a_03_test", "c_03_test",  # "b_03_test", "d_03_test",
-    "a_04_test", "c_04_test", "#b_04_test", "d_04_test",
+    #"a_00_test",  # "b_00_test", "c_00_test", "d_00_test",
+    "a_01_test",  "b_01_test", "c_01_test", "d_01_test",
+    # "a_02_test",  # "c_02_test",  "b_02_test", "d_02_test",
+    #"a_03_test", "c_03_test", "b_03_test", "d_03_test",
+    # "a_04_test", "c_04_test", "#b_04_test", "d_04_test",
     # "Tests"
 ]
 
@@ -66,7 +68,7 @@ for case in testCasesStrings:
         currentElement += 1
         if not isfile(join(join(dirResults, case), testcase)):
             open(join(dirResults, case) + "/" + testcase, "w").close()
-            for wi, gr, prec in itertools.product([0], [0, 1], [0, 1]):
+            for wi, gr, prec in itertools.product([0], [1], [1]):
                 row = {'Case': case + "/" + testcase}
                 print("Testcase (" + str(currentElement) + "/" + str(numElements) + "): " + case + "/" + testcase + " " + str(datetime.datetime.now().time()))
                 if gr == 0:
@@ -85,7 +87,7 @@ for case in testCasesStrings:
                     postfix_prec = "_d"
                     print("    double")
                     row['Precision'] = "double"
-                print("    wi 0" + str(wi))
+                print("    wi " + str(wi))
                 row['Combine Width'] = str(wi)
 
                 if False:
@@ -108,19 +110,19 @@ for case in testCasesStrings:
                         # generate output
                         with open(join(join(dirResults, case), testcase + postfix + postfix_prec), "w") as resultFile:
                             if prec == 0:
-                                subprocess.call(["../build_mingw_d4/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
-                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", "18"], timeout=30,
+                                subprocess.call([pathToExeD4 + "/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
+                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", splitWidth], timeout=600,
                                                 stdout=resultFile, stderr=resultFile)
                                 row[
-                                    'Command'] = "../build_mingw_d4/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
-                                    wi) + " -m 18"
+                                    'Command'] = pathToExeD4 + "/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
+                                    wi) + " -m " + splitWidth
                             if prec == 1:
-                                subprocess.call(["../build_mingw_double/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
-                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", "18"], timeout=30,
+                                subprocess.call([pathToExeDouble + "/gpusat.exe", "-f", dirDecomp + "/" + case + "/" + testcase + postfix + ".td", "-s",
+                                                 dirFormula + "/" + case + "/" + testcase + ".cnf", "-c", "../kernel/", "-w", str(wi), "-m", splitWidth], timeout=600,
                                                 stdout=resultFile, stderr=resultFile)
                                 row[
-                                    'Command'] = "../build_mingw_double/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
-                                    wi) + " -m 18"
+                                    'Command'] = pathToExeDouble + "/gpusat.exe -f " + dirDecomp + "/" + case + "/" + testcase + postfix + ".td -s " + dirFormula + "/" + case + "/" + testcase + ".cnf -c ../kernel/ -w " + str(
+                                    wi) + " -m " + splitWidth
 
                         weighted = False
                         with open(dirFormula + "/" + case + "/" + testcase + ".cnf") as formulaFile:

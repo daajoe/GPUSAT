@@ -1,0 +1,1401 @@
+---
+title: "Summary_improved"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+---
+  
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(  warning = FALSE,fig.width=15, fig.height=10)
+
+library("psych", lib.loc = "~/R/win-library/3.4")
+library("zoom", lib.loc = "~/R/win-library/3.4")
+library("knitr", lib.loc = "~/R/win-library/3.4")
+```
+
+```{r load data, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+
+Results_ <-
+  read.csv(
+    file = "Summary_Benchmarks_.csv",
+    header = TRUE,
+    sep = ",",
+    quote = "\"",
+    dec = "."
+  )
+
+Results <- Results_[order(Results_[,5]),]
+Benchmark_Width <-
+  read.csv(
+    file = "Summary_Benchmark_Width_Ready.csv",
+    header = TRUE,
+    sep = ",",
+    quote = "\"",
+    dec = "."
+  )
+
+Instances_SAT <- paste(Benchmark_Width$file_name[Benchmark_Width$sat.unsat=="SATISFIABLE"],".cnf",sep="")
+Instances_UNSAT <- paste(Benchmark_Width$file_name[Benchmark_Width$sat.unsat=="UNSATISFIABLE"],".cnf",sep="")
+
+
+Instances_Primal_Width_0_5 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_primal_s1234>=0 &  Benchmark_Width$width_primal_s1234<=5],".cnf",sep="")
+Instances_Primal_Width_6_14 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_primal_s1234>=6 &  Benchmark_Width$width_primal_s1234<=14],".cnf",sep="")
+Instances_Primal_Width_15_30 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_primal_s1234>=15 &  Benchmark_Width$width_primal_s1234<=30],".cnf",sep="")
+
+Instances_Incidence_Width_0_5 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_incidence_s1234>=0 &  Benchmark_Width$width_incidence_s1234<=5],".cnf",sep="")
+Instances_Incidence_Width_6_14 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_incidence_s1234>=6 &  Benchmark_Width$width_incidence_s1234<=14],".cnf",sep="")
+Instances_Incidence_Width_15_30 <- paste(Benchmark_Width$file_name[Benchmark_Width$width_incidence_s1234>=15 &  Benchmark_Width$width_incidence_s1234<=30],".cnf",sep="")
+```
+
+# Plots
+
+## gpusat vs gpusat
+
+```{r gpusat vs gpusat, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+png(file = "gpusat-incidence_vs_gpusat-primal.png")
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+dev.off()
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. approxmc 
+
+```{r gpusat vs. approxmc, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "approxmc"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. approxmc")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","approxmc","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "approxmc"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("approxmc vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("approxmc","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "approxmc"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. approxmc")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","approxmc","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "approxmc"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("approxmc vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("approxmc","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat (vbest) vs. approxmc
+
+```{r gpusat (vbest) vs. approxmc, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_1 <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat1_times_2 <- Results$time[Results$setting == "incidence_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "approxmc"]
+
+gpusat1_times <- as.numeric(sort(pmin(gpusat1_times_1,gpusat1_times_2)))
+gpusat1_times <- gpusat1_times[gpusat1_times < 900]
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_1,gpusat1_times_2,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("gpusat vs. approxmc")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("gpusat","approxmc","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_1 <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat1_times_2 <- Results$time[Results$setting == "incidence_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "approxmc"]
+
+gpusat1_times <- as.numeric(pmin(gpusat1_times_1,gpusat1_times_2))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_1,gpusat1_times_2,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("gpusat vs. approxmc")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("gpusat","approxmc","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. sharpSAT 
+
+```{r gpusat vs. sharpSAT, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "sharpSAT"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. sharpSAT")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","sharpSAT","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "sharpSAT"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("sharpSAT vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("sharpSAT","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "sharpSAT"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. sharpSAT")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","sharpSAT","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "sharpSAT"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("sharpSAT vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("sharpSAT","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. cachet
+
+```{r gpusat vs. cachet, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "cachet"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. cachet")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","cachet","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "cachet"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("cachet vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("cachet","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "cachet"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. cachet")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","cachet","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "cachet"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("cachet vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("cachet","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. dsharp
+
+```{r gpusat vs. dsharp, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "dsharp"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. dsharp")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","dsharp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "dsharp"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("dsharp vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("dsharp","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$solver == "dsharp"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. dsharp")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("primal_double_w-14","dsharp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "dsharp"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("dsharp vs. incidence_double_w-14")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("dsharp","incidence_double_w-14","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. sharpSAT vs. cachet vs. dsharp vs. approxmc
+
+```{r gpusat vs. sharpSAT vs. cachet vs. dsharp vs. approxmc, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14"]
+gpusat2_times_ <- Results$time[Results$setting == "incidence_double_w-14"]
+gpusat3_times_ <- Results$time[Results$solver == "sharpSAT"]
+gpusat4_times_ <- Results$time[Results$solver == "cachet"]
+gpusat5_times_ <- Results$time[Results$solver == "dsharp"]
+gpusat6_times_ <- Results$time[Results$solver == "approxmc"]
+gpusat7_times_ <- Results$time[Results$solver == "clasp"]
+gpusat8_times_ <- Results$time[Results$solver == "lingeling"]
+gpusat9_times_ <- Results$time[Results$solver == "minisat"]
+gpusat10_times_ <- Results$time[Results$solver == "picosat"]
+gpusat11_times_ <- Results$time[Results$solver == "cryptominisat"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+gpusat3_times <- as.numeric(sort(gpusat3_times_[gpusat3_times_ < 900]))
+gpusat3_numbers <- as.numeric(1:length(gpusat3_times))
+gpusat4_times <- as.numeric(sort(gpusat4_times_[gpusat4_times_ < 900]))
+gpusat4_numbers <- as.numeric(1:length(gpusat4_times))
+gpusat5_times <- as.numeric(sort(gpusat5_times_[gpusat5_times_ < 900]))
+gpusat5_numbers <- as.numeric(1:length(gpusat5_times))
+gpusat6_times <- as.numeric(sort(gpusat6_times_[gpusat6_times_ < 900]))
+gpusat6_numbers <- as.numeric(1:length(gpusat6_times))
+gpusat7_times <- as.numeric(sort(gpusat7_times_[gpusat7_times_ < 900]))
+gpusat7_numbers <- as.numeric(1:length(gpusat7_times))
+gpusat8_times <- as.numeric(sort(gpusat8_times_[gpusat8_times_ < 900]))
+gpusat8_numbers <- as.numeric(1:length(gpusat8_times))
+gpusat9_times <- as.numeric(sort(gpusat9_times_[gpusat9_times_ < 900]))
+gpusat9_numbers <- as.numeric(1:length(gpusat9_times))
+gpusat10_times <- as.numeric(sort(gpusat10_times_[gpusat10_times_ < 900]))
+gpusat10_numbers <- as.numeric(1:length(gpusat10_times))
+gpusat11_times <- as.numeric(sort(gpusat11_times_[gpusat11_times_ < 900]))
+gpusat11_numbers <- as.numeric(1:length(gpusat11_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat3_numbers, gpusat3_times, type="l", lwd=0.5, lty="solid", col="yellow", pch=".")
+lines(gpusat4_numbers, gpusat4_times, type="l", lwd=0.5, lty="solid", col="violet", pch=".")
+lines(gpusat5_numbers, gpusat5_times, type="l", lwd=0.5, lty="solid", col="brown", pch=".")
+lines(gpusat6_numbers, gpusat6_times, type="l", lwd=0.5, lty="solid", col="orange", pch=".")
+lines(gpusat7_numbers, gpusat7_times, type="l", lwd=0.5, lty="solid", col="gold", pch=".")
+lines(gpusat8_numbers, gpusat8_times, type="l", lwd=0.5, lty="solid", col="coral", pch=".")
+lines(gpusat9_numbers, gpusat9_times, type="l", lwd=0.5, lty="solid", col="cyan", pch=".")
+lines(gpusat10_numbers, gpusat10_times, type="l", lwd=0.5, lty="solid", col="darkgreen", pch=".")
+lines(gpusat11_numbers, gpusat11_times, type="l", lwd=0.5, lty="solid", col="darkmagenta", pch=".")
+
+# add a title and subtitle
+title("primal_double_w-14 vs. sharpSAT vs. cachet")
+
+# add a legend
+legend(0, 900, xpd=TRUE, c("primal_double_w-14","incidence_double_w-14","sharpSAT","cachet","dsharp","approxmc","clasp","lingeling","minisat","picosat","cryptominisat"), cex=0.8, col=c("red","green","yellow","violet","brown","orange","gold","coral","cyan","darkgreen","darkmagenta"), lty="solid", title="solver")
+
+```
+
+## SAT gpusat vs. dynasp
+
+```{r SAT gpusat vs. dynasp kaktus, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_SAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_SAT]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_SAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_SAT]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+```{r SAT gpusat vs. dynasp instance, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_SAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_SAT]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidende
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_SAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_SAT]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## UNSAT gpusat vs. dynasp
+
+```{r UNSAT gpusat vs. dynasp kaktus, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_UNSAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_UNSAT]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_UNSAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_UNSAT]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+```{r UNSAT gpusat vs. dynasp instance, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_UNSAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_UNSAT]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidende
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_UNSAT]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_UNSAT]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1,  xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. dynasp: Width 0-5
+
+```{r UNSAT gpusat vs. dynasp kaktus Width 0-5, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_0_5]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_0_5]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_0_5]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_0_5]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+```{r UNSAT gpusat vs. dynasp instance Width 0-5, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_0_5]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_0_5]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidende
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_0_5]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_0_5]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1,  xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. dynasp: Width 6-14
+
+```{r UNSAT gpusat vs. dynasp kaktus Width 6-14, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_6_14]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_6_14]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_6_14]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_6_14]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+```{r UNSAT gpusat vs. dynasp instance Width 6-14, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_6_14]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_6_14]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidende
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_6_14]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_6_14]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1,  xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. dynasp: Width 15-30
+
+```{r UNSAT gpusat vs. dynasp kaktus Width 15-30, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### Primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_15_30]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_15_30]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidence
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_15_30]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_15_30]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+```{r UNSAT gpusat vs. dynasp instance Width 15-30, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+### primal
+gpusat1_times_ <- Results$time[Results$setting == "primal_double_w-14" & Results$instance %in% Instances_Primal_Width_15_30]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_primal" & Results$instance %in% Instances_Primal_Width_15_30]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat primal vs. dynasp primal")
+
+legend(0, -0.1, xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+### incidende
+gpusat1_times_ <- Results$time[Results$setting == "incidence_double_w-14" & Results$instance %in% Instances_Incidence_Width_15_30]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence" & Results$instance %in% Instances_Incidence_Width_15_30]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+title("gpusat incidence vs. dynasp incidence")
+
+legend(0, -0.1,  xpd=TRUE, c("gpusat","dynasp","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+```
+
+## dynasp vs. sharpsat
+
+```{r dynasp vs. sharpSAT, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "dynasp_primal"]
+gpusat2_times_ <- Results$time[Results$solver == "sharpSAT"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("dynasp_primal vs. sharpSAT")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("dynasp_primal","sharpSAT","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "sharpSAT"]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence"]
+
+gpusat1_times <- as.numeric(sort(gpusat1_times_[gpusat1_times_ < 900]))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric(sort(gpusat2_times_[gpusat2_times_ < 900]))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric(sort(pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_times <- gpusat_vbest_times[gpusat_vbest_times<900]
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("sharpSAT vs. dynasp_incidence")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("sharpSAT","dynasp_incidence","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$setting == "dynasp_primal"]
+gpusat2_times_ <- Results$time[Results$solver == "sharpSAT"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("dynasp_primal vs. sharpSAT")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("dynasp_primal","sharpSAT","best"), cex=0.8, col=c("green","red","blue"), lty="solid", title="solver")
+
+# Create Line Chart
+# convert factor to numeric for convenience
+gpusat1_times_ <- Results$time[Results$solver == "sharpSAT"]
+gpusat2_times_ <- Results$time[Results$setting == "dynasp_incidence"]
+
+gpusat1_times <- as.numeric((gpusat1_times_))
+gpusat1_numbers <- as.numeric(1:length(gpusat1_times))
+gpusat2_times <- as.numeric((gpusat2_times_))
+gpusat2_numbers <- as.numeric(1:length(gpusat2_times))
+
+gpusat_vbest_times <- as.numeric((pmin(gpusat1_times_,gpusat2_times_)))
+gpusat_vbest_numbers <- as.numeric(1:length(gpusat_vbest_times))
+
+gpusat1_times <- gpusat1_times[order(gpusat_vbest_times)]
+gpusat2_times <- gpusat2_times[order(gpusat_vbest_times)]
+gpusat_vbest_times <- gpusat_vbest_times[order(gpusat_vbest_times)]
+
+# set up the plot
+plot(range(0:length(gpusat_vbest_times)+1), range(0:max(gpusat1_times,gpusat2_times)), type="n", xlab="Instances",   ylab="Time", lab=c(20,10,7))
+
+# add lines
+lines(gpusat1_numbers, gpusat1_times, type="l", lwd=0.5, lty="solid", col="red", pch=".")
+lines(gpusat2_numbers, gpusat2_times, type="l", lwd=0.5, lty="solid", col="green", pch=".")
+lines(gpusat_vbest_numbers, gpusat_vbest_times, type="l", lwd=0.5, lty="solid", col="blue", pch=".")
+
+# add a title and subtitle
+title("sharpSAT vs. dynasp_incidence")
+
+# add a legend
+legend(0, -0.1, xpd=TRUE, c("sharpSAT","dynasp_incidence","best"), cex=0.8, col=c("red","green","blue"), lty="solid", title="solver")
+
+```
+
+## gpusat vs. dynasp: Solutions more than 5000
+
+## gpusat vs. dynasp: Solutions less than 5000

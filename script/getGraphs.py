@@ -4,9 +4,11 @@ from os.path import isdir, join, isfile
 
 import CommonMethods
 
-dirRaw = "./benchmarks/raw"
-dirIncidence = "./benchmarks/incidence"
-dirPrimal = "./benchmarks/primal"
+dirRaw = "./benchmarks/ready"
+dirIncidence = "./benchmarks/graphs/incidence"
+dirPrimal = "./benchmarks/graphs/primal"
+dirIncidenceDecomp = "./benchmarks/decomp/incidence"
+dirPrimalDecomp = "./benchmarks/decomp/primal"
 
 if not isdir(dirRaw):
     makedirs(dirRaw)
@@ -14,6 +16,10 @@ if not isdir(dirIncidence):
     makedirs(dirIncidence)
 if not isdir(dirPrimal):
     makedirs(dirPrimal)
+if not isdir(dirIncidenceDecomp):
+    makedirs(dirIncidenceDecomp)
+if not isdir(dirPrimalDecomp):
+    makedirs(dirPrimalDecomp)
 
 numFiles = len(listdir(dirRaw))
 currentFile = 1
@@ -30,9 +36,17 @@ def process(i):
         if not isfile(join(dirIncidence, case + ".gr")):
             with open(join(dirIncidence, case + ".gr"), "w")as graphFile:
                 graphFile.write(CommonMethods.genIncidenceGraph(formula))
+        if not isfile(join(dirIncidenceDecomp, case + ".cnf")):
+            with open(join(dirIncidence, case + ".gr"), "r")as graphFile:
+                with open(join(dirIncidenceDecomp, case + ".cnf"), "w")as decompFile:
+                    CommonMethods.genTreeDecomp(graphFile, decompFile)
         if not isfile(join(dirPrimal, case + ".gr")):
             with open(join(dirPrimal, case + ".gr"), "w")as graphFile:
                 graphFile.write(CommonMethods.genPrimalGraph(formula))
+        if not isfile(join(dirPrimalDecomp, case + ".cnf")):
+            with open(join(dirPrimal, case + ".gr"), "r")as graphFile:
+                with open(join(dirPrimalDecomp, case + ".cnf"), "w")as decompFile:
+                    CommonMethods.genTreeDecomp(graphFile, decompFile)
 
 
 pool = ThreadPool(6)
