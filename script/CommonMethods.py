@@ -51,7 +51,7 @@ def genTreeDecomp(graphFile, decompFile):
 
 
 def getBestTreeDecomp(graphPath, decompPath, numTries):
-    currentWidth=-1
+    currentWidth = -1
     try:
         with open(decompPath, "w") as decompFile:
             with open(graphPath, "r")as graphFile:
@@ -84,7 +84,7 @@ def getTreeWidth(graphPath, decompPath, seed):
             with open(graphPath, "r")as graphFile:
                 decomp = check_output(["./htd_main", "--opt", "width", "-s", str(seed)], stdin=graphFile, timeout=300).decode('ascii')
                 decompFile.write(decomp)
-                return decomp.splitlines()[0].split(" ")[3]
+                return int(decomp.splitlines()[0].split(" ")[3]) - 1
     except subprocess.TimeoutExpired as tim:
         print("        TIMEOUT: htd - " + str(type(tim)) + " " + str(tim.args))
         return -1
@@ -122,12 +122,12 @@ def preprocessFormula(formualFile, preprocFile):
 
 
 def cleanFormula(formula):
-    formula = re.sub(r' +', ' ', re.sub('\s*%\s*0\s*', ' ', formula.replace("\t", " ")))
+    formula = re.sub('\s*%\s*0\s*', ' ', formula.replace("\t", " "))
     formula_ = " ".join([a for a in formula.splitlines() if len(a) > 0 and a[0] != "c" and a[0] != "p" and a[0] != "w"]).replace(" 0 ", " 0\n")
     problemLine = [a for a in formula.splitlines() if len(a) > 0 and a[0] == "p"]
-    if len(problemLine) > 0:
-        problemLine = problemLine[0] + "\n"
-        return re.sub(r' +', ' ', re.sub(r'\n +', '\n', re.sub(r'\n+', '\n', (problemLine + formula_ + '\n'))))
+    if len(problemLine) > 0 and len(formula_) > 0:
+        problemLine = problemLine[0]
+        return re.sub(r' +', ' ', re.sub(r'\n +', '\n', ("p cnf " + str(problemLine.split()[2]) + " " + str(len(formula_.splitlines())) + "\n" + formula_)))
     return ""
 
 
@@ -213,14 +213,14 @@ def getModelsW(sol):
 
 def getMaxVarOcc(formula):
     occurences = {}
-    for i in range(1,int(getNumVariables(formula))+1):
-        occurences[str(i)]=0
-    newFormula = formula.replace("-","")
+    for i in range(1, int(getNumVariables(formula)) + 1):
+        occurences[str(i)] = 0
+    newFormula = formula.replace("-", "")
     for line in newFormula.splitlines():
         if len(line) > 0 and line[0] != 'p' and line[0] != 'c' and line[0] != 's' and line[0] != '%':
             for item in line.split():
-                if item!="0":
-                    occurences[item]+=1
+                if item != "0":
+                    occurences[item] += 1
     return max(occurences.items(), key=lambda k: k[1])[1]
 
 
@@ -242,14 +242,16 @@ def getNumAtoms(formula):
 
 
 def simplePreproc(formula):
-    newFormula = [list(map(int, [y for y in x.split(" ") if y])) for x in formula.splitlines() if
-                  len(x) > 0 and x[0] != 'p' and x[0] != 'c' and x[0] != 's' and x[0] != '%']
+    newFormula = [list(map(int, [y for y in x.split() if y])) for x in formula.splitlines() if len(x) > 0 and x[0] != 'p']
     currentFacts = [x[0] for x in newFormula if len(x) == 2]
     oldFacts = currentFacts
     while len(currentFacts) > 0:
-        newFormula = [list([y for y in x if len(x) == 2 or not ((y * -1) in currentFacts)]) for x in newFormula if
-                      len(x) == 2 or len([y for y in x if y in currentFacts]) == 0]
-        currentFacts = [x[0] for x in newFormula if len(x) == 2 and x[0] not in oldFacts]
+        newFormula = [[y for y in x if not (-y in currentFacts)] for x in newFormula if len(x) > 2 and len([y for y in x if y in currentFacts]) == 0]
+        currentFacts = [x[0] for x in newFormula if len(x) == 2]
         oldFacts += currentFacts
+    newFormula = [[x, 0] for x in oldFacts] + newFormula
     variables = [x for x in formula.splitlines() if len(x) > 0 and x[0] == 'p'][0].split()[2]
-    return '\n'.join(["p cnf " + str(variables) +" "+ str(len(newFormula))] + [' '.join(map(str, x)) for x in newFormula]) + '\n'
+    if len(newFormula) > 0:
+        return '\n'.join(["p cnf " + str(variables) + " " + str(len(newFormula))] + [' '.join(map(str, x)) for x in newFormula]) + '\n'
+    else:
+        return ""

@@ -1,10 +1,10 @@
 #!/usr/bin/env Rscript
-setwd("C:/Users/Markus/Sync/Projects/LogicSem/script")
-PlotSize <- 1500
+setwd("C:/Users/Markus/Sync/Projects/LogicSem/script/")
+PlotSize <- 1000
 
 Results_ <-
   read.csv(
-    file = "Summary_Benchmarks_.csv",
+    file = "Summary_Benchmarks.csv",
     header = TRUE,
     sep = ",",
     quote = "\"",
@@ -20,6 +20,9 @@ Benchmark_Width <-
     quote = "\"",
     dec = "."
   )
+
+Plot_Dir = "./Plots_improved"
+dir.create(Plot_Dir)
 
 Benchmark_Width$X.models.sharpSAT <- as.numeric(Benchmark_Width$X.models.sharpSAT)
 
@@ -232,7 +235,7 @@ generateInstanceKaktusPlot <-
       paste("kaktus ", PlotTitle, sep = ""),
       Instances1,
       Instances2,
-      paste("./Plots/kaktus_", name, sep = ""),
+      paste(paste(Plot_Dir,"/kaktus_",sep=""), name, sep = ""),
       name1,
       name2
     )
@@ -240,7 +243,7 @@ generateInstanceKaktusPlot <-
       paste("instance ", PlotTitle, sep = ""),
       Instances1,
       Instances2,
-      paste("./Plots/instance_", name, sep = ""),
+      paste(paste(Plot_Dir,"/instance_",sep=""), name, sep = ""),
       name1,
       name2
     )
@@ -250,8 +253,8 @@ generateInstanceKaktusPlot <-
 ## gpusat vs gpusat
 generateInstanceKaktusPlot(
   "gpusat incidence vs primal",
-  Results$setting == "primal_double_w-14",
-  Results$setting == "incidence_double_w-14",
+  Results$setting == "primal_double_w-14_m-24",
+  Results$setting == "incidence_double_w-14_m-24",
   "gpusat_incidence_vs_primal.png",
   "primal",
   "incidence"
@@ -261,7 +264,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. approxmc
 generateInstanceKaktusPlot(
   "gpusat primal vs. approxmc",
-  Results$setting == "primal_double_w-14",
+  Results$setting == "primal_double_w-14_m-24",
   Results$solver == "approxmc",
   "gpusat_primal-vs-approxmc.png",
   "gpusat primal",
@@ -269,7 +272,7 @@ generateInstanceKaktusPlot(
 )
 generateInstanceKaktusPlot(
   "gpusat incidence vs. approxmc",
-  Results$setting == "incidence_double_w-14",
+  Results$setting == "incidence_double_w-14_m-24",
   Results$solver == "approxmc",
   "gpusat_incidence-vs-approxmc.png",
   "gpusat incidence",
@@ -285,7 +288,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. sharpSAT
 generateInstanceKaktusPlot(
   "gpusat primal vs. sharpSAT",
-  Results$setting == "primal_double_w-14",
+  Results$setting == "primal_double_w-14_m-24",
   Results$solver == "sharpSAT",
   "gpusat_primal-vs-sharpSAT.png",
   "gpusat primal",
@@ -293,7 +296,7 @@ generateInstanceKaktusPlot(
 )
 generateInstanceKaktusPlot(
   "gpusat incidence vs. sharpSAT",
-  Results$setting == "incidence_double_w-14",
+  Results$setting == "incidence_double_w-14_m-24",
   Results$solver == "sharpSAT",
   "gpusat_incidence-vs-sharpSAT.png",
   "gpusat incidence",
@@ -304,7 +307,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. cachet
 generateInstanceKaktusPlot(
   "gpusat primal vs. cachet",
-  Results$setting == "primal_double_w-14",
+  Results$setting == "primal_double_w-14_m-24",
   Results$solver == "cachet",
   "gpusat_primal-vs-cachet.png",
   "gpusat primal",
@@ -312,7 +315,7 @@ generateInstanceKaktusPlot(
 )
 generateInstanceKaktusPlot(
   "gpusat incidence vs. cachet",
-  Results$setting == "incidence_double_w-14",
+  Results$setting == "incidence_double_w-14_m-24",
   Results$solver == "cachet",
   "gpusat_incidence-vs-cachet.png",
   "gpusat incidence",
@@ -323,7 +326,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dsharp
 generateInstanceKaktusPlot(
   "gpusat primal vs. dsharp",
-  Results$setting == "primal_double_w-14",
+  Results$setting == "primal_double_w-14_m-24",
   Results$solver == "dsharp",
   "gpusat_primal-vs-dsharp.png",
   "gpusat primal",
@@ -331,7 +334,7 @@ generateInstanceKaktusPlot(
 )
 generateInstanceKaktusPlot(
   "gpusat incidence vs. dsharp",
-  Results$setting == "incidence_double_w-14",
+  Results$setting == "incidence_double_w-14_m-24",
   Results$solver == "dsharp",
   "gpusat_incidence-vs-dsharp.png",
   "gpusat incidence",
@@ -342,7 +345,7 @@ generateInstanceKaktusPlot(
 ## SAT gpusat vs. dynasp
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal SAT",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_SAT,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_SAT,
@@ -353,7 +356,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence SAT",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_SAT,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_SAT,
@@ -366,7 +369,7 @@ generateInstanceKaktusPlot(
 ## UNSAT gpusat vs. dynasp
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal UNSAT",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_UNSAT,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_UNSAT,
@@ -377,7 +380,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence UNSAT",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_UNSAT,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_UNSAT,
@@ -390,7 +393,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Width 0-5
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal Width 0-5",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_0_5,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_0_5,
@@ -401,7 +404,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence Width 0-5",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_0_5,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_0_5,
@@ -414,7 +417,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Width 6-14
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal Width 6-14",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_6_14,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_6_14,
@@ -425,7 +428,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence Width 6-14",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_6_14,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_6_14,
@@ -438,7 +441,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Width 15-30
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal Width 15-30",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_15_30,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_15_30,
@@ -449,7 +452,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence Width 15-30",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_15_30,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_15_30,
@@ -462,7 +465,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Width 18-30
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal Width 18-30",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_18_30,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_18_30,
@@ -473,7 +476,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence Width 18-30",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_18_30,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_18_30,
@@ -486,7 +489,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Width <30
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal Width 30",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_30,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_30,
@@ -497,7 +500,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence Width 30",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_30,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_30,
@@ -534,7 +537,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Solutions less than 5000
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal models <= 5000",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_30 & Results$instance %in% Instances_Models_5000,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_30 & Results$instance %in% Instances_Models_5000,
@@ -545,7 +548,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence models <= 5000",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_30 & Results$instance %in% Instances_Models_5000,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_30 & Results$instance %in% Instances_Models_5000,
@@ -558,7 +561,7 @@ generateInstanceKaktusPlot(
 ## gpusat vs. dynasp: Solutions more than 5000
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal models > 5000",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_30 & Results$instance %in% Instances_Models_5000_p,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_30 & Results$instance %in% Instances_Models_5000_p,
@@ -569,7 +572,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence models > 5000",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_30 & Results$instance %in% Instances_Models_5000_p,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_30 & Results$instance %in% Instances_Models_5000_p,
@@ -579,10 +582,10 @@ generateInstanceKaktusPlot(
 )
 
 
-## gpusat vs. dynasp: Solutions more than 5000
+## gpusat vs. dynasp models > 5000 width 18-30
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal models > 5000 width 18-30",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_18_30 & Results$instance %in% Instances_Models_5000_p,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_18_30 & Results$instance %in% Instances_Models_5000_p,
@@ -593,7 +596,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence models > 5000 width 18-30",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_18_30 & Results$instance %in% Instances_Models_5000_p,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_18_30 & Results$instance %in% Instances_Models_5000_p,
@@ -603,10 +606,10 @@ generateInstanceKaktusPlot(
 )
 
 
-## gpusat vs. dynasp: Solutions more than 5000
+## gpusat vs. dynasp models <= 5000 width 18-30
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp primal models <= 5000 width 18-30",
-  Results$setting == "primal_double_w-14" &
+  Results$setting == "primal_double_w-14_m-24" &
     Results$instance %in% Instances_Primal_Width_18_30 & Results$instance %in% Instances_Models_5000,
   Results$setting == "dynasp_primal" &
     Results$instance %in% Instances_Primal_Width_18_30 & Results$instance %in% Instances_Models_5000,
@@ -617,7 +620,7 @@ generateInstanceKaktusPlot(
 
 generateInstanceKaktusPlot(
   "gpusat vs. dynasp incidence models <= 5000 width 18-30",
-  Results$setting == "incidence_double_w-14" &
+  Results$setting == "incidence_double_w-14_m-24" &
     Results$instance %in% Instances_Incidence_Width_18_30 & Results$instance %in% Instances_Models_5000,
   Results$setting == "dynasp_incidence" &
     Results$instance %in% Instances_Incidence_Width_18_30 & Results$instance %in% Instances_Models_5000,

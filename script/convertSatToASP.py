@@ -6,9 +6,9 @@ from subprocess import call
 
 from os.path import join, isdir
 
-dirSatFormulas = "./benchmarks/ready"
-dirAspPrograms = "./benchmarks/asp"
-dirAspProgramsGround = "./benchmarks/asp_ground"
+dirSatFormulas = "./benchmarks_old/ready"
+dirAspPrograms = "./benchmarks_old/asp"
+dirAspProgramsGround = "./benchmarks_old/asp_ground"
 
 if not isdir(dirAspPrograms):
     makedirs(dirAspPrograms)
@@ -27,7 +27,7 @@ def process(i):
         for a in range(1, numVars + 1):
             aspProgram += "{a_" + str(a) + "}.\n"
         for line in cleanFormula:
-            if len(line)>1:
+            if len(line.split())>0:
                 aspProgram += ":-"
                 for atom in line.split():
                     at = int(atom)

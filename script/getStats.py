@@ -2,17 +2,15 @@
 import csv
 import xml.etree.ElementTree as ET
 
-from os.path import isfile
-
 fieldnames = ['solver', 'solver_version', 'setting', 'error', 'instance', '#models', 'time', 'timeout', 'SAT']
 
-summaryFile = './Summary_Benchmarks_2.csv'
+summaryFile = './Summary_Benchmarks.csv'
 
 with open(summaryFile, 'w', newline='\n') as csvfile:
     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
     writer.writeheader()
 
-for treeString in ['./eval_dynasp.xml', './eval_cobra.xml', './eval_hermann_2.xml']:
+for treeString in ['./eval_cobra_dynasp.xml', './eval_cobra.xml', './eval_hermann_2.xml',"./eval_cobra_dynqbfa.xml"]:
     tree = ET.parse(treeString)
     root = tree.getroot()
     specs = root.findall('.//project/runspec/')

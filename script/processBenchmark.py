@@ -2,7 +2,7 @@
 import csv
 import multiprocessing
 from os.path import join, isdir, isfile
-from os import makedirs, listdir
+from os import makedirs, listdir, remove
 from CommonMethods import *
 from functools import partial
 
@@ -54,7 +54,7 @@ total_size = len(listdir(dirRaw))
 processing = 0
 
 
-def process(lock,testcase):
+def process(lock, testcase):
     case = testcase[:-4]
     row = {'file_name': case}
     row['sat-unsat'] = 'ERROR'
@@ -71,7 +71,7 @@ def process(lock,testcase):
     row['max_var_occ_preproc'] = -1
     row['num_Atoms_preproc'] = -1
     row['num_Clauses_preproc'] = -1
-    if case not in contents:
+    if case+"," not in contents:
         print("%s" % (testcase))
 
         try:
@@ -91,6 +91,14 @@ def process(lock,testcase):
         except BaseException as ex:
             print("        Error: - " + str(type(ex)) + " " + str(ex.args))
 
+        if row['width_primal'] == 0 or row['width_incidence'] == 0:
+            remove(join(dirPrimal, case + ".gr"))
+            remove(dirDecomp + "/primal/" + testcase + ".td")
+            remove(join(dirIncidence, case + ".gr"))
+            remove(dirDecomp + "/incidence/" + testcase + ".td")
+            remove(join(dirClean, testcase))
+            remove(join(preprocessPath, testcase))
+            return
         row['sat-unsat'] = checkSAT(join(dirClean, testcase))
 
         try:
@@ -122,7 +130,9 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(12)
     m = multiprocessing.Manager()
     l = m.Lock()
-    func=partial(process,l)
-    pool.map(func, numFiles)
+    for f in numFiles:
+    #    if f =="BMS_k3_n100_m429_2.cnf":
+    #        process("",f)
+        pool.apply_async(process,(l,f,))
     pool.close()
     pool.join()
