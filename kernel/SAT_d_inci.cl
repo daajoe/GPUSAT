@@ -1,3 +1,4 @@
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
 
 int isNotSat(unsigned long assignment, __global long *clause, __global unsigned long *variables);

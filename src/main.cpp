@@ -151,14 +151,20 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.") == 0) {
+
+            cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
+            context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
+            cl_int err;
+            devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
+            if (err == CL_SUCCESS) {
+                queue = cl::CommandQueue(context, devices[0]);
                 break;
             }
         }
-        cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
-        context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
-        devices = context.getInfo<CL_CONTEXT_DEVICES>();
-        queue = cl::CommandQueue(context, devices[0]);
+        if (iter == platforms.end()) {
+            std::cout << "ERROR: no GPU found!";
+            exit(1);
+        }
         time_init_opencl = getTime() - time_init_opencl;
 
         long long int time_build_kernel = getTime();
