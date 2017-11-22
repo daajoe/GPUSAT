@@ -103,13 +103,10 @@ namespace gpusat {
 
     /// type for saving the sat formula
     struct satformulaType {
-        cl_long numclauses = 0;
         cl_long numVars = 0;
-        cl_long totalNumVar = 0;
         cl_long numWeights = 0;
         solType *variableWeights = nullptr;
-        cl_long *numVarsC = nullptr;
-        cl_long *clauses = nullptr;
+        std::vector<std::vector<cl_long>> clauses;
     };
 
     enum graphTypes {
@@ -119,6 +116,8 @@ namespace gpusat {
     enum precisionTypes {
         DOUBLE, D4
     };
+
+    bool compVars(const cl_long &a, const cl_long &b);
 }
 
 #endif //GPUSAT_TYPES_H_H

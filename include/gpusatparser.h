@@ -42,7 +42,7 @@ namespace gpusat {
          * @param clauses
          *      object containing the clauses in the sat formula
          */
-        void parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> &clauses);
+        void parseProblemLine(satformulaType &satformula, std::string item);
 
         void parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights);
     };

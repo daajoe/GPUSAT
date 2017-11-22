@@ -13,10 +13,7 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::queue<std::queue<cl_long>> clauses;
         std::vector<std::pair<cl_long, solType>> weights;
-        std::vector<cl_long> clauseVars;
-        cl_long clauseSize = 0;
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 0) {
@@ -25,7 +22,7 @@ namespace gpusat {
                     //comment line (ignore)
                 } else if (type == 'p') {
                     //start line
-                    parseProblemLine(ret, item, clauses);
+                    parseProblemLine(ret, item);
                 } else if (type == 'w') {
                     //start line
                     this->parseWeightLine(item, weights);
@@ -33,48 +30,16 @@ namespace gpusat {
                     //clause line
                     std::stringstream sline(item);
                     std::string i;
+                    std::vector<cl_long> *clause = new std::vector<cl_long>();
                     while (!sline.eof()) {
                         getline(sline, i, ' ');
-                        if (i.size() > 0) {
-                            clauseVars.push_back(stol(i));
-                            clauseSize++;
-                        }
+                        cl_long num = std::stol(i);
+                        if (num != 0)
+                            clause->push_back(num);
                     }
-                    //parseClauseLine(item, clauses, clauseSize);
+                    std::sort(clause->begin(), clause->end(), compVars);
+                    ret.clauses.push_back(*clause);
                 }
-            }
-        }
-
-        std::queue<cl_long> *clause = new std::queue<cl_long>;
-        for (int a = 0; a < clauseVars.size(); a++) {
-            cl_long x = clauseVars[a];
-            if (clauseVars[a] == 0) {
-                clauses.push(*clause);
-                std::queue<cl_long> empty;
-                clause = new std::queue<cl_long>;
-            } else {
-                clause->push(clauseVars[a]);
-            }
-        }
-
-        if (!clauses.empty()) {
-            int a = 0, s = 0;
-            ret.totalNumVar = clauseSize;
-            ret.clauses = new cl_long[clauseSize]();
-            while (!clauses.empty()) {
-                std::queue<cl_long> &clause = clauses.front();
-                ret.numVarsC[a] = clause.size();
-
-                int b = 0;
-                while (!clause.empty()) {
-                    ret.clauses[s + b] = clause.front();
-                    clause.pop();
-                    b++;
-                }
-                std::sort(&ret.clauses[s], &ret.clauses[s + b]);
-                clauses.pop();
-                s += ret.numVarsC[a];
-                a++;
             }
         }
 
@@ -111,7 +76,7 @@ namespace gpusat {
         return ret;
     }
 
-    void CNFParser::parseProblemLine(satformulaType &satformula, std::string item, std::queue<std::queue<cl_long>> &clauses) {
+    void CNFParser::parseProblemLine(satformulaType &satformula, std::string item) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //p
@@ -123,8 +88,6 @@ namespace gpusat {
         satformula.numVars = stoi(i);
         getline(sline, i, ' '); //num clauses
         while (i.size() == 0) getline(sline, i, ' ');
-        satformula.numclauses = stoi(i);
-        satformula.numVarsC = new cl_long[satformula.numclauses]();
     }
 
     void CNFParser::parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights) {

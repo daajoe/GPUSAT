@@ -117,6 +117,25 @@ namespace gpusat {
         isSat = 0;
         cl_long numHpath = pow(2, node.numVars);
         this->numIntroduce++;
+
+        // get clauses
+        std::vector<cl_long> numVarsClause;
+        std::vector<cl_long> clauses;
+        cl_long numClauses=0;
+        for (cl_long i = 0; i < formula.clauses.size(); i++) {
+            std::vector<cl_long> v(formula.clauses[i].size());
+            std::vector<cl_long>::iterator it;
+            it = std::set_intersection(node.variables, node.variables + node.numVars, &formula.clauses[i][0], &formula.clauses[i][0] + formula.clauses[i].size(),
+                                       v.begin(), compVars);
+            if (it - v.begin() == formula.clauses[i].size()) {
+                numClauses++;
+                numVarsClause.push_back(formula.clauses[i].size());
+                for (cl_long a = 0; a < formula.clauses[i].size(); a++) {
+                    clauses.push_back(formula.clauses[i][a]);
+                }
+            }
+        }
+
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeNode]();
@@ -137,15 +156,15 @@ namespace gpusat {
                     kernel.setArg(7, NULL);
                 }
                 cl::Buffer bufClauses;
-                if (formula.totalNumVar > 0) {
-                    bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (formula.totalNumVar), formula.clauses);
+                if (clauses.size() > 0) {
+                    bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
                     kernel.setArg(0, bufClauses);
                 } else {
                     kernel.setArg(0, NULL);
                 }
                 cl::Buffer bufNumVarsC;
-                if (formula.numclauses > 0) {
-                    bufNumVarsC = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (formula.numclauses), formula.numVarsC);
+                if (numClauses > 0) {
+                    bufNumVarsC = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
                     kernel.setArg(1, bufNumVarsC);
                 } else {
                     kernel.setArg(1, NULL);
@@ -159,7 +178,7 @@ namespace gpusat {
                     kernel.setArg(8, NULL);
                 }
                 cl::Buffer bufSAT(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &isSat);
-                kernel.setArg(2, formula.numclauses);
+                kernel.setArg(2, numClauses);
                 kernel.setArg(4, node.numVars);
                 kernel.setArg(5, bufSolNext);
                 kernel.setArg(6, edge.numVars);
@@ -231,6 +250,25 @@ namespace gpusat {
         isSat = 0;
         cl_long numHpath = pow(2, node.numVars);
         this->numLeafs++;
+
+        // get clauses
+        std::vector<cl_long> numVarsClause;
+        std::vector<cl_long> clauses;
+        cl_long numClauses=0;
+        for (cl_long i = 0; i < formula.clauses.size(); i++) {
+            std::vector<cl_long> v(formula.clauses[i].size());
+            std::vector<cl_long>::iterator it;
+            it = std::set_intersection(node.variables, node.variables + node.numVars, &formula.clauses[i][0], &formula.clauses[i][0] + formula.clauses[i].size(),
+                                       v.begin(), compVars);
+            if (it - v.begin() == formula.clauses[i].size()) {
+                numClauses++;
+                numVarsClause.push_back(formula.clauses[i].size());
+                for (cl_long a = 0; a < formula.clauses[i].size(); a++) {
+                    clauses.push_back(formula.clauses[i][a]);
+                }
+            }
+        }
+
         for (int a = 0; a < numIterations; a++) {
             node.solution[a] = new solType[bagSizeNode]();
             cl_long startIdNode = a * bagSizeNode;
@@ -245,21 +283,21 @@ namespace gpusat {
                 kernel.setArg(5, NULL);
             }
             cl::Buffer bufClauses;
-            if (formula.totalNumVar > 0) {
-                bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (formula.totalNumVar), formula.clauses);
+            if (clauses.size() > 0) {
+                bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
                 kernel.setArg(0, bufClauses);
             } else {
                 kernel.setArg(0, NULL);
             }
             cl::Buffer bufNumVarsC;
-            if (formula.numclauses > 0) {
-                bufNumVarsC = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (formula.numclauses), formula.numVarsC);
+            if (numClauses > 0) {
+                bufNumVarsC = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
                 kernel.setArg(1, bufNumVarsC);
             } else {
                 kernel.setArg(1, NULL);
             }
             cl::Buffer bufSAT(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &isSat);
-            kernel.setArg(2, formula.numclauses);
+            kernel.setArg(2, numClauses);
             kernel.setArg(3, bufSol);
             kernel.setArg(4, node.numVars);
             kernel.setArg(6, bufSAT);
@@ -546,12 +584,8 @@ namespace gpusat {
         std::vector<cl_long> clauseVector;
         for (int i = 0, a = 0, b = 0; i < node.numVars; i++) {
             if (node.variables[i] > formula.numVars) {
-                for (; a < node.variables[i] - formula.numVars - 1; a++) {
-                    b += formula.numVarsC[a];
-                }
-                for (int c = 0; c < formula.numVarsC[a]; c++) {
-                    cl_long clause = formula.clauses[b + c];
-                    clauseVector.push_back(clause);
+                for (cl_long a = 0; a < formula.clauses[node.variables[i] - formula.numVars - 1].size(); a++) {
+                    clauseVector.push_back(formula.clauses[node.variables[i] - formula.numVars - 1][a]);
                 }
                 clauseVector.push_back(0);
             }
@@ -715,11 +749,8 @@ namespace gpusat {
         std::vector<cl_long> clauseVector;
         for (int i = 0, a = 0, b = 0; i < node.numVars; i++) {
             if (node.variables[i] > formula.numVars) {
-                for (; a < node.variables[i] - formula.numVars - 1; a++) {
-                    b += formula.numVarsC[a];
-                }
-                for (int c = 0; c < formula.numVarsC[a]; c++) {
-                    clauseVector.push_back(formula.clauses[b + c]);
+                for (cl_long a = 0; a < formula.clauses[node.variables[i] - formula.numVars - 1].size(); a++) {
+                    clauseVector.push_back(formula.clauses[node.variables[i] - formula.numVars - 1][a]);
                 }
                 clauseVector.push_back(0);
             }

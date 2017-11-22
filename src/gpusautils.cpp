@@ -39,7 +39,7 @@ namespace gpusat {
             cl_long esize = decomp.bags[i].numEdges;
             std::cout << "edgeschild nodes: ";
             for (int a = 0; a < esize; a++) {
-                std::cout << decomp.bags[i].edges[a]->id+1 << " ";
+                std::cout << decomp.bags[i].edges[a]->id + 1 << " ";
             }
             std::cout << "\n";
         }
@@ -82,6 +82,7 @@ namespace gpusat {
         }
     }
 
+    /*
     void GPUSATUtils::printFormula(satformulaType formula) {
         cl_long size = formula.numclauses;
         int numVar = 0;
@@ -96,7 +97,7 @@ namespace gpusat {
             std::cout << "\n";
         }
     }
-
+*/
     std::string GPUSATUtils::readFile(std::string path) {
         std::stringbuf treeD;
         std::string inputLine;

@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     TDParser tdParser(combineWidth);
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
-    if (satFormula.numVars + satFormula.numclauses == treeDecomp.numVars) {
+    if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
         graph = INCIDENCE;
     } else if (satFormula.numVars == treeDecomp.numVars) {
         graph = PRIMAL;
