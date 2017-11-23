@@ -37,7 +37,11 @@ namespace gpusat {
                         if (num != 0)
                             clause->push_back(num);
                     }
-                    std::sort(clause->begin(), clause->end(), compVars);
+                    if (clause->size() > 1) {
+                        std::sort(clause->begin(), clause->end(), compVars);
+                    } else if (clause->size() == 1) {
+                        ret.facts.push_back((*clause)[0]);
+                    }
                     ret.clauses.push_back(*clause);
                 }
             }
@@ -106,7 +110,7 @@ namespace gpusat {
         combineWidth = i;
     }
 
-    treedecType TDParser::parseTreeDecomp(std::string graph) {
+    treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
         preetreedecType ret = preetreedecType();
         std::stringstream ss(graph);
         std::string item;
@@ -139,18 +143,22 @@ namespace gpusat {
 
         if (!edges.empty()) {
             for (int a = 0; a < ret.numb; a++) {
-                ret.bags[a].edges = new preebagType *[edges[a].size()]();
                 int b = 0;
                 while (!edges[a].empty()) {
-                    ret.bags[a].edges[b] = &ret.bags[edges[a].back() - 1];
+                    ret.bags[a].edges.push_back(&ret.bags[edges[a].back() - 1]);
                     edges[a].pop_back();
                     b++;
                 }
-                ret.bags[a].numEdges = b;
-                std::sort(ret.bags[a].edges, ret.bags[a].edges + ret.bags[a].numEdges, compTreedType);
+                std::sort(ret.bags[a].edges.begin(), ret.bags[a].edges.end(), compTreedType);
             }
         }
 
+        // remove facts form decomp and formula
+        preprocessFacts(ret, formula);
+        if (formula.unsat) {
+            return treedecType();
+        }
+        // combine small bags
         preprocessDecomp(&ret.bags[0]);
         treedecType ret_ = treedecType();
         ret_.numb = 0;
@@ -159,7 +167,7 @@ namespace gpusat {
         while (!bags.empty()) {
             preebagType *bag = bags.front();
             bags.pop_front();
-            for (int a = 0; a < bag->numEdges; a++) {
+            for (int a = 0; a < bag->edges.size(); a++) {
                 bags.push_back(bag->edges[a]);
             }
             ret_.numb++;
@@ -170,13 +178,13 @@ namespace gpusat {
         while (!bags.empty()) {
             preebagType *bag = bags.front();
             bags.pop_front();
-            ret_.bags[id].numVars = bag->numVariables;
+            ret_.bags[id].numVars = bag->variables.size();
             ret_.bags[id].variables = new cl_long[ret_.bags[id].numVars];
-            std::copy(bag->variables, bag->variables + bag->numVariables, ret_.bags[id].variables);
-            ret_.bags[id].numEdges = bag->numEdges;
+            std::copy(bag->variables.begin(), bag->variables.end(), ret_.bags[id].variables);
+            ret_.bags[id].numEdges = bag->edges.size();
             ret_.bags[id].edges = new cl_long[ret_.bags[id].numEdges];
             ret_.bags[id].numSol = static_cast<cl_long>(pow(2, ret_.bags[id].numVars));
-            for (int a = 0; a < bag->numEdges; a++) {
+            for (int a = 0; a < bag->edges.size(); a++) {
                 ret_.bags[id].edges[a] = cid;
                 bags.push_back(bag->edges[a]);
                 cid++;
@@ -250,16 +258,14 @@ namespace gpusat {
             }
         }
         ret.bags[bnum - 1].id = bnum - 1;
-        ret.bags[bnum - 1].variables = new cl_long[match_count - 1]();
-        ret.bags[bnum - 1].numVariables = match_count - 1;
         while (getline(sline, i, ' ')) //vertices
         {
             if (i[0] != '\r') {
-                ret.bags[bnum - 1].variables[a] = stoi(i);
+                ret.bags[bnum - 1].variables.push_back(stoi(i));
                 a++;
             }
         }
-        std::sort(ret.bags[bnum - 1].variables, &ret.bags[bnum - 1].variables[ret.bags[bnum - 1].numVariables]);
+        std::sort(ret.bags[bnum - 1].variables.begin(), ret.bags[bnum - 1].variables.end());
     }
 
     void TDParser::preprocessDecomp(preebagType *decomp) {
@@ -268,35 +274,31 @@ namespace gpusat {
         // try to merge child nodes
         while (changed) {
             changed = false;
-            for (int a = 0; a < decomp->numEdges && !changed; a++) {
-                for (int b = 0; b < decomp->numEdges && !changed; b++) {
-                    if (a != b && decomp->edges[a]->numVariables < combineWidth &&
-                        decomp->edges[b]->numVariables < combineWidth && decomp->numEdges > 1) {
-                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->numVariables + decomp->edges[b]->numVariables));
+            for (int a = 0; a < decomp->edges.size() && !changed; a++) {
+                for (int b = 0; b < decomp->edges.size() && !changed; b++) {
+                    if (a != b && ((decomp->edges[a]->variables.size() < combineWidth &&
+                                    decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 ||
+                                   decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
+                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->variables.size() + decomp->edges[b]->variables.size()));
                         std::vector<cl_long>::iterator it;
-                        it = std::set_union(decomp->edges[a]->variables, decomp->edges[a]->variables + decomp->edges[a]->numVariables,
-                                            decomp->edges[b]->variables,
-                                            decomp->edges[b]->variables + decomp->edges[b]->numVariables, v.begin());
+                        it = std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(),
+                                            decomp->edges[b]->variables.end(), v.begin());
                         v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                        if (v.size() < combineWidth) {
+                        if (v.size() < combineWidth || decomp->edges[a]->variables.size() == 0 ||
+                            decomp->edges[b]->variables.size() == 0) {
                             changed = true;
                             cl_long cid = decomp->edges[b]->id;
-                            decomp->edges[a]->numVariables = v.size();
-                            decomp->edges[a]->variables = new cl_long[decomp->edges[a]->numVariables];
-                            std::copy(&v[0], &v[0] + v.size(), decomp->edges[a]->variables);
+                            decomp->edges[a]->variables.assign(v.begin(), v.end());
 
-                            std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges[a]->numEdges + decomp->edges[b]->numEdges));
+                            std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges[a]->edges.size() + decomp->edges[b]->edges.size()));
                             std::vector<preebagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges, decomp->edges[a]->edges + decomp->edges[a]->numEdges, decomp->edges[b]->edges,
-                                                 decomp->edges[b]->edges + decomp->edges[b]->numEdges, v_.begin(), compTreedType);
+                            it_ = std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(),
+                                                 decomp->edges[b]->edges.end(), v_.begin(), compTreedType);
                             v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                            decomp->edges[a]->numEdges = v_.size();
-                            decomp->edges[a]->edges = new preebagType *[decomp->edges[a]->numEdges];
-                            std::copy(&v_[0], &v_[0] + v_.size(), decomp->edges[a]->edges);
-                            if (b < decomp->numEdges - 1) {
-                                std::copy(decomp->edges + b + 1, decomp->edges + decomp->numEdges, decomp->edges + b);
+                            decomp->edges[a]->edges.assign(v_.begin(), v_.end());
+                            if (b < decomp->edges.size()) {
+                                decomp->edges.erase(decomp->edges.begin() + b);
                             }
-                            decomp->numEdges--;
                         }
                     }
                 }
@@ -305,35 +307,34 @@ namespace gpusat {
 
         changed = true;
         // try to merge with child nodes
-        if (decomp->numVariables < combineWidth) {
+        if (decomp->variables.size() < combineWidth || decomp->variables.size() == 0) {
             while (changed) {
                 changed = false;
-                for (int i = 0; i < decomp->numEdges; i++) {
-                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->numVariables + decomp->edges[i]->numVariables));
+                for (int i = 0; i < decomp->edges.size(); i++) {
+                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->variables.size() + decomp->edges[i]->variables.size()));
                     std::vector<cl_long>::iterator it;
-                    it = std::set_union(decomp->variables, decomp->variables + decomp->numVariables, decomp->edges[i]->variables,
-                                        decomp->edges[i]->variables + decomp->edges[i]->numVariables, v.begin());
+                    it = std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
+                                        v.begin());
                     v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                    if (v.size() < combineWidth) {
+                    if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
                         changed = true;
                         cl_long cid = decomp->edges[i]->id;
-                        decomp->numVariables = v.size();
-                        decomp->variables = new cl_long[decomp->numVariables];
-                        std::copy(&v[0], &v[0] + v.size(), decomp->variables);
+                        decomp->variables.assign(v.begin(), v.end());
 
-                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->numEdges + decomp->edges[i]->numEdges));
+                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges.size() + decomp->edges[i]->edges.size()));
                         std::vector<preebagType *>::iterator it_;
-                        it_ = std::set_union(decomp->edges, decomp->edges + decomp->numEdges, decomp->edges[i]->edges,
-                                             decomp->edges[i]->edges + decomp->edges[i]->numEdges, v_.begin(), compTreedType);
+                        it_ = std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), v_.begin(),
+                                             compTreedType);
                         v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                        decomp->numEdges = v_.size() - 1;
-                        decomp->edges = new preebagType *[decomp->numEdges];
-                        for (int asdf = 0, x = 0; asdf < decomp->numEdges; asdf++, x++) {
+                        decomp->edges.clear();
+                        for (int asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
                             preebagType *&sdggg = v_[asdf];
                             if (v_[asdf]->id == cid) {
                                 x++;
                             }
-                            decomp->edges[asdf] = v_[x];
+                            if (x < v_.size()) {
+                                decomp->edges.push_back(v_[x]);
+                            }
                         }
                     }
                 }
@@ -341,8 +342,83 @@ namespace gpusat {
         }
 
         // process child nodes
-        for (int i = 0; i < decomp->numEdges; i++) {
+        for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i]);
         }
     }
+
+    void TDParser::preprocessFacts(preetreedecType &decomp, satformulaType &formula) {
+        for (cl_long i = 0; i < formula.facts.size(); i++) {
+            cl_long fact = formula.facts[i];
+            for (cl_long a = 0; a < formula.clauses.size(); a++) {
+                std::vector<cl_long>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
+                if (elem != formula.clauses[a].end()) {
+                    if (*elem == (fact)) {
+                        formula.clauses.erase(formula.clauses.begin() + a);
+                        if (decomp.numVars > formula.numVars) {
+                            relableDecomp(&decomp.bags[0], a + formula.numVars + 1);
+                            decomp.numVars--;
+                        }
+                        a--;
+                    } else if (*elem == (-fact)) {
+                        if (formula.clauses[a].size() == 1) {
+                            formula.unsat = true;
+                            return;
+                        } else {
+                            formula.clauses[a].erase(elem);
+                            if (formula.clauses[a].size() == 1 &&
+                                std::find(formula.facts.begin() + i, formula.facts.end(), formula.clauses[a][0]) == formula.facts.end() &&
+                                std::find(formula.facts.begin() + i, formula.facts.end(), -formula.clauses[a][0]) == formula.facts.end()) {
+                                formula.facts.push_back(formula.clauses[a][0]);
+                            }
+                        }
+                    }
+                }
+            }
+            for (int j = i; j < formula.facts.size(); ++j) {
+                if (std::abs(formula.facts[j]) > std::abs(fact)) {
+                    if (formula.facts[j] > 0) {
+                        formula.facts[j]--;
+                    } else if (formula.facts[j] < 0) {
+                        formula.facts[j]++;
+                    }
+                }
+            }
+            relableDecomp(&decomp.bags[0], std::abs(fact));
+            decomp.numVars--;
+            relableFormula(formula, std::abs(fact));
+            formula.numVars--;
+        }
+    }
+
+
+    void TDParser::relableDecomp(preebagType *decomp, cl_long id) {
+        for (int i = 0; i < decomp->variables.size(); i++) {
+            if (decomp->variables[i] > id) {
+                decomp->variables[i]--;
+            } else if (decomp->variables[i] == id) {
+                decomp->variables.erase(decomp->variables.begin() + i);
+                i--;
+            }
+        }
+        for (int j = 0; j < decomp->edges.size(); ++j) {
+            relableDecomp(decomp->edges[j], id);
+        }
+    }
+
+
+    void TDParser::relableFormula(satformulaType &formula, cl_long id) {
+        for (int i = 0; i < formula.clauses.size(); i++) {
+            for (int j = 0; j < formula.clauses[i].size(); ++j) {
+                if (std::abs(formula.clauses[i][j]) > id) {
+                    if (formula.clauses[i][j] > 0) {
+                        formula.clauses[i][j]--;
+                    } else if (formula.clauses[i][j] < 0) {
+                        formula.clauses[i][j]++;
+                    }
+                }
+            }
+        }
+    }
+
 }

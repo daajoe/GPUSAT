@@ -8,4 +8,8 @@ namespace gpusat {
     bool compVars(const cl_long &a, const cl_long &b) {
         return std::abs(a) < std::abs(b);
     }
+
+    bool compVarsEq(const cl_long &a, const cl_long &b) {
+        return std::abs(a) == std::abs(b);
+    }
 }

@@ -21,18 +21,6 @@ namespace gpusat {
 
     private:
         /**
-         * parses a clause line from the sat formula
-         *
-         * @param item
-         *      the line
-         * @param clauses
-         *      the clauses
-         * @param clauseSize
-         *      size of each clause
-         */
-        void parseClauseLine(std::string item, std::queue<std::queue<cl_long>> &clauses, cl_long &clauseSize);
-
-        /**
          * parses a problem line from the sat formula
          *
          * @param satformula
@@ -49,7 +37,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        TDParser(int i);
+        explicit TDParser(int i);
 
         /**
          * generates a treedec from a given string
@@ -59,7 +47,7 @@ namespace gpusat {
          * @return
          *      the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph);
+        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
     private:
         /**
@@ -105,6 +93,12 @@ namespace gpusat {
         int combineWidth;
 
         void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
+
+        void preprocessFacts(preetreedecType &decomp, satformulaType &formula);
+
+        void relableDecomp(preebagType *decomp, cl_long id);
+
+        void relableFormula(satformulaType &formula, cl_long id);
     };
 }
 #endif //GPUSAT_PARSER_H

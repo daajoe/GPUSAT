@@ -86,10 +86,8 @@ namespace gpusat {
     /// type for preprocessing a tree decomposition
     struct preebagType {
         cl_long id = 0;
-        cl_long numEdges = 0;
-        cl_long numVariables = 0;
-        cl_long *variables = nullptr;
-        preebagType **edges = nullptr;
+        std::vector<cl_long> variables;
+        std::vector<preebagType *> edges;
     };
 
     /// type for saving a tree decomposition
@@ -105,8 +103,10 @@ namespace gpusat {
     struct satformulaType {
         cl_long numVars = 0;
         cl_long numWeights = 0;
+        bool unsat = false;
         solType *variableWeights = nullptr;
         std::vector<std::vector<cl_long>> clauses;
+        std::vector<cl_long> facts;
     };
 
     enum graphTypes {
@@ -118,6 +118,8 @@ namespace gpusat {
     };
 
     bool compVars(const cl_long &a, const cl_long &b);
+
+    bool compVarsEq(const cl_long &a, const cl_long &b);
 }
 
 #endif //GPUSAT_TYPES_H_H

@@ -121,7 +121,7 @@ namespace gpusat {
         // get clauses
         std::vector<cl_long> numVarsClause;
         std::vector<cl_long> clauses;
-        cl_long numClauses=0;
+        cl_long numClauses = 0;
         for (cl_long i = 0; i < formula.clauses.size(); i++) {
             std::vector<cl_long> v(formula.clauses[i].size());
             std::vector<cl_long>::iterator it;
@@ -254,7 +254,7 @@ namespace gpusat {
         // get clauses
         std::vector<cl_long> numVarsClause;
         std::vector<cl_long> clauses;
-        cl_long numClauses=0;
+        cl_long numClauses = 0;
         for (cl_long i = 0; i < formula.clauses.size(); i++) {
             std::vector<cl_long> v(formula.clauses[i].size());
             std::vector<cl_long>::iterator it;

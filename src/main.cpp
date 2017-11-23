@@ -122,7 +122,41 @@ int main(int argc, char *argv[]) {
     CNFParser cnfParser;
     TDParser tdParser(combineWidth);
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str());
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula);
+    if(satFormula.unsat){
+        std::cout << "{\n    \"Model Count\": " << 0;
+        time_total = getTime() - time_total;
+        std::cout << "\n    ,\"Time\":{";
+        std::cout << "\n        \"Solving\": " << 0;
+        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
+        std::cout << "\n        ,\"Build_Kernel\": " << 0;
+        std::cout << "\n        ,\"Generate_Model\": " << 0;
+        std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        std::cout << "\n    }";
+        std::cout << "\n    ,\"Statistics\":{";
+        std::cout << "\n        \"Num Join\": " << 0;
+        std::cout << "\n        ,\"Num Forget\": " << 0;
+        std::cout << "\n        ,\"Num Introduce\": " << 0;
+        std::cout << "\n        ,\"Num Leaf\": " << 0;
+
+        if (getStats) {
+            std::cout << "\n        ,\"Actual Paths\":{";
+            std::cout << "\n            \"min\": " << 0;
+            std::cout << "\n            ,\"max\": " << 0;
+            std::cout << "\n            ,\"mean\": " << 0;
+            std::cout << "\n        }";
+            std::cout << "\n        ,\"Current Paths\":{";
+            std::cout << "\n            \"min\": " << 0;
+            std::cout << "\n            ,\"max\": " << 0;
+            std::cout << "\n            ,\"mean\": " << 0;
+            std::cout << "\n        }";
+        }
+        std::cout << "\n    }";
+        std::cout << "\n}";
+        exit(20);
+
+    }
     if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
         graph = INCIDENCE;
     } else if (satFormula.numVars == treeDecomp.numVars) {
@@ -196,48 +230,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-        //create kernel binary if it doesn't exist
-        std::string sourcePath;
+            //create kernel binary if it doesn't exist
+            std::string sourcePath;
 
 #ifdef sType_Double
-        switch (graph) {
-            case PRIMAL:
-                sourcePath = kernelPath + "SAT_d_primal.cl";
-                break;
-            case INCIDENCE:
-                sourcePath = kernelPath + "SAT_d_inci.cl";
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d_inci.cl";
+                    break;
+            }
 #else
-        switch (graph) {
-            case PRIMAL:
-                sourcePath = kernelPath + "SAT_d4_primal.cl";
-                break;
-            case INCIDENCE:
-                sourcePath = kernelPath + "SAT_d4_inci.cl";
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d4_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d4_inci.cl";
+                    break;
+            }
 #endif
-        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+            program = cl::Program(context, sources);
+            program.build(devices);
 
-        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-        char *binChunk = &binData[0];
+            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            char *binChunk = &binData[0];
 
-        std::vector<char *> binaries;
-        for (const size_t &binSize : binSizes) {
-            binaries.push_back(binChunk);
-            binChunk += binSize;
-        }
+            std::vector<char *> binaries;
+            for (const size_t &binSize : binSizes) {
+                binaries.push_back(binChunk);
+                binChunk += binSize;
+            }
 
-        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-        for (unsigned int i = 0; i < binaries.size(); ++i)
-            binaryfile.write(binaries[i], binSizes[i]);
-        binaryfile.close();
+            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+            for (unsigned int i = 0; i < binaries.size(); ++i)
+                binaryfile.write(binaries[i], binSizes[i]);
+            binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
