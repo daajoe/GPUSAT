@@ -373,3 +373,170 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
     }
     return 1;
 }
+
+stype solveIntroduceF(__global stype *eSol,
+                      __global long *clauses, unsigned long cLen,
+                      __global unsigned long *nVars, __global unsigned long *eVars,
+                      unsigned long numNV, unsigned long numEV,
+                      __global unsigned long *nClauses, __global unsigned long *eClauses,
+                      unsigned long numNC, unsigned long numEC,
+                      unsigned long startIDe,
+                      unsigned long minIDe, unsigned long maxIDe, __global double *weights,
+                      long id) {
+    unsigned long assignment = id >> numNC, templateID = 0;
+    unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
+    //check clauses
+    for (a = 0, b = 0, i = 0; a < numNC; i++) {
+        if (i == 0 || clauses[i] == 0) {
+            if (clauses[i] == 0) i++;
+            if (nClauses[a] == eClauses[b]) {
+                b++;
+            } else if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
+                return 0.0;
+            }
+            a++;
+        }
+    }
+    unsigned long d = 0;
+    int baseSum = 0;
+    //check variables
+    for (i = 0, c = 0; i < cLen; i++) {
+        if (clauses[i] == 0) {
+            baseSum = 0;
+            if (nClauses[c] == eClauses[d]) {
+                d++;
+            }
+            c++;
+        } else {
+            for (a = 0; a < numNV; a++) {
+                if ((((id >> c) & 1) == 0) && (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
+                    return 0.0;
+                }
+                if ((baseSum == 0) && (nClauses[c] == eClauses[d]) && (((id >> c) & 1) == 1) &&
+                    (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
+                    base++;
+                    baseSum = 1;
+                }
+            }
+        }
+    }
+
+    //template variables
+    for (b = 0, a = 0; a < numNV; a++) {
+        if (nVars[a] == eVars[b]) {
+            templateID |= ((id >> (a + numNC)) & 1) << (b + numEC);
+            b++;
+        }
+    }
+
+    //template clauses
+    for (b = 0, a = 0; a < numNC; a++) {
+        if (nClauses[a] == eClauses[b]) {
+            templateID |= ((id >> a) & 1) << b;
+            b++;
+        }
+    }
+
+    unsigned long combinations = (unsigned long) exp2((double) base);
+    unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
+
+    double weight = 1;
+
+    if (weights != 0) {
+        for (b = 0, a = 0; nVars[a] != 0; a++) {
+            if ((nVars[a] != eVars[b])) {
+                weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
+            }
+            if (nVars[a] == eVars[b] && eVars[b] != 0) {
+                b++;
+            }
+        }
+    }
+    stype tmp = 0.0;
+    if (numNV != numEV) {
+        for (i = 0, c = 0; i < combinations; i++) {
+            otherID = templateID;
+            index = 0;
+
+            for (ec = 0, nc = 0, x = 0; nc < numNC; nc++, x++) {
+                rec = 0;
+                if (eClauses[ec] == nClauses[nc]) {
+                    for (; clauses[x] != 0; x++) {
+                        for (a = 0, b = 0; a < numNV && rec == 0; a++) {
+                            if (clauses[x] == (nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
+                                otherID &= ~(((i >> index) & 1) << ec);
+                                index++;
+                                rec = 1;
+                            }
+                            if (nVars[a] == eVars[b]) {
+                                b++;
+                            } else {
+                            }
+                        }
+                    }
+                    ec++;
+                } else {
+                    for (; clauses[x] != 0; x++);
+                }
+            }
+
+            if (otherID >= minIDe && otherID < maxIDe) {
+                tmp += eSol[otherID - startIDe];
+            }
+        }
+    } else {
+        if (otherID >= minIDe && otherID < maxIDe) {
+            tmp += eSol[otherID - startIDe];
+        }
+    }
+    tmp *= weight;
+    return tmp;
+}
+
+__kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
+                                   __global unsigned long *varsF, __global unsigned long *varsE,
+                                   unsigned long numVF, unsigned long numVE,
+                                   __global unsigned long *fClauses, __global unsigned long *eClauses,
+                                   unsigned long numCF, unsigned long numCE,
+                                   unsigned long startIDf, unsigned long startIDe,
+                                   unsigned long minIDE, unsigned long maxIDE, __global int *sols,
+                                   __global unsigned long *varsI, unsigned long numVI, __global unsigned long *iClauses, unsigned long numCI,
+                                   __global long *clauses, unsigned long cLen, __global double *weights) {
+    unsigned long id = get_global_id(0);
+    unsigned long a = 0, b = 0, templateId = 0, i = 0;
+    unsigned long combinations = (unsigned long) exp2((double) numVI - numVF);
+    //clauses
+    for (a = 0, b = 0; a < numCI; a++) {
+        if (fClauses[b] == iClauses[a]) {
+            templateId = templateId | (((id >> b) & 1) << a);
+            b++;
+        } else {
+            templateId = templateId | (1 << a);
+        }
+    }
+    //variables
+    for (a = 0, b = 0; a < numVI && b < numVF; a++) {
+        if (varsF[b] == varsI[a]) {
+            templateId = templateId | (((id >> (b + numCF)) & 1) << (a + numCI));
+            b++;
+        }
+    }
+
+    for (i = 0; i < combinations; i++) {
+        long b = 0, otherId = templateId;
+        for (a = 0; a < numVI; a++) {
+            if (b >= numVF || varsI[a] != varsF[b]) {
+                otherId = otherId | (((i >> (a - b)) & 1) << (a + numCI));
+            } else {
+                b++;
+            }
+        }
+        stype tmp = solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
+                                    weights, otherId);
+        solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
+                                                  weights, otherId);
+    }
+    if (solsF[id - (startIDf)] > 0) {
+        *sols = 1;
+    }
+}

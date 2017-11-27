@@ -1,9 +1,8 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
 
-stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, __global long *minId, __global long *maxId,
-                      __global long *startIDEdge, __global double *weights) {
-    long id = get_global_id(0);
+stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId,
+                      long startIDEdge, __global double *weights, long id) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
@@ -27,11 +26,11 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
     }
 
 
-    if (edge!=0&&otherId >= (*minId) && otherId < (*maxId)) {
-        return edge[otherId - (*startIDEdge)] * weight;
-    } else if (edge==0&&otherId >= (*minId) && otherId < (*maxId)) {
+    if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
+        return edge[otherId - (startIDEdge)] * weight;
+    } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
-    } else{
+    } else {
         return -1.0;
     }
 
@@ -118,8 +117,8 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     double weight = 1;
-        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights);
-        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights);
+    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, *minId1, *maxId1, *startIDEdge1, weights, id);
+    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, *minId2, *maxId2, *startIDEdge2, weights, id);
     if (weights != 0) {
         for (int a = 0; a < numV; a++) {
             weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
@@ -248,7 +247,7 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
                              __global long *startIDNode, __global long *startIDEdge, __global double *weights, __global int *sols) {
     long id = get_global_id(0);
     stype tmp;
-    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights);
+    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
     if (tmp > 0.0) {
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (sat != 1) {
@@ -261,6 +260,56 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
         solutions[id - (*startIDNode)] = 0.0;
     }
     if (solutions[id - (*startIDNode)] > 0) {
+        *sols = 1;
+    }
+}
+
+
+stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global stype *edge, long numVE,
+                      __global long *variables, __global long *edgeVariables, long minId, long maxId,
+                      long startIDEdge, __global double *weights, long id) {
+    stype tmp;
+    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
+    if (tmp > 0.0) {
+        int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+        if (sat != 1) {
+            return 0.0;
+        } else {
+            return tmp;
+        }
+    } else {
+        return 0.0;
+    }
+}
+
+__kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype *solsE,
+                                   long numVE, __global long *varsE, long combinations, long numVF,
+                                   long minIdE, long maxIdE, long startIDF,
+                                   long startIDE, __global int *sols,
+                                   long numVI, __global long *varsI,
+                                   __global long *clauses, __global long *numVarsC, long numclauses, __global double *weights) {
+    long id = get_global_id(0), templateId = 0;
+    for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
+        if (varsI[i] == varsF[a]) {
+            templateId = templateId | (((id >> a) & 1) << i);
+            a++;
+        }
+    }
+
+    for (int i = 0; i < combinations; i++) {
+        long b = 0, otherId = templateId;
+        for (int a = 0; a < numVI; a++) {
+            if (b >= numVF || varsI[a] != varsF[b]) {
+                otherId = otherId | (((i >> (a - b)) & 1) << a);
+            } else {
+                b++;
+            }
+        }
+        stype tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId);
+        solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId);
+
+    }
+    if (solsF[id - (startIDF)] > 0) {
         *sols = 1;
     }
 }

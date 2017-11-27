@@ -33,9 +33,12 @@ namespace gpusat {
                     std::vector<cl_long> *clause = new std::vector<cl_long>();
                     while (!sline.eof()) {
                         getline(sline, i, ' ');
-                        cl_long num = std::stol(i);
-                        if (num != 0)
-                            clause->push_back(num);
+                        if (i.size() > 0) {
+                            cl_long num = std::stol(i);
+                            if (num != 0) {
+                                clause->push_back(num);
+                            }
+                        }
                     }
                     if (clause->size() > 1) {
                         std::sort(clause->begin(), clause->end(), compVars);
@@ -178,18 +181,14 @@ namespace gpusat {
         while (!bags.empty()) {
             preebagType *bag = bags.front();
             bags.pop_front();
-            ret_.bags[id].numVars = bag->variables.size();
-            ret_.bags[id].variables = new cl_long[ret_.bags[id].numVars];
-            std::copy(bag->variables.begin(), bag->variables.end(), ret_.bags[id].variables);
-            ret_.bags[id].numEdges = bag->edges.size();
-            ret_.bags[id].edges = new cl_long[ret_.bags[id].numEdges];
-            ret_.bags[id].numSol = static_cast<cl_long>(pow(2, ret_.bags[id].numVars));
+            ret_.bags[id].variables = (*bag).variables;
+            ret_.bags[id].numSol = static_cast<cl_long>(pow(2, (cl_long) ret_.bags[id].variables.size()));
             for (int a = 0; a < bag->edges.size(); a++) {
-                ret_.bags[id].edges[a] = cid;
+                ret_.bags[id].edges.push_back(cid);
                 bags.push_back(bag->edges[a]);
                 cid++;
             }
-            std::sort(ret_.bags[id].edges, ret_.bags[id].edges + ret_.bags[id].numEdges);
+            std::sort(ret_.bags[id].edges.begin(), ret_.bags[id].edges.end());
             id++;
         }
         ret_.numVars = ret.numVars;

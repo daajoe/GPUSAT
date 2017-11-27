@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
     TDParser tdParser(combineWidth);
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula);
-    if(satFormula.unsat){
+    if (satFormula.unsat) {
         std::cout << "{\n    \"Model Count\": " << 0;
         time_total = getTime() - time_total;
         std::cout << "\n    ,\"Time\":{";
@@ -230,48 +230,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-            //create kernel binary if it doesn't exist
-            std::string sourcePath;
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
 #ifdef sType_Double
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+        }
 #else
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d4_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d4_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d4_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d4_inci.cl";
+                break;
+        }
 #endif
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
@@ -287,43 +287,42 @@ int main(int argc, char *argv[]) {
         time_build_kernel = getTime() - time_build_kernel;
 
         Solver *sol;
+        bagType next;
         switch (graph) {
             case PRIMAL:
                 sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false, getStats);
+                next.numSol = pow(2, next.variables.size());
+                next.variables.assign(treeDecomp.bags[0].variables.begin(),
+                                      treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
             case INCIDENCE:
                 sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true, getStats);
+                std::vector<cl_long> *vars = new std::vector<cl_long>;
+                for (int i = 0; i < treeDecomp.bags[0].variables.size(); ++i) {
+                    if (treeDecomp.bags[0].variables[i] <= satFormula.numVars) {
+                        (*vars).push_back(treeDecomp.bags[0].variables[i]);
+                    } else {
+                        break;
+                    }
+                }
+                next.numSol = pow(2, next.variables.size());
+                next.variables = *vars;
                 break;
         }
         long long int time_solving = getTime();
-        (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0]);
+        (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next);
         time_solving = getTime() - time_solving;
 
         long long int time_model = getTime();
         solType solutions = 0.0;
         if ((*sol).isSat > 0) {
-            cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, treeDecomp.bags[0].numVars)));
+            cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
             for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
                 if (treeDecomp.bags[0].solution[a] == nullptr) {
                     continue;
                 }
                 for (cl_long i = 0; i < bagSizeNode; i++) {
-                    if (graph == INCIDENCE) {
-                        bool sat = true;
-                        int b = 0, c = 0;
-                        for (b = 0; treeDecomp.bags[0].variables[b] <= satFormula.numVars && b < treeDecomp.bags[0].numVars; b++) {
-                        };
-                        for (c = 0; b + c < treeDecomp.bags[0].numVars; c++) {
-                            if (((i >> c) & 1) == 0) {
-                                sat = false;
-                            }
-                        }
-                        if (sat) {
-                            solutions = solutions + treeDecomp.bags[0].solution[a][i];
-                        }
-                    } else {
-                        solutions = solutions + treeDecomp.bags[0].solution[a][i];
-                    }
+                    solutions = solutions + treeDecomp.bags[0].solution[a][i];
                 }
             }
 #ifdef sType_Double

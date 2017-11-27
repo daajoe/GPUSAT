@@ -11,13 +11,13 @@ namespace gpusat {
         cl_long size = decomp.numb;
         for (int i = 0; i < size; i++) {
             std::cout << "\nbagnum: " << i + 1 << "\n";
-            cl_long vsize = decomp.bags[i].numVars;
+            cl_long vsize = decomp.bags[i].variables.size();
             std::cout << "variables: ";
             for (int a = 0; a < vsize; a++) {
                 std::cout << decomp.bags[i].variables[a] << " ";
             }
             std::cout << "\n";
-            cl_long esize = decomp.bags[i].numEdges;
+            cl_long esize = decomp.bags[i].edges.size();
             std::cout << "edgeschild nodes: ";
             for (int a = 0; a < esize; a++) {
                 std::cout << decomp.bags[i].edges[a] << " ";
@@ -45,59 +45,33 @@ namespace gpusat {
         }
     }
 
-    void GPUSATUtils::printSolutions(treedecType decomp) {
-        cl_long size = decomp.numb;
-        for (int i = 0; i < size; i++) {
-            std::cout << "\nbagnum: " << i + 1 << "\n";
-            cl_long numS = decomp.bags[i].numSol;
-            cl_long numVariables = decomp.bags[i].numVars;
-            cl_long *vars = decomp.bags[i].variables;
-            //solType *sol = decomp.bags[i].solution;
-            //printSol(numS, numVariables, vars, sol);
-            std::cout << "\n";
+    void GPUSATUtils::printSol(cl_long numS, std::vector<cl_long> vars, solType **sol, satformulaType &formula, cl_long bagSize) {
+        std::cout << "variables: \n";
+        for (int j = 0; j < vars.size(); ++j) {
+            std::cout << vars[j] << " ";
         }
-    }
-
-    void GPUSATUtils::printSol(cl_long numS, cl_long numVariables, cl_long *vars, solType **sol, satformulaType &formula, cl_long bagSize) {
-        std::cout << "solutions: \n";
+        std::cout << "\nsolutions: \n";
         for (int i = 0; i < numS / bagSize; i++) {
             if (sol[i] == nullptr) {
                 continue;
             }
             for (int a = 0; a < bagSize; a++) {
                 int b = 0, c = 0;
-                for (b = 0; vars[b] <= formula.numVars && b < numVariables; b++) {
+                for (b = 0; b < vars.size() && vars[b] <= formula.numVars; b++) {
                     cl_long asdf = vars[b];
                     int xyz = 0;
                 };
-                if (sol[i][a] != 0.0) {
-                    std::cout << i * bagSize + a << ": ";
+                std::cout << i * bagSize + a << ": ";
 #ifdef sType_Double
-                    std::cout << sol[i][a] << "\n";
+                std::cout << sol[i][a] << "\n";
 #else
-                    std::cout << d4_to_string(sol[i][a]) << "\n";
+                std::cout << d4_to_string(sol[i][a]) << "\n";
 #endif
-                }
             }
         }
     }
 
-    /*
-    void GPUSATUtils::printFormula(satformulaType formula) {
-        cl_long size = formula.numclauses;
-        int numVar = 0;
-        for (int i = 0; i < size; i++) {
-            std::cout << "\nclause: " << i + 1 << "\n";
-            cl_long vsize = formula.numVarsC[i];
-            std::cout << "variables: ";
-            for (int a = 0; a < vsize; a++) {
-                std::cout << formula.clauses[numVar + a] << " ";
-            }
-            numVar += vsize;
-            std::cout << "\n";
-        }
-    }
-*/
+
     std::string GPUSATUtils::readFile(std::string path) {
         std::stringbuf treeD;
         std::string inputLine;
@@ -127,4 +101,5 @@ namespace gpusat {
         std::ofstream fileOut(path, std::ios::binary);
         fileOut.write(data, size);
     }
+
 }

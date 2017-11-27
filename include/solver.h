@@ -47,16 +47,11 @@ namespace gpusat {
          * @param node
          *      the node to start from in the tree decompostion
          */
-        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node);
+        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &lastNode);
 
     protected:
-        /**
-         * TODO
-         * @param formula
-         * @param node
-         * @param next
-         */
-        virtual void solveForgIntroduce(satformulaType &formula, bagType &node, bagType &next);
+
+        virtual void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &)=0;
 
         /**
          * function to solve a join node
@@ -117,6 +112,8 @@ namespace gpusat {
         void solveLeaf(satformulaType &formula, bagType &node);
 
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
+
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &);
     };
 
     class Solver_Incidence : public Solver {
@@ -133,6 +130,8 @@ namespace gpusat {
         void solveLeaf(satformulaType &formula, bagType &node);
 
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
+
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

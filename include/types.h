@@ -68,11 +68,9 @@ namespace gpusat {
 
     /// type for a bag in the tree decomposition
     struct bagType {
-        cl_long numVars = 0;
-        cl_long numEdges = 0;
         cl_long numSol = 0;
-        cl_long *variables = nullptr;
-        cl_long *edges = nullptr;
+        std::vector<cl_long> variables;
+        std::vector<cl_long> edges;
         solType **solution = nullptr;
     };
 
