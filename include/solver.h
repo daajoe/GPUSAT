@@ -27,9 +27,6 @@ namespace gpusat {
         std::vector<cl_long> numHoldPaths;
         std::vector<cl_long> numSolPaths;
 
-        /**
-         * TODO
-         */
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
                cl::Kernel &kernel_, int width, bool incidence, int getStats) : platforms(platforms_), context(context_), devices(devices_), queue(queue_),
                                                                                program(program_),
@@ -66,26 +63,6 @@ namespace gpusat {
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type)=0;
 
         /**
-         * function to solve a forget node
-         *
-         * @param node
-         *      the node to save the solutions in
-         * @param edge
-         *      the next node
-         */
-        virtual void solveForget(bagType &node, bagType &edge, satformulaType &formula)=0;
-
-        /**
-         * function to solve a leaf node
-         *
-         * @param formula
-         *      the sat formula
-         * @param node
-         *      the node to save the solutions in
-         */
-        virtual void solveLeaf(satformulaType &formula, bagType &node)=0;
-
-        /**
          * function to solve a introduce node
          *
          * @param formula
@@ -107,10 +84,6 @@ namespace gpusat {
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
 
-        void solveForget(bagType &node, bagType &edge, satformulaType &formula);
-
-        void solveLeaf(satformulaType &formula, bagType &node);
-
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &);
@@ -124,10 +97,6 @@ namespace gpusat {
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
-
-        void solveForget(bagType &node, bagType &edge, satformulaType &formula);
-
-        void solveLeaf(satformulaType &formula, bagType &node);
 
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
