@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
     std::string kernelPath = "./kernel/";
     graphTypes graph = INCIDENCE;
     cl_long getStats = 0;
+    bool factR = true;
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -36,8 +37,10 @@ int main(int argc, char *argv[]) {
             {"kernelDir",     required_argument, 0, 'c'},
             {"help",          no_argument,       0, 'h'},
             {"getStats",      no_argument,       0, 'a'},
+            {"noFactRemoval", no_argument,       0, 'b'},
             {0,               0,                 0, 0}
     };
+    //parse flags
     while ((opt = getopt_long(argc, argv, "f:s:c:w:m:ah", flags, NULL)) != -1) {
         switch (opt) {
             case 'f': {
@@ -49,6 +52,9 @@ int main(int argc, char *argv[]) {
                     treeD.sputn("\n", 1);
                 }
                 break;
+            }
+            case 'b': {
+                factR = false;
             }
             case 's': {
                 // input sat formula
@@ -98,7 +104,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // no file flag
+    // no decomposition file flag
     if (!file) {
         while (getline(std::cin, inputLine)) {
             treeD.sputn(inputLine.c_str(), inputLine.size());
@@ -120,9 +126,12 @@ int main(int argc, char *argv[]) {
 
     long long int time_parsing = getTime();
     CNFParser cnfParser;
-    TDParser tdParser(combineWidth);
+    TDParser tdParser(combineWidth, factR);
+    //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
+    //parse the tree decomposition
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula);
+    //found unsat during preprocessing
     if (satFormula.unsat) {
         std::cout << "{\n    \"Model Count\": " << 0;
         time_total = getTime() - time_total;
@@ -157,10 +166,12 @@ int main(int argc, char *argv[]) {
         exit(20);
 
     }
-    if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
-        graph = INCIDENCE;
-    } else if (satFormula.numVars == treeDecomp.numVars) {
+    if (satFormula.numVars == treeDecomp.numVars) {
+        // decomposition is of the incidence graph
         graph = PRIMAL;
+    } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
+        // decomposition is of the primal graph
+        graph = INCIDENCE;
     } else {
         std::cerr << "Error: Unknown graph type\n" << "Usage: \n" << argv[0] << "\n"
                   << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
@@ -230,48 +241,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-        //create kernel binary if it doesn't exist
-        std::string sourcePath;
+            //create kernel binary if it doesn't exist
+            std::string sourcePath;
 
 #ifdef sType_Double
-        switch (graph) {
-            case PRIMAL:
-                sourcePath = kernelPath + "SAT_d_primal.cl";
-                break;
-            case INCIDENCE:
-                sourcePath = kernelPath + "SAT_d_inci.cl";
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d_inci.cl";
+                    break;
+            }
 #else
-        switch (graph) {
-            case PRIMAL:
-                sourcePath = kernelPath + "SAT_d4_primal.cl";
-                break;
-            case INCIDENCE:
-                sourcePath = kernelPath + "SAT_d4_inci.cl";
-                break;
-        }
+            switch (graph) {
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d4_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d4_inci.cl";
+                    break;
+            }
 #endif
-        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+            program = cl::Program(context, sources);
+            program.build(devices);
 
-        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-        char *binChunk = &binData[0];
+            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            char *binChunk = &binData[0];
 
-        std::vector<char *> binaries;
-        for (const size_t &binSize : binSizes) {
-            binaries.push_back(binChunk);
-            binChunk += binSize;
-        }
+            std::vector<char *> binaries;
+            for (const size_t &binSize : binSizes) {
+                binaries.push_back(binChunk);
+                binChunk += binSize;
+            }
 
-        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-        for (unsigned int i = 0; i < binaries.size(); ++i)
-            binaryfile.write(binaries[i], binSizes[i]);
-        binaryfile.close();
+            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+            for (unsigned int i = 0; i < binaries.size(); ++i)
+                binaryfile.write(binaries[i], binSizes[i]);
+            binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary

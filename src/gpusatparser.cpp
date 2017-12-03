@@ -14,6 +14,7 @@ namespace gpusat {
         std::stringstream ss(formula);
         std::string item;
         std::vector<std::pair<cl_long, solType>> weights;
+        std::vector<cl_long> *clause = new std::vector<cl_long>();
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 0) {
@@ -30,22 +31,26 @@ namespace gpusat {
                     //clause line
                     std::stringstream sline(item);
                     std::string i;
-                    std::vector<cl_long> *clause = new std::vector<cl_long>();
+
+                    cl_long num = 0;
                     while (!sline.eof()) {
                         getline(sline, i, ' ');
                         if (i.size() > 0) {
-                            cl_long num = std::stol(i);
+                            num = std::stol(i);
                             if (num != 0) {
                                 clause->push_back(num);
                             }
                         }
                     }
-                    if (clause->size() > 1) {
+                    if (clause->size() > 1 && num == 0) {
                         std::sort(clause->begin(), clause->end(), compVars);
-                    } else if (clause->size() == 1) {
+                        ret.clauses.push_back(*clause);
+                        clause->clear();
+                    } else if (clause->size() == 1 && num == 0) {
                         ret.facts.push_back((*clause)[0]);
+                        ret.clauses.push_back(*clause);
+                        clause->clear();
                     }
-                    ret.clauses.push_back(*clause);
                 }
             }
         }
@@ -109,8 +114,9 @@ namespace gpusat {
         weights.push_back(weight);
     }
 
-    TDParser::TDParser(int i) {
+    TDParser::TDParser(int i, bool b) {
         combineWidth = i;
+        factR = b;
     }
 
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
@@ -157,9 +163,11 @@ namespace gpusat {
         }
 
         // remove facts form decomp and formula
-        preprocessFacts(ret, formula);
-        if (formula.unsat) {
-            return treedecType();
+        if (factR) {
+            preprocessFacts(ret, formula);
+            if (formula.unsat) {
+                return treedecType();
+            }
         }
         // combine small bags
         preprocessDecomp(&ret.bags[0]);

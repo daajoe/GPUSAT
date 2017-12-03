@@ -48,7 +48,7 @@ namespace gpusat {
 
     protected:
 
-        virtual void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &)=0;
+        virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf)=0;
 
         /**
          * function to solve a join node
@@ -86,7 +86,7 @@ namespace gpusat {
 
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
-        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &);
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
 
     class Solver_Incidence : public Solver {
@@ -100,7 +100,7 @@ namespace gpusat {
 
         void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
-        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &);
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

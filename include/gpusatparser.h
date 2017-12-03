@@ -37,7 +37,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        explicit TDParser(int i);
+        explicit TDParser(int i, bool b);
 
         /**
          * generates a treedec from a given string
@@ -99,6 +99,8 @@ namespace gpusat {
         void relableDecomp(preebagType *decomp, cl_long id);
 
         void relableFormula(satformulaType &formula, cl_long id);
+
+        bool factR;
     };
 }
 #endif //GPUSAT_PARSER_H
