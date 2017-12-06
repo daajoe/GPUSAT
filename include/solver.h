@@ -91,7 +91,8 @@ namespace gpusat {
 
     class Solver_Incidence : public Solver {
     public:
-        Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
+        Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
+                         cl::Program &program_,
                          cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
                                                                                            getStats) {}
 

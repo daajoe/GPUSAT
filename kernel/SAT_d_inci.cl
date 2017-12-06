@@ -106,29 +106,26 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
  *      min id of the edge
  * @param maxID
  *      max id of the edge
- * @param isSAT
- *      set to 1 if models are found
  */
 __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
-                             __global long *clauses, __global unsigned long *cLen,
+                             __global long *clauses, unsigned long cLen,
                              __global unsigned long *nVars, __global unsigned long *eVars,
-                             __global unsigned long *numNV, __global unsigned long *numEV,
+                             unsigned long numNV, unsigned long numEV,
                              __global unsigned long *nClauses, __global unsigned long *eClauses,
-                             __global unsigned long *numNC, __global unsigned long *numEC,
-                             __global unsigned long *startIDn, __global unsigned long *startIDe,
-                             __global unsigned long *minIDe, __global unsigned long *maxIDe,
-                             __global unsigned long *isSAT, __global double *weights, __global int *sols) {
+                             unsigned long numNC, unsigned long numEC,
+                             unsigned long startIDn, unsigned long startIDe,
+                             unsigned long minIDe, unsigned long maxIDe, __global double *weights, __global int *sols) {
     unsigned long id = get_global_id(0);
-    unsigned long assignment = id >> *numNC, templateID = 0;
+    unsigned long assignment = id >> numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
     //check clauses
-    for (a = 0, b = 0, i = 0; a < *numNC; i++) {
+    for (a = 0, b = 0, i = 0; a < numNC; i++) {
         if (i == 0 || clauses[i] == 0) {
             if (clauses[i] == 0) i++;
             if (nClauses[a] == eClauses[b]) {
                 b++;
             } else if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
-                nSol[id - *startIDn] = 0.0;
+                nSol[id - startIDn] = 0.0;
                 return;
             }
             a++;
@@ -137,7 +134,7 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
     unsigned long d = 0;
     int baseSum = 0;
     //check variables
-    for (i = 0, c = 0; i < *cLen; i++) {
+    for (i = 0, c = 0; i < cLen; i++) {
         if (clauses[i] == 0) {
             baseSum = 0;
             if (nClauses[c] == eClauses[d]) {
@@ -145,9 +142,9 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
             }
             c++;
         } else {
-            for (a = 0; a < *numNV; a++) {
+            for (a = 0; a < numNV; a++) {
                 if ((((id >> c) & 1) == 0) && (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
-                    nSol[id - *startIDn] = 0.0;
+                    nSol[id - startIDn] = 0.0;
                     return;
                 }
                 if ((baseSum == 0) && (nClauses[c] == eClauses[d]) && (((id >> c) & 1) == 1) &&
@@ -160,15 +157,15 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
     }
 
     //template variables
-    for (b = 0, a = 0; a < *numNV; a++) {
+    for (b = 0, a = 0; a < numNV; a++) {
         if (nVars[a] == eVars[b]) {
-            templateID |= ((id >> (a + *numNC)) & 1) << (b + *numEC);
+            templateID |= ((id >> (a + numNC)) & 1) << (b + numEC);
             b++;
         }
     }
 
     //template clauses
-    for (b = 0, a = 0; a < *numNC; a++) {
+    for (b = 0, a = 0; a < numNC; a++) {
         if (nClauses[a] == eClauses[b]) {
             templateID |= ((id >> a) & 1) << b;
             b++;
@@ -190,16 +187,16 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
             }
         }
     }
-    if (*numNV != *numEV) {
+    if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
             index = 0;
 
-            for (ec = 0, nc = 0, x = 0; nc < *numNC; nc++, x++) {
+            for (ec = 0, nc = 0, x = 0; nc < numNC; nc++, x++) {
                 rec = 0;
                 if (eClauses[ec] == nClauses[nc]) {
                     for (; clauses[x] != 0; x++) {
-                        for (a = 0, b = 0; a < *numNV && rec == 0; a++) {
+                        for (a = 0, b = 0; a < numNV && rec == 0; a++) {
                             if (clauses[x] == (nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
                                 otherID &= ~(((i >> index) & 1) << ec);
                                 index++;
@@ -217,18 +214,17 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
                 }
             }
 
-            if (otherID >= (*minIDe) && otherID < (*maxIDe)) {
-                nSol[id - (*startIDn)] += eSol[otherID - (*startIDe)];
+            if (otherID >= (minIDe) && otherID < (maxIDe)) {
+                nSol[id - (startIDn)] += eSol[otherID - (startIDe)];
             }
         }
     } else {
-        if (otherID >= (*minIDe) && otherID < (*maxIDe)) {
-            nSol[id - (*startIDn)] += eSol[otherID - (*startIDe)];
+        if (otherID >= (minIDe) && otherID < (maxIDe)) {
+            nSol[id - (startIDn)] += eSol[otherID - (startIDe)];
         }
     }
-    nSol[id - (*startIDn)] *= weight;
-    if (nSol[id - (*startIDn)] > 0) {
-        *isSAT = 1;
+    nSol[id - (startIDn)] *= weight;
+    if (nSol[id - (startIDn)] > 0) {
         *sols = 1;
     }
 
