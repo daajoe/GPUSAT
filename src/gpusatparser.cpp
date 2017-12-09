@@ -239,10 +239,6 @@ namespace gpusat {
             edges.push_back(edge);
         }
         getline(sline, i, ' '); //width
-        if (stoi(i) > 35) {
-            std::cerr << "error treewidth oversize, exiting.\n";
-            exit(1);
-        };
         getline(sline, i, ' '); //num vars
         ret.numVars = stoi(i);
     }
@@ -352,6 +348,18 @@ namespace gpusat {
         for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i]);
         }
+
+        std::set<cl_long> intersectBag;
+        for (int b = 0; b < decomp->edges.size(); b++) {
+            std::vector<cl_long> intersectBag_;
+            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(),
+                                  std::back_inserter(intersectBag_));
+            intersectBag.insert(intersectBag_.begin(), intersectBag_.end());
+        }
+        if (intersectBag.size() > 30) {
+            std::cerr << "max bag oversize, exiting.\n";
+            exit(1);
+        };
     }
 
     void TDParser::preprocessFacts(preetreedecType &decomp, satformulaType &formula) {
