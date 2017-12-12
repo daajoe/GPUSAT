@@ -31,8 +31,6 @@ namespace gpusat {
          *      object containing the clauses in the sat formula
          */
         void parseProblemLine(satformulaType &satformula, std::string item);
-
-        void parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights);
     };
 
     class TDParser {

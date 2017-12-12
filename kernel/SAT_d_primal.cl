@@ -24,10 +24,9 @@
  *      the ids of the variables in the next bag
  */
 stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId,
-                      long startIDEdge, __global double *weights, long id) {
+                      long startIDEdge, long id) {
     long otherId = 0;
     long a = 0, b = 0;
-    double weight = 1.0;
     for (b = 0; b < numVE && a < numV; b++) {
         while ((variables[a] != edgeVariables[b])) {
             a++;
@@ -36,20 +35,8 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
         a++;
     };
 
-    //weighted model count
-    if (weights != 0) {
-        for (b = 0, a = 0; a < numV; a++) {
-            if ((variables[a] != edgeVariables[b])) {
-                weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
-            }
-            if ((variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
-                b++;
-            }
-        }
-    }
-
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
-        return edge[otherId - (startIDEdge)] * weight;
+        return edge[otherId - (startIDEdge)];
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
     } else {
@@ -140,25 +127,18 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  */
 __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1,
                         __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global int *sols) {
+                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global int *sols) {
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
-    double weight = 1;
     // get solution count from first edge
-    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights, id);
+    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, id);
     // get solution count from second edge
-    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights, id);
-    // weighted model count
-    if (weights != 0) {
-        for (int a = 0; a < numV; a++) {
-            weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
-        }
-    }
+    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, id);
+
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
         solutions[id - (startIDNode)] *= tmp;
-        solutions[id - (startIDNode)] /= weight;
     }
 
     // we have some solutions in edge2
@@ -195,11 +175,11 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
  */
 __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge, long numVE,
                              __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global long *maxId,
-                             __global long *startIDNode, __global long *startIDEdge, __global double *weights, __global int *sols) {
+                             __global long *startIDNode, __global long *startIDEdge, __global int *sols) {
     long id = get_global_id(0);
     stype tmp;
     // get solution count from the edge
-    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
+    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, id);
     if (tmp > 0.0) {
         //check if assignment satisfies the given clauses
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
@@ -242,11 +222,11 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
  */
 stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global stype *edge, long numVE,
                       __global long *variables, __global long *edgeVariables, long minId, long maxId,
-                      long startIDEdge, __global double *weights, long id) {
+                      long startIDEdge, long id) {
     stype tmp;
     if (edge != 0) {
         // get solutions count edge
-        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
+        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, id);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
@@ -306,7 +286,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, 
                                    long minIdE, long maxIdE, long startIDF,
                                    long startIDE, __global int *sols,
                                    long numVI, __global long *varsI,
-                                   __global long *clauses, __global long *numVarsC, long numclauses, __global double *weights) {
+                                   __global long *clauses, __global long *numVarsC, long numclauses) {
     long id = get_global_id(0);
     if (numVI != numVF) {
         long templateId = 0;
@@ -329,11 +309,11 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, 
                 }
             }
             // get solution count of the corresponding assignment in the edge
-            solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId);
+            solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, otherId);
         }
     } else {
         // no forget variables, only introduce
-        solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id);
+        solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, id);
     }
     if (solsF[id - (startIDF)] > 0) {
         *sols = 1;

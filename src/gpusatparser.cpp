@@ -13,7 +13,6 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::vector<std::pair<cl_long, solType>> weights;
         std::vector<cl_long> *clause = new std::vector<cl_long>();
         while (getline(ss, item)) {
             //ignore empty line
@@ -26,7 +25,6 @@ namespace gpusat {
                     parseProblemLine(ret, item);
                 } else if (type == 'w') {
                     //start line
-                    this->parseWeightLine(item, weights);
                 } else {
                     //clause line
                     std::stringstream sline(item);
@@ -54,37 +52,6 @@ namespace gpusat {
                 }
             }
         }
-
-        if (!weights.empty()) {
-            ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
-            ret.numWeights = (ret.numVars + 1) * 2;
-
-            for (int i = 0; i <= ret.numVars; i++) {
-                ret.variableWeights[i * 2] = -1.0;
-                ret.variableWeights[i * 2 + 1] = -1.0;
-            }
-
-            for (int i = 0; i < weights.size(); i++) {
-                if (weights[i].first < 0) {
-                    ret.variableWeights[abs(weights[i].first) * 2 + 1] = weights[i].second;
-                } else if (weights[i].first > 0) {
-                    ret.variableWeights[abs(weights[i].first) * 2] = weights[i].second;
-                }
-            }
-
-            for (int i = 0; i <= ret.numVars; i++) {
-                if (ret.variableWeights[i * 2] < 0.0 && ret.variableWeights[i * 2 + 1] < 0.0) {
-                    ret.variableWeights[i * 2] = 1.0;
-                    ret.variableWeights[i * 2 + 1] = 1.0;
-                } else if (ret.variableWeights[i * 2] < 0.0) {
-                    ret.variableWeights[i * 2] = 1.0 - ret.variableWeights[i * 2 + 1];
-                } else if (ret.variableWeights[i * 2 + 1] < 0.0) {
-                    ret.variableWeights[i * 2 + 1] = 1.0 - ret.variableWeights[i * 2];
-                }
-            }
-        } else {
-            ret.variableWeights = nullptr;
-        }
         return ret;
     }
 
@@ -100,18 +67,6 @@ namespace gpusat {
         satformula.numVars = stoi(i);
         getline(sline, i, ' '); //num clauses
         while (i.size() == 0) getline(sline, i, ' ');
-    }
-
-    void CNFParser::parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights) {
-        std::stringstream sline(item);
-        std::string i;
-        std::pair<cl_long, solType> weight;
-        getline(sline, i, ' '); //w
-        getline(sline, i, ' '); //variable
-        weight.first = stol(i);
-        getline(sline, i, ' '); //weight
-        weight.second = stod(i);
-        weights.push_back(weight);
     }
 
     TDParser::TDParser(int i, bool b) {

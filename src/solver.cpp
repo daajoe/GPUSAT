@@ -136,13 +136,6 @@ namespace gpusat {
             kernel.setArg(15, NULL);
         }
         kernel.setArg(16, numClauses);
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(17, bufWeights);
-        } else {
-            kernel.setArg(17, NULL);
-        }
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeForget]();
@@ -326,14 +319,6 @@ namespace gpusat {
             cl_long clausesLength = clauseVector.size();
             kernel.setArg(20, clausesLength);
 
-            cl::Buffer bufWeights;
-            if (formula.variableWeights != nullptr) {
-                bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-                kernel.setArg(21, bufWeights);
-            } else {
-                kernel.setArg(21, NULL);
-            }
-
             cl_int bagsolutions = 0;
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
             kernel.setArg(14, bufsolBag);
@@ -453,13 +438,6 @@ namespace gpusat {
         kernel.setArg(2, numClauses);
         kernel.setArg(6, edge.variables.size());
         kernel.setArg(4, node.variables.size());
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(14, bufWeights);
-        } else {
-            kernel.setArg(14, NULL);
-        }
 
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
@@ -471,7 +449,7 @@ namespace gpusat {
             kernel.setArg(12, bufStartNode);
             cl_int bagsolutions = 0;
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
-            kernel.setArg(15, bufsolBag);
+            kernel.setArg(14, bufsolBag);
 
             for (int b = 0; b < numSubIterations; b++) {
                 if (edge.solution[b] == nullptr) {
@@ -573,13 +551,6 @@ namespace gpusat {
         kernel.setArg(6, node.variables.size());
         kernel.setArg(7, edge1.variables.size());
         kernel.setArg(8, edge2.variables.size());
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(16, bufWeights);
-        } else {
-            kernel.setArg(16, NULL);
-        }
 
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
@@ -594,7 +565,7 @@ namespace gpusat {
             kernel.setArg(0, bufSol);
             cl_int bagsolutions = 0;
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
-            kernel.setArg(17, bufsolBag);
+            kernel.setArg(16, bufsolBag);
 
             for (int b = 0; b < std::max(numIterationsEdge1, numIterationsEdge2); b++) {
                 startIdEdge1 = b * bagSizeEdge1;
@@ -747,14 +718,6 @@ namespace gpusat {
         //number of clauses edge - 11
         cl_long numEClauses = eClauses.size() - 1;
         kernel.setArg(11, numEClauses);
-        //weights - 17
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(16, bufWeights);
-        } else {
-            kernel.setArg(16, NULL);
-        }
 
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
@@ -768,7 +731,7 @@ namespace gpusat {
 
             cl_int bagsolutions = 0;
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
-            kernel.setArg(17, bufsolBag);
+            kernel.setArg(16, bufsolBag);
             for (int b = 0; b < numSubIterations; b++) {
                 if (edge.solution[b] == nullptr) {
                     continue;
@@ -868,17 +831,9 @@ namespace gpusat {
         //number of clauses - 10
         cl_long numClauses = nClausesVector.size() - 1;
         kernel.setArg(10, numClauses);
-        //weights - 11
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(11, bufWeights);
-        } else {
-            kernel.setArg(11, NULL);
-        }
         //node variables - 12
         cl::Buffer bufVariables = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (nVars.size()), &nVars[0]);
-        kernel.setArg(12, bufVariables);
+        kernel.setArg(11, bufVariables);
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeNode]();
@@ -890,7 +845,7 @@ namespace gpusat {
             kernel.setArg(7, startIdNode);
             cl_int bagsolutions = 0;
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
-            kernel.setArg(13, bufsolBag);
+            kernel.setArg(12, bufsolBag);
             for (int b = 0; b < numIterations; b++) {
                 if (edge1_.solution[b] == nullptr) {
                     continue;

@@ -33,8 +33,7 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
                         unsigned long minIDe1, unsigned long maxIDe1,
                         unsigned long minIDe2, unsigned long maxIDe2,
                         unsigned long startIDn, unsigned long startIDe1, unsigned long startIDe2,
-                        unsigned long numClauses,
-                        __global double *weights, __global unsigned long *nVars, __global int *sols) {
+                        unsigned long numClauses, __global unsigned long *nVars, __global int *sols) {
     unsigned long combinations = ((unsigned long) exp2((double) numClauses));
     unsigned long start2 = 0, end2 = combinations - 1;
 
@@ -55,16 +54,7 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
         }
     }
     if (tmpSol != 0.0) {
-        if (weights != 0) {
-            double weight = 1;
-            unsigned long assignment = id >> numClauses;
-            for (int a = 0; nVars[a] != 0; a++) {
-                weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
-            }
-            nSol[id - (startIDn)] += tmpSol / weight;
-        } else {
-            nSol[id - (startIDn)] += tmpSol;
-        }
+        nSol[id - (startIDn)] += tmpSol;
     }
     if (nSol[id - (startIDn)] > 0) {
         *sols = 1;
@@ -114,7 +104,7 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
                              __global unsigned long *nClauses, __global unsigned long *eClauses,
                              unsigned long numNC, unsigned long numEC,
                              unsigned long startIDn, unsigned long startIDe,
-                             unsigned long minIDe, unsigned long maxIDe, __global double *weights, __global int *sols) {
+                             unsigned long minIDe, unsigned long maxIDe, __global int *sols) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
@@ -175,18 +165,6 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
     unsigned long combinations = (unsigned long) exp2((double) base);
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
-    double weight = 1;
-
-    if (weights != 0) {
-        for (b = 0, a = 0; nVars[a] != 0; a++) {
-            if ((nVars[a] != eVars[b])) {
-                weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
-            }
-            if (nVars[a] == eVars[b] && eVars[b] != 0) {
-                b++;
-            }
-        }
-    }
     if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -223,7 +201,6 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
             nSol[id - (startIDn)] += eSol[otherID - (startIDe)];
         }
     }
-    nSol[id - (startIDn)] *= weight;
     if (nSol[id - (startIDn)] > 0) {
         *sols = 1;
     }
@@ -287,7 +264,7 @@ stype solveIntroduceF(__global stype *eSol,
                       __global unsigned long *nClauses, __global unsigned long *eClauses,
                       unsigned long numNC, unsigned long numEC,
                       unsigned long startIDe,
-                      unsigned long minIDe, unsigned long maxIDe, __global double *weights,
+                      unsigned long minIDe, unsigned long maxIDe,
                       long id) {
     unsigned long assignment = id >> numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
@@ -346,18 +323,6 @@ stype solveIntroduceF(__global stype *eSol,
     unsigned long combinations = (unsigned long) exp2((double) base);
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
-    double weight = 1;
-
-    if (weights != 0) {
-        for (b = 0, a = 0; nVars[a] != 0; a++) {
-            if ((nVars[a] != eVars[b])) {
-                weight *= weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1];
-            }
-            if (nVars[a] == eVars[b] && eVars[b] != 0) {
-                b++;
-            }
-        }
-    }
     stype tmp = 0.0;
     if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
@@ -403,7 +368,6 @@ stype solveIntroduceF(__global stype *eSol,
             }
         }
     }
-    tmp *= weight;
     return tmp;
 }
 
@@ -452,8 +416,6 @@ stype solveIntroduceF(__global stype *eSol,
  *      array containing the clauses of the current node, negated atoms are negative
  * @param cLen
  *      length of the clauses array
- * @param weights
- *      array containing the weights of each variable
  */
 __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                                    __global unsigned long *varsF, __global unsigned long *varsE,
@@ -463,7 +425,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                                    unsigned long startIDf, unsigned long startIDe,
                                    unsigned long minIDE, unsigned long maxIDE, __global int *sols,
                                    __global unsigned long *varsI, unsigned long numVI, __global unsigned long *iClauses, unsigned long numCI,
-                                   __global long *clauses, unsigned long cLen, __global double *weights) {
+                                   __global long *clauses, unsigned long cLen) {
     unsigned long id = get_global_id(0);
     unsigned long a = 0, b = 0, templateId = 0, i = 0;
     unsigned long combinations = (unsigned long) exp2((double) numVI - numVF);
@@ -496,13 +458,11 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                 }
             }
             // get solution count from edge
-            solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
-                                                      weights, otherId);
+            solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,                                                      otherId);
         }
     } else {
         // only solve introduce if there is no forget
-        solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
-                                                  weights, id);
+        solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,                                                  id);
     }
     if (solsF[id - (startIDf)] > 0) {
         *sols = 1;
