@@ -36,6 +36,7 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
         a++;
     };
 
+    //weighted model count
     if (weights != 0) {
         for (b = 0, a = 0; a < numV; a++) {
             if ((variables[a] != edgeVariables[b])) {
@@ -78,20 +79,26 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
 int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
+    // iterate through all clauses
     for (i = 0; i < numclauses; i++) {
         satC = 0;
+        // iterate through clause variables
         for (a = 0; a < numVarsC[i] && !satC; a++) {
             satC = 1;
+            //check current variables
             for (b = 0; b < numV; b++) {
+                // check if clause is satisfied
                 if ((clauses[varNum + a] == variables[b]) ||
                     (clauses[varNum + a] == -variables[b])) {
                     satC = 0;
                     if (clauses[varNum + a] < 0) {
+                        //clause contains negative var and var is assigned negative
                         if ((id & (1 << (b))) == 0) {
                             satC = 1;
                             break;
                         }
                     } else {
+                        //clause contains positive var and var is assigned positive
                         if ((id & (1 << (b))) > 0) {
                             satC = 1;
                             break;
@@ -101,6 +108,7 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
             }
         }
         varNum += numVarsC[i];
+        // we have an unsattisifed clause
         if (!satC) {
             return 0;
         }
@@ -136,20 +144,28 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     double weight = 1;
+    // get solution count from first edge
     tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights, id);
+    // get solution count from second edge
     tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights, id);
+    // weighted model count
     if (weights != 0) {
         for (int a = 0; a < numV; a++) {
             weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
         }
     }
+
+    // we have some solutions in edge1
     if (tmp >= 0.0) {
         solutions[id - (startIDNode)] *= tmp;
         solutions[id - (startIDNode)] /= weight;
     }
+
+    // we have some solutions in edge2
     if (tmp_ >= 0.0) {
         solutions[id - (startIDNode)] *= tmp_;
     }
+
     if (solutions[id - (startIDNode)] > 0) {
         *sols = 1;
     }
@@ -182,8 +198,10 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
                              __global long *startIDNode, __global long *startIDEdge, __global double *weights, __global int *sols) {
     long id = get_global_id(0);
     stype tmp;
+    // get solution count from the edge
     tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
     if (tmp > 0.0) {
+        //check if assignment satisfies the given clauses
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (sat != 1) {
             solutions[id - (*startIDNode)] = 0.0;
@@ -192,6 +210,7 @@ __kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, lo
             solutions[id - (*startIDNode)] = tmp;
         }
     } else if (tmp == 0.0) {
+        //solution count of the edge is 0
         solutions[id - (*startIDNode)] = 0.0;
     }
     if (solutions[id - (*startIDNode)] > 0) {
@@ -226,11 +245,14 @@ stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numc
                       long startIDEdge, __global double *weights, long id) {
     stype tmp;
     if (edge != 0) {
+        // get solutions count edge
         tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
     } else {
+        // no edge - solve leaf
         tmp = 1.0;
     }
     if (tmp > 0.0) {
+        // check if assignment satisfies the given clauses
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (sat != 1) {
             return 0.0;
@@ -288,6 +310,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, 
     long id = get_global_id(0);
     if (numVI != numVF) {
         long templateId = 0;
+        // generate templateId
         for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
             if (varsI[i] == varsF[a]) {
                 templateId = templateId | (((id >> a) & 1) << i);
@@ -295,6 +318,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, 
             }
         }
 
+        // iterate through all corresponding edge solutions
         for (int i = 0; i < combinations; i++) {
             long b = 0, otherId = templateId;
             for (int a = 0; a < numVI; a++) {
@@ -304,9 +328,11 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, 
                     b++;
                 }
             }
+            // get solution count of the corresponding assignment in the edge
             solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId);
         }
     } else {
+        // no forget variables, only introduce
         solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id);
     }
     if (solsF[id - (startIDF)] > 0) {

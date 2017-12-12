@@ -42,7 +42,7 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
     unsigned long mask = id & (((unsigned long) exp2((double) numClauses)) - 1);
     unsigned long templateID = id >> numClauses << numClauses;
     double tmpSol = 0;
-    //sum up all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
+    //sum up the solution count for all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
     for (; start2 < combinations && e2Sol[(templateID | start2) - (startIDe2)] == 0; start2++);
     for (; end2 > 0 && e2Sol[(templateID | end2) - (startIDe2)] == 0; end2--);
     for (int a = 0; a < combinations; a++) {
@@ -156,7 +156,7 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
         }
     }
 
-    //template variables
+    //generate template variables
     for (b = 0, a = 0; a < numNV; a++) {
         if (nVars[a] == eVars[b]) {
             templateID |= ((id >> (a + numNC)) & 1) << (b + numEC);
@@ -164,7 +164,7 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
         }
     }
 
-    //template clauses
+    //generate template clauses
     for (b = 0, a = 0; a < numNC; a++) {
         if (nClauses[a] == eClauses[b]) {
             templateID |= ((id >> a) & 1) << b;
@@ -468,7 +468,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
     unsigned long a = 0, b = 0, templateId = 0, i = 0;
     unsigned long combinations = (unsigned long) exp2((double) numVI - numVF);
     if (numVI != numVF || numCI != numCF) {
-        //clauses
+        //generate template clauses
         for (a = 0, b = 0; a < numCI; a++) {
             if (fClauses[b] == iClauses[a]) {
                 templateId = templateId | (((id >> b) & 1) << a);
@@ -477,7 +477,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                 templateId = templateId | (1 << a);
             }
         }
-        //variables
+        //generate template variables
         for (a = 0, b = 0; a < numVI && b < numVF; a++) {
             if (varsF[b] == varsI[a]) {
                 templateId = templateId | (((id >> (b + numCF)) & 1) << (a + numCI));
@@ -485,6 +485,7 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
             }
         }
 
+        // iterate through all corresponding assignments in the edge
         for (i = 0; i < combinations; i++) {
             long b = 0, otherId = templateId;
             for (a = 0; a < numVI; a++) {
@@ -494,10 +495,12 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                     b++;
                 }
             }
+            // get solution count from edge
             solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
                                                       weights, otherId);
         }
     } else {
+        // only solve introduce if there is no forget
         solsF[id - (startIDf)] += solveIntroduceF(solsE, clauses, cLen, varsI, varsE, numVI, numVE, iClauses, eClauses, numCI, numCE, startIDe, minIDE, maxIDE,
                                                   weights, id);
     }
