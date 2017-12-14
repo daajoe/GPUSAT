@@ -95,7 +95,11 @@ namespace gpusat {
             }
         }
 
-        kernel = cl::Kernel(program, "solveIntroduceForget");
+        if (!leaf) {
+            kernel = cl::Kernel(program, "solveIntroduceForget");
+        } else {
+            kernel = cl::Kernel(program, "solveIntroduceForgetLeaf");
+        }
 
         kernel.setArg(3, eVars.size());
 
@@ -357,7 +361,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
-                this->isSat = 1;
+                isSat = 1;
             }
         }
         for (cl_long a = 0; a < cnode.numSol / bagSizeEdge; a++) {
@@ -487,7 +491,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
-                this->isSat = 1;
+                isSat = 1;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -609,7 +613,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
-                this->isSat = 1;
+                isSat = 1;
             }
         }
         for (cl_long a = 0; a < edge1.numSol / bagSizeEdge1; a++) {
@@ -759,7 +763,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
-                this->isSat = 1;
+                isSat = 1;
             }
         }
         for (cl_long a = 0; a < edge.numSol / bagSizeEdge; a++) {
@@ -906,7 +910,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
-                this->isSat = 1;
+                isSat = 1;
             }
         }
         if (node.variables.size() != edge1.variables.size()) {

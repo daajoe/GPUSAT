@@ -198,7 +198,7 @@ int main(int argc, char *argv[]) {
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
 
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
-            context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
+            context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
             cl_int err;
             devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
             if (err == CL_SUCCESS) {
