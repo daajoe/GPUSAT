@@ -6,7 +6,7 @@ stype
 solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, long startIDEdge, long id) {
     long otherId = 0;
     long a = 0, b = 0;
-    for (b = 0; b < numVE && a < numV; b++) {
+    for (b = 0; b < numVE & a < numV; b++) {
         while ((variables[a] != edgeVariables[b])) {
             a++;
         }
@@ -31,28 +31,12 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
     for (i = 0; i < numclauses; i++) {
         satC = 0;
         // iterate through clause variables
-        for (a = 0; a < numVarsC[i] && !satC; a++) {
-            satC = 1;
+        for (a = 0; a < numVarsC[i] & !satC; a++) {
             //check current variables
-            for (b = 0; b < numV; b++) {
+            for (b = 0; b < numV & !satC; b++) {
                 // check if clause is satisfied
-                if ((clauses[varNum + a] == variables[b]) ||
-                    (clauses[varNum + a] == -variables[b])) {
-                    satC = 0;
-                    if (clauses[varNum + a] < 0) {
-                        //clause contains negative var and var is assigned negative
-                        if ((id & (1 << (b))) == 0) {
-                            satC = 1;
-                            break;
-                        }
-                    } else {
-                        //clause contains positive var and var is assigned positive
-                        if ((id & (1 << (b))) > 0) {
-                            satC = 1;
-                            break;
-                        }
-                    }
-                }
+                satC |= ((clauses[varNum + a] == variables[b]) | (clauses[varNum + a] == -variables[b])) & (clauses[varNum + a] < 0) & ((id & (1 << (b))) == 0)
+                        | ((clauses[varNum + a] == variables[b]) | (clauses[varNum + a] == -variables[b])) & (clauses[varNum + a] > 0) & ((id & (1 << (b))) > 0);
             }
         }
         varNum += numVarsC[i];
@@ -83,30 +67,6 @@ solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge
 
 
 // Operation to solve a Introduce node in the decomposition.
-__kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge, long numVE,
-                             __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global long *maxId,
-                             __global long *startIDNode, __global long *startIDEdge, __global int *sols) {
-    long id = get_global_id(0);
-    stype tmp;
-    // get solution count from the edge
-    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, id);
-    if (tmp > 0.0) {
-        //check if assignment satisfies the given clauses
-        int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
-        if (sat != 1) {
-            solutions[id - (*startIDNode)] = 0.0;
-        } else {
-            (*models) = 1;
-            solutions[id - (*startIDNode)] = tmp;
-        }
-    } else if (tmp == 0.0) {
-        //solution count of the edge is 0
-        solutions[id - (*startIDNode)] = 0.0;
-    }
-    *sols |= solutions[id - (*startIDNode)] > 0;
-}
-
-// Operation to solve a Introduce node in the decomposition.
 stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global stype *edge, long numVE, __global long *variables,
                       __global long *edgeVariables, long minId, long maxId, long startIDEdge, long id) {
     stype tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, id);
@@ -129,7 +89,7 @@ solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype
     long id = get_global_id(0);
     long templateId = 0;
     // generate templateId
-    for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
+    for (int i = 0, a = 0; i < numVI & a < numVF; i++) {
         templateId |= (((varsI[i] == varsF[a]) & ((id >> a) & 1)) << i);
         a += (varsI[i] == varsF[a]);
     }
@@ -138,7 +98,7 @@ solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype
     for (int i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (int a = 0; a < numVI; a++) {
-            otherId |= (((b >= numVF || varsI[a] != varsF[b]) & ((i >> (a - b)) & 1)) << a);
+            otherId |= (((b >= numVF | varsI[a] != varsF[b]) & ((i >> (a - b)) & 1)) << a);
             b += (b < numVF) & (varsI[a] == varsF[b]);
         }
         // get solution count of the corresponding assignment in the edge
@@ -156,7 +116,7 @@ solveIntroduceForgetLeaf(__global stype *solsF, __global long *varsF, __global s
     long id = get_global_id(0);
     long templateId = 0;
     // generate templateId
-    for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
+    for (int i = 0, a = 0; i < numVI & a < numVF; i++) {
         templateId |= (((varsI[i] == varsF[a]) & ((id >> a) & 1)) << i);
         a += (varsI[i] == varsF[a]);
     }
@@ -165,7 +125,7 @@ solveIntroduceForgetLeaf(__global stype *solsF, __global long *varsF, __global s
     for (int i = 0; i < combinations; i++) {
         long b = 0, otherId = templateId;
         for (int a = 0; a < numVI; a++) {
-            otherId |= (((b >= numVF || varsI[a] != varsF[b]) & ((i >> (a - b)) & 1)) << a);
+            otherId |= (((b >= numVF | varsI[a] != varsF[b]) & ((i >> (a - b)) & 1)) << a);
             b += (b < numVF) & (varsI[a] == varsF[b]);
         }
         // get solution count of the corresponding assignment in the edge
