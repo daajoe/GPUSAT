@@ -102,6 +102,7 @@ namespace gpusat {
         }
 
         kernel.setArg(3, eVars.size());
+        eVars.push_back(0);
 
         cl::Buffer buf_varsE;
         if (eVars.size() > 0) {
@@ -116,6 +117,7 @@ namespace gpusat {
 
         //number Variables introduce
         kernel.setArg(12, iVars.size());
+        iVars.push_back(0);
 
         //variables introduce
         cl::Buffer bufIVars;
@@ -140,19 +142,20 @@ namespace gpusat {
             kernel.setArg(15, NULL);
         }
         kernel.setArg(16, numClauses);
+        cl::Buffer buf_varsF;
+        fVars.push_back(0);
+        if (fVars.size() > 0) {
+            buf_varsF = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
+            kernel.setArg(1, buf_varsF);
+        } else {
+            kernel.setArg(1, NULL);
+        }
         for (int a = 0; a < numIterations; a++) {
             cl_int solutions = 0;
             node.solution[a] = new solType[bagSizeForget]();
             cl_long startIdNode = a * bagSizeForget;
             cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(solType) * (bagSizeForget), node.solution[a]);
             kernel.setArg(0, buf_solsF);
-            cl::Buffer buf_varsF;
-            if (fVars.size() > 0) {
-                buf_varsF = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
-                kernel.setArg(1, buf_varsF);
-            } else {
-                kernel.setArg(1, NULL);
-            }
             kernel.setArg(9, startIdNode);
 
             cl_int bagsolutions = 0;

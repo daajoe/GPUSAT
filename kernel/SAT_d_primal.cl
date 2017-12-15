@@ -40,7 +40,7 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
             }
         }
         varNum += numVarsC[i];
-        // we have an unsattisifed clause
+        // we have an unsatisfied clause
         if (!satC) {
             return 0;
         }
@@ -60,11 +60,9 @@ solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge
     // get solution count from second edge
     tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, id);
 
-
-    solutions[id - (startIDNode)] *= (((stype) (tmp < 0.0)) + (tmp >= 0.0) * tmp) * (((stype) (tmp < 0.0)) + (tmp_ >= 0.0) * tmp_);
+    solutions[id - (startIDNode)] *= (((stype) (tmp < 0.0)) + (tmp >= 0.0) * tmp) * (((stype) (tmp_ < 0.0)) + (tmp_ >= 0.0) * tmp_);
     *sols |= (solutions[id - (startIDNode)] > 0);
 }
-
 
 // Operation to solve a Introduce node in the decomposition.
 stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global stype *edge, long numVE, __global long *variables,
@@ -80,8 +78,7 @@ stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numc
     }
 }
 
-
-// Operation to solve a Introduce and Forget node in the decomposition.
+// Operation to solve Introduce and Forget nodes in the decomposition.
 __kernel void
 solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE,
                      long maxIdE, long startIDF, long startIDE, __global int *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC,
