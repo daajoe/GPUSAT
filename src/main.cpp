@@ -29,6 +29,7 @@ int main(int argc, char *argv[]) {
     graphTypes graph = INCIDENCE;
     cl_long getStats = 0;
     bool factR = true;
+    bool cpu = false;
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -38,6 +39,7 @@ int main(int argc, char *argv[]) {
             {"help",          no_argument,       0, 'h'},
             {"getStats",      no_argument,       0, 'a'},
             {"noFactRemoval", no_argument,       0, 'b'},
+            {"CPU",           no_argument,       0, 'd'},
             {0,               0,                 0, 0}
     };
     //parse flags
@@ -80,6 +82,10 @@ int main(int argc, char *argv[]) {
             }
             case 'a': {
                 getStats = 1;
+                break;
+            }
+            case 'd': {
+                cpu = true;
                 break;
             }
             case 'h': {
@@ -198,7 +204,11 @@ int main(int argc, char *argv[]) {
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
 
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
-            context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
+            if (cpu) {
+                context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
+            } else {
+                context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
+            }
             cl_int err;
             devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
             if (err == CL_SUCCESS) {
