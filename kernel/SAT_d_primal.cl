@@ -52,7 +52,7 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
 __kernel void
 solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
           long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,
-          __global int *sols) {
+          __global long *sols) {
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     // get solution count from first edge
@@ -61,7 +61,8 @@ solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge
     tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, id);
 
     solutions[id - (startIDNode)] *= (((stype) (tmp < 0.0)) + (tmp >= 0.0) * tmp) * (((stype) (tmp_ < 0.0)) + (tmp_ >= 0.0) * tmp_);
-    *sols |= (solutions[id - (startIDNode)] > 0);
+    if (solutions[id - (startIDNode)] > 0)
+        *sols = 1;
 }
 
 // Operation to solve a Introduce node in the decomposition.
@@ -81,7 +82,7 @@ stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numc
 // Operation to solve Introduce and Forget nodes in the decomposition.
 __kernel void
 solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE,
-                     long maxIdE, long startIDF, long startIDE, __global int *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC,
+                     long maxIdE, long startIDF, long startIDE, __global long *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC,
                      long numclauses) {
     long id = get_global_id(0);
     long templateId = 0;
@@ -101,14 +102,16 @@ solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype
         // get solution count of the corresponding assignment in the edge
         solsF[id - (startIDF)] += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, otherId);
     }
-    *sols |= solsF[id - (startIDF)] > 0;
+    if (solsF[id - (startIDF)] > 0)
+        *sols = 1;
 }
 
 
 // Operation to solve a Leaf node in the decomposition.
 __kernel void
 solveIntroduceForgetLeaf(__global stype *solsF, __global long *varsF, __global stype *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE,
-                         long maxIdE, long startIDF, long startIDE, __global int *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC,
+                         long maxIdE, long startIDF, long startIDE, __global long *sols, long numVI, __global long *varsI, __global long *clauses,
+                         __global long *numVarsC,
                          long numclauses) {
     long id = get_global_id(0);
     long templateId = 0;
@@ -128,5 +131,6 @@ solveIntroduceForgetLeaf(__global stype *solsF, __global long *varsF, __global s
         // get solution count of the corresponding assignment in the edge
         solsF[id - (startIDF)] += checkBag(clauses, numVarsC, numclauses, otherId, numVI, varsI);
     }
-    *sols |= solsF[id - (startIDF)] > 0;
+    if (solsF[id - (startIDF)] > 0)
+        *sols = 1;
 }

@@ -241,48 +241,48 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-            //create kernel binary if it doesn't exist
-            std::string sourcePath;
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
 #ifdef sType_Double
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+        }
 #else
-            switch (graph) {
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d4_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d4_inci.cl";
-                    break;
-            }
+        switch (graph) {
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d4_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d4_inci.cl";
+                break;
+        }
 #endif
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary

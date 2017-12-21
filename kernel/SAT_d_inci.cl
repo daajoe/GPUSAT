@@ -6,7 +6,7 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
 // Operation to solve a Join node in the decomposition.
 __kernel void
 solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol, unsigned long minIDe1, unsigned long maxIDe1, unsigned long minIDe2, unsigned long maxIDe2,
-          unsigned long startIDn, unsigned long startIDe1, unsigned long startIDe2, unsigned long numClauses, __global unsigned long *nVars, __global int *sols) {
+          unsigned long startIDn, unsigned long startIDe1, unsigned long startIDe2, unsigned long numClauses, __global unsigned long *nVars, __global long *sols) {
     unsigned long combinations = ((unsigned long) exp2((double) numClauses));
     unsigned long start2 = 0, end2 = combinations - 1;
 
@@ -38,7 +38,7 @@ solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol, un
 __kernel void
 solveIntroduce(__global stype *nSol, __global stype *eSol, __global long *clauses, unsigned long cLen, __global unsigned long *nVars, __global unsigned long *eVars,
                unsigned long numNV, unsigned long numEV, __global unsigned long *nClauses, __global unsigned long *eClauses, unsigned long numNC, unsigned long numEC,
-               unsigned long startIDn, unsigned long startIDe, unsigned long minIDe, unsigned long maxIDe, __global int *sols) {
+               unsigned long startIDn, unsigned long startIDe, unsigned long minIDe, unsigned long maxIDe, __global long *sols) {
     unsigned long id = get_global_id(0);
     unsigned long assignment = id >> numNC, templateID = 0;
     unsigned long a = 0, b = 0, c = 0, i = 0, notSAT = 0, base = 0;
@@ -270,7 +270,7 @@ stype solveIntroduceF(__global stype *eSol, __global long *clauses, unsigned lon
 __kernel void
 solveIntroduceForget(__global stype *solsF, __global stype *solsE, __global unsigned long *varsF, __global unsigned long *varsE, unsigned long numVF, unsigned long numVE,
                      __global unsigned long *fClauses, __global unsigned long *eClauses, unsigned long numCF, unsigned long numCE, unsigned long startIDf,
-                     unsigned long startIDe, unsigned long minIDE, unsigned long maxIDE, __global int *sols, __global unsigned long *varsI, unsigned long numVI,
+                     unsigned long startIDe, unsigned long minIDE, unsigned long maxIDE, __global long *sols, __global unsigned long *varsI, unsigned long numVI,
                      __global unsigned long *iClauses, unsigned long numCI, __global long *clauses, unsigned long cLen) {
     unsigned long id = get_global_id(0);
     unsigned long a = 0, b = 0, templateId = 0, i = 0;
