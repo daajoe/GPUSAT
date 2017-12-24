@@ -6,6 +6,7 @@
 #include <gpusatparser.h>
 #include <d4_utils.h>
 #include <gpusautils.h>
+#include <unordered_map>
 
 namespace gpusat {
 
@@ -13,7 +14,7 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::vector<std::pair<cl_long, solType>> weights;
+        std::unordered_map<cl_long, solType> weights;
         std::vector<cl_long> *clause = new std::vector<cl_long>();
         while (getline(ss, item)) {
             //ignore empty line
@@ -25,7 +26,7 @@ namespace gpusat {
                     //start line
                     parseProblemLine(ret, item);
                 } else if (type == 'w') {
-                    //start line
+                    //weight line
                     this->parseWeightLine(item, weights);
                 } else {
                     //clause line
@@ -55,31 +56,24 @@ namespace gpusat {
             }
         }
 
-        if (!weights.empty()) {
+        if (wmc) {
             ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
-            for (int i = 0; i <= ret.numVars; i++) {
-                ret.variableWeights[i * 2] = -1.0;
-                ret.variableWeights[i * 2 + 1] = -1.0;
-            }
-
-            for (int i = 0; i < weights.size(); i++) {
-                if (weights[i].first < 0) {
-                    ret.variableWeights[abs(weights[i].first) * 2 + 1] = weights[i].second;
-                } else if (weights[i].first > 0) {
-                    ret.variableWeights[abs(weights[i].first) * 2] = weights[i].second;
-                }
-            }
-
-            for (int i = 0; i <= ret.numVars; i++) {
-                if (ret.variableWeights[i * 2] < 0.0 && ret.variableWeights[i * 2 + 1] < 0.0) {
-                    ret.variableWeights[i * 2] = 1.0;
-                    ret.variableWeights[i * 2 + 1] = 1.0;
-                } else if (ret.variableWeights[i * 2] < 0.0) {
-                    ret.variableWeights[i * 2] = 1.0 - ret.variableWeights[i * 2 + 1];
-                } else if (ret.variableWeights[i * 2 + 1] < 0.0) {
-                    ret.variableWeights[i * 2 + 1] = 1.0 - ret.variableWeights[i * 2];
+            for (cl_long i = 0; i <= ret.numVars; i++) {
+                std::unordered_map<cl_long, solType>::const_iterator elem = weights.find(i);
+                if (elem != weights.end()) {
+                    solType we = weights[i];
+                    if (we < 0) {
+                        ret.variableWeights[i * 2] = 1;
+                        ret.variableWeights[i * 2 + 1] = 1;
+                    } else {
+                        ret.variableWeights[i * 2] = weights[i];
+                        ret.variableWeights[i * 2 + 1] = 1 - weights[i];
+                    }
+                } else {
+                    ret.variableWeights[i * 2] = 1;
+                    ret.variableWeights[i * 2 + 1] = 1;
                 }
             }
         } else {
@@ -102,16 +96,19 @@ namespace gpusat {
         while (i.size() == 0) getline(sline, i, ' ');
     }
 
-    void CNFParser::parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights) {
+    void CNFParser::parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights) {
         std::stringstream sline(item);
         std::string i;
-        std::pair<cl_long, solType> weight;
         getline(sline, i, ' '); //w
         getline(sline, i, ' '); //variable
-        weight.first = stol(i);
+        cl_long id = stol(i);
         getline(sline, i, ' '); //weight
-        weight.second = stod(i);
-        weights.push_back(weight);
+        solType val = stod(i);
+        weights[id] = (id < 0) ? -val : val;
+    }
+
+    CNFParser::CNFParser(bool weighted) {
+        wmc = weighted;
     }
 
     TDParser::TDParser(int i, bool b) {
@@ -174,7 +171,7 @@ namespace gpusat {
         treedecType ret_ = treedecType();
         ret_.numb = 0;
         std::list<preebagType *> bags;
-        bags.push_back(&ret.bags[0]);
+        bags.push_back(&(ret.bags[0]));
         while (!bags.empty()) {
             preebagType *bag = bags.front();
             bags.pop_front();
@@ -348,18 +345,6 @@ namespace gpusat {
         for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i]);
         }
-
-        std::set<cl_long> intersectBag;
-        for (int b = 0; b < decomp->edges.size(); b++) {
-            std::vector<cl_long> intersectBag_;
-            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(),
-                                  std::back_inserter(intersectBag_));
-            intersectBag.insert(intersectBag_.begin(), intersectBag_.end());
-        }
-        if (intersectBag.size() > 30) {
-            std::cerr << "max bag oversize, exiting.\n";
-            exit(1);
-        };
     }
 
     void TDParser::preprocessFacts(preetreedecType &decomp, satformulaType &formula) {
@@ -401,6 +386,18 @@ namespace gpusat {
             }
             relableDecomp(&decomp.bags[0], std::abs(fact));
             decomp.numVars--;
+            if (formula.variableWeights != nullptr) {
+                if (fact < 0) {
+                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2 + 1];
+                } else {
+                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
+                }
+                formula.numWeights-=2;
+                for (int j = std::abs(fact); j < formula.numVars; ++j) {
+                    formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
+                    formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
+                }
+            }
             relableFormula(formula, std::abs(fact));
             formula.numVars--;
         }

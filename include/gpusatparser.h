@@ -4,19 +4,22 @@
 
 #include <queue>
 #include <types.h>
+#include <unordered_map>
 
 namespace gpusat {
     class CNFParser {
     public:
 
+        CNFParser(bool weighted);
+
         /**
-         * generates a treedec from a given string
-         *
-         * @param formula
-         *      the string representation of the tree decomposition
-         * @return
-         *      the tree decomposition
-         */
+                 * generates a treedec from a given string
+                 *
+                 * @param formula
+                 *      the string representation of the tree decomposition
+                 * @return
+                 *      the tree decomposition
+                 */
         satformulaType parseSatFormula(std::string formula);
 
     private:
@@ -32,7 +35,9 @@ namespace gpusat {
          */
         void parseProblemLine(satformulaType &satformula, std::string item);
 
-        void parseWeightLine(std::string item, std::vector<std::pair<cl_long, solType>> &weights);
+        void parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights);
+
+        bool wmc;
     };
 
     class TDParser {
@@ -48,6 +53,8 @@ namespace gpusat {
          *      the tree decomposition
          */
         treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
+
+        solType defaultWeight = 1.0;
 
     private:
         /**

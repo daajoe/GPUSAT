@@ -30,6 +30,7 @@ int main(int argc, char *argv[]) {
     cl_long getStats = 0;
     bool factR = true;
     bool cpu = false;
+    bool weighted = false;
     static struct option flags[] = {
             {"formula",       required_argument, 0, 's'},
             {"decomposition", required_argument, 0, 'f'},
@@ -40,11 +41,15 @@ int main(int argc, char *argv[]) {
             {"getStats",      no_argument,       0, 'a'},
             {"noFactRemoval", no_argument,       0, 'b'},
             {"CPU",           no_argument,       0, 'd'},
+            {"weighted",      no_argument,       0, 'e'},
             {0,               0,                 0, 0}
     };
     //parse flags
     while ((opt = getopt_long(argc, argv, "f:s:c:w:m:ah", flags, NULL)) != -1) {
         switch (opt) {
+            case 'e': {
+                weighted = true;
+            }
             case 'f': {
                 // input tree decomposition file
                 file = true;
@@ -131,8 +136,18 @@ int main(int argc, char *argv[]) {
     }
 
     long long int time_parsing = getTime();
-    CNFParser cnfParser;
+    CNFParser cnfParser(weighted);
     TDParser tdParser(combineWidth, factR);
+    std::string satString = sat.str();
+    std::string treeDString = treeD.str();
+    if (satString.size() < 10) {
+        std::cerr << "Error: SAT formula\n";
+        exit(EXIT_FAILURE);
+    }
+    if (treeDString.size() < 9) {
+        std::cerr << "Error: tree decomposition\n";
+        exit(EXIT_FAILURE);
+    }
     //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
@@ -348,7 +363,7 @@ int main(int argc, char *argv[]) {
             }
 #ifdef sType_Double
             std::cout.precision(17);
-            std::cout << "{\n    \"Model Count\": " << solutions;
+            std::cout << "{\n    \"Model Count\": " << solutions * tdParser.defaultWeight;
 #else
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
 #endif

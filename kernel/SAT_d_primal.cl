@@ -39,10 +39,10 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
     //weighted model count
     if (weights != 0) {
         for (b = 0, a = 0; a < numV; a++) {
-            if ((variables[a] != edgeVariables[b])) {
+            if (edgeVariables == 0 || (variables[a] != edgeVariables[b])) {
                 weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
             }
-            if ((variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
+            if (edgeVariables != 0 && (variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
                 b++;
             }
         }
@@ -250,6 +250,13 @@ stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numc
     } else {
         // no edge - solve leaf
         tmp = 1.0;
+
+        //weighted model count
+        if (weights != 0) {
+            for (int i = 0; i < numV; i++) {
+                tmp *= weights[((id >> i) & 1) > 0 ? variables[i] * 2 : variables[i] * 2 + 1];
+            }
+        }
     }
     if (tmp > 0.0) {
         // check if assignment satisfies the given clauses

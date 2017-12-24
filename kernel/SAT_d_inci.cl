@@ -43,7 +43,7 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
     unsigned long templateID = id >> numClauses << numClauses;
     double tmpSol = 0;
     //sum up the solution count for all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
-    for (; start2 < combinations && e2Sol[(templateID | start2) - (startIDe2)] == 0; start2++);
+    for (; start2 < (combinations - 1) && e2Sol[(templateID | start2) - (startIDe2)] == 0; start2++);
     for (; end2 > 0 && e2Sol[(templateID | end2) - (startIDe2)] == 0; end2--);
     for (int a = 0; a < combinations; a++) {
         if ((templateID | a) >= minIDe1 && (templateID | a) < maxIDe1 && e1Sol[(templateID | a) - (startIDe1)] != 0) {
@@ -187,6 +187,7 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
             }
         }
     }
+    stype tmp = 0;
     if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -215,15 +216,15 @@ __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
             }
 
             if (otherID >= (minIDe) && otherID < (maxIDe)) {
-                nSol[id - (startIDn)] += eSol[otherID - (startIDe)];
+                tmp += eSol[otherID - (startIDe)];
             }
         }
     } else {
         if (otherID >= (minIDe) && otherID < (maxIDe)) {
-            nSol[id - (startIDn)] += eSol[otherID - (startIDe)];
+            tmp += eSol[otherID - (startIDe)];
         }
     }
-    nSol[id - (startIDn)] *= weight;
+    nSol[id - (startIDn)] += tmp * weight;
     if (nSol[id - (startIDn)] > 0) {
         *sols = 1;
     }
