@@ -48,7 +48,8 @@ namespace gpusat {
                         ret.clauses.push_back(*clause);
                         clause->clear();
                     } else if (clause->size() == 1 && num == 0) {
-                        ret.facts.push_back((*clause)[0]);
+                        if (std::find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
+                            ret.facts.push_back((*clause)[0]);
                         ret.clauses.push_back(*clause);
                         clause->clear();
                     }
