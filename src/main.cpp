@@ -28,6 +28,7 @@ int main(int argc, char *argv[]) {
     std::string kernelPath = "./kernel/";
     graphTypes graph = INCIDENCE;
     cl_long getStats = 0;
+    cl_long cores = 1;
     bool factR = true;
     bool cpu = false;
     bool weighted = false;
@@ -42,6 +43,7 @@ int main(int argc, char *argv[]) {
             {"noFactRemoval", no_argument,       0, 'b'},
             {"CPU",           no_argument,       0, 'd'},
             {"weighted",      no_argument,       0, 'e'},
+            {"cores",         required_argument, 0, 'x'},
             {0,               0,                 0, 0}
     };
     //parse flags
@@ -83,6 +85,10 @@ int main(int argc, char *argv[]) {
             }
             case 'm': {
                 maxBag = std::atoi(optarg);
+                break;
+            }
+            case 'x': {
+                cores = std::atoi(optarg);
                 break;
             }
             case 'a': {
@@ -208,6 +214,7 @@ int main(int argc, char *argv[]) {
     std::vector<cl::Platform> platforms;
     cl::Context context;
     std::vector<cl::Device> devices;
+    std::vector<cl::Device> devices_;
     cl::CommandQueue queue;
     cl::Program program;
     cl::Kernel kernel;
@@ -226,8 +233,10 @@ int main(int argc, char *argv[]) {
             }
             cl_int err;
             devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
+            cl_device_partition_property props[4] = {CL_DEVICE_PARTITION_BY_COUNTS, cores, CL_DEVICE_PARTITION_BY_COUNTS_LIST_END, 0};
+            devices[0].createSubDevices(props, &devices_);
             if (err == CL_SUCCESS) {
-                queue = cl::CommandQueue(context, devices[0]);
+                queue = cl::CommandQueue(context, devices_[0]);
                 break;
             }
         }
