@@ -14,6 +14,13 @@
 #include <numeric>
 #include <solver.h>
 #include <d4_utils.h>
+//#include <quadmath.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+extern "C" {
+#include "quadmath.h"
+}
 
 using namespace gpusat;
 
@@ -350,7 +357,7 @@ int main(int argc, char *argv[]) {
         time_solving = getTime() - time_solving;
 
         long long int time_model = getTime();
-        solType solutions = 0.0;
+        __float128 solutions = 0.0;
         if ((*sol).isSat > 0) {
             cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
             for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
@@ -361,9 +368,15 @@ int main(int argc, char *argv[]) {
                     solutions = solutions + treeDecomp.bags[0].solution[a][i];
                 }
             }
+            if (!weighted) {
+                __float128 base = 0.78, exponent = satFormula.numVars;
+                solutions = solutions / powq(base, exponent);
+            }
 #ifdef sType_Double
             std::cout.precision(17);
-            std::cout << "{\n    \"Model Count\": " << solutions * tdParser.defaultWeight;
+            char buf[128];
+            quadmath_snprintf(buf, sizeof buf, "%.14Qe", solutions);
+            std::cout << "{\n    \"Model Count\": " << buf;
 #else
             std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
 #endif

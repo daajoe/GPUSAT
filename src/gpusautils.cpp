@@ -63,7 +63,7 @@ namespace gpusat {
                 };
                 std::cout << i * bagSize + a << ": ";
 #ifdef sType_Double
-                std::cout << sol[i][a] << "\n";
+                //std::cout << sol[i][a] << "\n";
 #else
                 std::cout << d4_to_string(sol[i][a]) << "\n";
 #endif

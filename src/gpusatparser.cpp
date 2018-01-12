@@ -73,12 +73,18 @@ namespace gpusat {
                         ret.variableWeights[i * 2 + 1] = 1 - weights[i];
                     }
                 } else {
-                    ret.variableWeights[i * 2] = 1;
-                    ret.variableWeights[i * 2 + 1] = 1;
+                    ret.variableWeights[i * 2] = 0.5;
+                    ret.variableWeights[i * 2 + 1] = 0.5;
                 }
             }
         } else {
-            ret.variableWeights = nullptr;
+            ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
+            ret.numWeights = (ret.numVars + 1) * 2;
+
+            for (cl_long i = 0; i <= ret.numVars; i++) {
+                ret.variableWeights[i * 2] = 0.78;
+                ret.variableWeights[i * 2 + 1] = 0.78;
+            }
         }
         return ret;
     }
@@ -393,7 +399,7 @@ namespace gpusat {
                 } else {
                     defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
                 }
-                formula.numWeights-=2;
+                formula.numWeights -= 2;
                 for (int j = std::abs(fact); j < formula.numVars; ++j) {
                     formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
                     formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
