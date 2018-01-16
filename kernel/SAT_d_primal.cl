@@ -1,5 +1,7 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
+//#define __global
+//#define __kernel
 
 /**
  * Operation to solve a Introduce node in the decomposition.
@@ -167,53 +169,6 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
     }
 
     if (solutions[id - (startIDNode)] > 0) {
-        *sols = 1;
-    }
-}
-
-/**
- * Operation to solve a Introduce node in the decomposition.
- *
- * @param clauses
- *      array containing the clauses in the sat formula
- * @param numVarsC
- *      array containing the number of variables for each clause
- * @param numclauses
- *      the number of clauses
- * @param solutions
- *      array for saving the number of models for each assignment
- * @param numV
- *      the number of variables in the current bag
- * @param edge
- *      the number of models for each assignment of the next bag
- * @param numVE
- *      the number of variables in the next bag
- * @param variables
- *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the next bag
- */
-__kernel void solveIntroduce(__global long *clauses, __global long *numVarsC, long numclauses, __global stype *solutions, long numV, __global stype *edge, long numVE,
-                             __global long *variables, __global long *edgeVariables, __global long *models, __global long *minId, __global long *maxId,
-                             __global long *startIDNode, __global long *startIDEdge, __global double *weights, __global int *sols) {
-    long id = get_global_id(0);
-    stype tmp;
-    // get solution count from the edge
-    tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
-    if (tmp > 0.0) {
-        //check if assignment satisfies the given clauses
-        int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
-        if (sat != 1) {
-            solutions[id - (*startIDNode)] = 0.0;
-        } else {
-            (*models) = 1;
-            solutions[id - (*startIDNode)] = tmp;
-        }
-    } else if (tmp == 0.0) {
-        //solution count of the edge is 0
-        solutions[id - (*startIDNode)] = 0.0;
-    }
-    if (solutions[id - (*startIDNode)] > 0) {
         *sols = 1;
     }
 }

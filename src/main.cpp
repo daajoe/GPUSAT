@@ -372,14 +372,9 @@ int main(int argc, char *argv[]) {
                 __float128 base = 0.78, exponent = satFormula.numVars;
                 solutions = solutions / powq(base, exponent);
             }
-#ifdef sType_Double
-            std::cout.precision(17);
             char buf[128];
-            quadmath_snprintf(buf, sizeof buf, "%.14Qe", solutions);
+            quadmath_snprintf(buf, sizeof buf, "%.30Qe", solutions);
             std::cout << "{\n    \"Model Count\": " << buf;
-#else
-            std::cout << "{\n    \"Model Count\": " << d4_to_string(solutions);
-#endif
 
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
@@ -388,6 +383,7 @@ int main(int argc, char *argv[]) {
         time_total = getTime() - time_total;
         std::sort(sol->numSolPaths.begin(), sol->numSolPaths.end());
         std::sort(sol->numHoldPaths.begin(), sol->numHoldPaths.end());
+        std::cout.precision(6);
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
         std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
