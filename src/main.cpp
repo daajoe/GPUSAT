@@ -224,10 +224,6 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(),
-                       "NVIDIA Corporation")) {
-                continue;
-            }
 
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
@@ -375,9 +371,10 @@ int main(int argc, char *argv[]) {
             if (!weighted) {
                 __float128 base = 0.78, exponent = satFormula.numVars;
                 solutions = solutions / powq(base, exponent);
+            } else {
+                solutions = solutions * tdParser.defaultWeight;
             }
             char buf[128];
-            solutions = solutions * tdParser.defaultWeight.x[0];
             quadmath_snprintf(buf, sizeof buf, "%.30Qe", solutions);
             std::cout << "{\n    \"Model Count\": " << buf;
 
