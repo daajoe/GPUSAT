@@ -39,4 +39,4 @@ endif ()
 
 file(GLOB gpusat_SRC "src/*.cpp")
 add_executable(gpusat ${gpusat_SRC})
-target_link_libraries(gpusat OpenCL)
+target_link_libraries(gpusat OpenCL quadmath)
