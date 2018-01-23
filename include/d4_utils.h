@@ -165,6 +165,12 @@ namespace gpusat {
         return b + a.x[0] + a.x[1] + a.x[2] + a.x[3];
     }
 
+    inline __float128 operator*(__float128 b, d4_Type a) {
+        __float128 tmp;
+        tmp = a.x[0] + a.x[1] + a.x[2] + a.x[3];
+        return tmp * b;
+    }
+
     inline d4_Type operator*(d4_Type a, d4_Type b) {
         return d4_mul(a, b);
     }
