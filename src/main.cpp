@@ -13,14 +13,18 @@
 #include <sys/stat.h>
 #include <numeric>
 #include <solver.h>
-#include <d4_utils.h>
 #include <stdlib.h>
 #include <stdio.h>
 
 #ifdef sType_Double
+
 #include <double_kernel.h>
+
 #else
+
 #include <d4_kernel.h>
+#include <d4_utils.h>
+
 #endif
 
 extern "C" {
@@ -31,7 +35,7 @@ using namespace gpusat;
 
 long long int getTime();
 
-void printUsage(){
+void printUsage(char *argv[]) {
     std::cout << "Usage: \n" << argv[0] << "\n"
               << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
               << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
@@ -40,6 +44,7 @@ void printUsage(){
               << "    --help,-h                       : prints this message\n"
               << "    --weighted                      : calculates the weighted model count of the formula\n";
 }
+
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
     std::stringbuf treeD, sat;
@@ -109,12 +114,12 @@ int main(int argc, char *argv[]) {
                 break;
             }
             case 'h': {
-                printUsage();
+                printUsage(argv);
                 exit(EXIT_SUCCESS);
             }
             default:
                 std::cerr << "Error: Unknown option\n";
-                printUsage();
+                printUsage(argv);
                 exit(EXIT_FAILURE);
         }
     }
@@ -130,7 +135,7 @@ int main(int argc, char *argv[]) {
     // error no sat formula given
     if (!formula) {
         std::cerr << "Error: No SAT formula\n";
-        printUsage();
+        printUsage(argv);
         exit(EXIT_FAILURE);
     }
 
@@ -194,7 +199,7 @@ int main(int argc, char *argv[]) {
         graph = INCIDENCE;
     } else {
         std::cerr << "Error: Unknown graph type\n";
-        printUsage();
+        printUsage(argv);
         exit(EXIT_FAILURE);
     }
     time_parsing = getTime() - time_parsing;
@@ -211,9 +216,6 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
-                continue;
-            }
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
