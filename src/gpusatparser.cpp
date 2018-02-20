@@ -118,9 +118,10 @@ namespace gpusat {
         wmc = weighted;
     }
 
-    TDParser::TDParser(int i, bool b) {
+    TDParser::TDParser(int i, bool b, int i1) {
         combineWidth = i;
         factR = b;
+        maxBag = i1;
     }
 
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
@@ -352,6 +353,30 @@ namespace gpusat {
         for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i]);
         }
+
+        for (int i = 0; i < decomp->edges.size(); i++) {
+            std::vector<cl_long> fVars;
+            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
+                                  std::back_inserter(fVars));
+            unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
+            if (numForgetVars >= 4) {
+                preebagType *newEdge = new preebagType;
+                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
+                fVars.clear();
+                std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(),
+                                    std::back_inserter(fVars));
+                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 4);
+                newEdge->edges.push_back(decomp->edges[i]);
+                decomp->edges[i] = newEdge;
+                std::sort(newEdge->variables.begin(), newEdge->variables.end());
+            }
+        }
+
+        if (decomp->variables.size() > 61) {
+            std::cout << "ERROR: width > 60";
+            exit(0);
+        }
+
     }
 
     void TDParser::preprocessFacts(preetreedecType &decomp, satformulaType &formula) {

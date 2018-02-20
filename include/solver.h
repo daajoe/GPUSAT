@@ -103,5 +103,19 @@ namespace gpusat {
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
+
+    class Solver_Dual : public Solver {
+    public:
+        Solver_Dual(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
+                      cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
+                                                                                        getStats) {}
+
+    protected:
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
+
+        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
+
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
+    };
 }
 #endif //GPUSAT_SOLVER_H_H

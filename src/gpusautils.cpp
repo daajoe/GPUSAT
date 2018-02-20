@@ -56,14 +56,9 @@ namespace gpusat {
                 continue;
             }
             for (int a = 0; a < bagSize; a++) {
-                int b = 0, c = 0;
-                for (b = 0; b < vars.size() && vars[b] <= formula.numVars; b++) {
-                    cl_long asdf = vars[b];
-                    int xyz = 0;
-                };
                 std::cout << i * bagSize + a << ": ";
 #ifdef sType_Double
-                //std::cout << sol[i][a] << "\n";
+                std::cout << sol[i][a] << "\n";
 #else
                 std::cout << d4_to_string(sol[i][a]) << "\n";
 #endif

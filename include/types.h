@@ -64,6 +64,37 @@ struct d4_Type {
 #define solType d4_Type
 #endif
 
+namespace dual {
+    typedef struct {
+        cl_long numC;
+        cl_long numCE1;
+        cl_long numCE2;
+        cl_long minId1;
+        cl_long maxId1;
+        cl_long minId2;
+        cl_long maxId2;
+        cl_long startIDNode;
+        cl_long startIDEdge1;
+        cl_long startIDEdge2;
+        cl_long numV;
+        cl_long numVE1;
+        cl_long numVE2;
+    } sJVars;
+
+    typedef struct {
+        cl_long numCI;
+        cl_long numCE;
+        cl_long numVF;
+        cl_long numVI;
+        cl_long numVE;
+        cl_long combinations;
+        cl_long minIdE;
+        cl_long maxIdE;
+        cl_long startIDF;
+        cl_long startIDE;
+        cl_long numCF;
+    } sIFVars;
+}
 namespace gpusat {
 
     /// type for a bag in the tree decomposition
@@ -108,7 +139,7 @@ namespace gpusat {
     };
 
     enum graphTypes {
-        INCIDENCE, PRIMAL
+        INCIDENCE, PRIMAL, DUAL
     };
 
     enum precisionTypes {

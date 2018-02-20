@@ -10,9 +10,9 @@ A SAT solver based on dynamic programming running on the GPU.
 
 ###Dependencies
 
-* cmake 3.2
-* gcc 5.4
-* AMD APP SDK 3.0
+* cmake 3.2 or newer
+* gcc 5.4 or newer
+* AMD APP SDK 3.0/CUDA Toolkit 9.1 or newer
 
 ###Compilation
 
@@ -23,7 +23,7 @@ The double4 Type is an adaption of [https://github.com/scibuilder/QD]
 
 `gpusat [-f <treedecomp>] -s <formula> [-w <width>] [-m <size>] [-c <kerneldir>] [-h]`
 
-The treedecomposition can eather be provided via file or piped into the program.
+The tree decomposition can either be provided via file or via input stream.
 
 *    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
 *    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
@@ -31,3 +31,4 @@ The treedecomposition can eather be provided via file or piped into the program.
 *    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
 *    --kernelDir,-c <kerneldir>      : <kerneldir> path to the directory containing the kernel files\n"
 *    --help,-h                       : prints this message\n";
+*    --weighted                      : calculates the weighted model count of the formula
