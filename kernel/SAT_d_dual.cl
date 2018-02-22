@@ -62,22 +62,22 @@ stype checkFalsifiable(cFVars params,
             if ((params.clauseId >> i) & 1) {
                 // iterate through clause
                 for (long a = 0; a < numVarsC[i]; a++) {
+                    //only works with printf don't know why.
+                    printf("");
                     long c = clauseVars[varNum + a];
                     if (c == v) {
                         // variable is contained positive in a clause
                         positive = 1;
-                        break;
                     }
                     if (c == -v) {
                         // variable is contained negative in a clause
                         negative = 1;
-                        break;
                     }
                 }
             }
             varNum += numVarsC[i];
         }
-        if (positive && negative) {
+        if (positive == 1 && negative == 1) {
             return 0.0;
         }
     }
@@ -104,11 +104,11 @@ double solveIntroduce_(sIVars params,
         int a = 0;
         stype tmp = solsE[otherId - (params.startIDEdge)];
         for (int b = 0; a < params.numC; a++) {
-            while (b < params.numCE && clauseIds[a] == clauseIdsE[b]) {
+            while (b < params.numCE && a < params.numC && clauseIds[a] == clauseIdsE[b]) {
                 b++;
                 a++;
             }
-            if (params.numCE == 0 || clauseIds[a] != clauseIdsE[b]) {
+            if (a < params.numC && (b >= params.numCE || clauseIds[a] != clauseIdsE[b])) {
                 if ((params.id >> a) & 1) {
                     //|var(C) /\ (var(x(t'))\var(A\{C}))|
                     long startIDC = 0;
@@ -125,7 +125,6 @@ double solveIntroduce_(sIVars params,
                         for (int k = 0; k < params.numVE; ++k) {
                             if (var == varsE[k]) {
                                 found = 1;
-                                break;
                             }
                         }
                         long startClauses = 0;
@@ -133,20 +132,20 @@ double solveIntroduce_(sIVars params,
                             for (int i = 0; i < numVarsC[k]; ++i) {
                                 if (var == abs(clauseVars[i + startClauses])) {
                                     found = 1;
-                                    break;
                                 }
                             }
                             startClauses += numVarsC[k];
                         }
                         //var(A\{C})
                         long startIDCE = 0;
-                        for (int i = 0; i < params.numCE && !subfound; ++i) {
+                        for (int i = 0; i < params.numCE; ++i) {
                             if ((otherId >> i) & 1) {
-                                for (int l = 0; l < numVarsCE[i] && !subfound; ++l) {
+                                for (int l = 0; l < numVarsCE[i]; ++l) {
                                     if (var == abs(clauseVarsE[l + startIDCE])) {
                                         subfound = 1;
-                                        break;
                                     }
+                                }
+                                if (subfound == 1) {
                                 }
                             }
                             startIDCE += numVarsCE[i];
@@ -158,14 +157,13 @@ double solveIntroduce_(sIVars params,
                                 for (int i = 0; i < numVarsC[k]; ++i) {
                                     if (var == abs(clauseVars[i + startClauses])) {
                                         subfound = 1;
-                                        break;
                                     }
                                 }
                             }
                             startClauses += numVarsC[k];
                         }
 
-                        if (found && !subfound) {
+                        if (found == 1 && subfound == 0) {
                             ++exponent;
                         }
                     }
@@ -178,14 +176,13 @@ double solveIntroduce_(sIVars params,
                     }
                     long exponent = 0;
                     for (int j = 0; j < numVarsC[a]; ++j) {
-                        int found = 0;
+                        long found = 0;
                         long varNum = 0;
                         long var = abs(clauseVars[j + startIDC]);
                         //var(x(t'))
                         for (int l = 0; l < params.numVE; ++l) {
                             if (var == varsE[l]) {
                                 found = 1;
-                                break;
                             }
                         }
                         long startClauses = 0;
@@ -193,12 +190,11 @@ double solveIntroduce_(sIVars params,
                             for (int i = 0; i < numVarsC[k]; ++i) {
                                 if (var == abs(clauseVars[i + startClauses])) {
                                     found = 1;
-                                    break;
                                 }
                             }
                             startClauses += numVarsC[k];
                         }
-                        if (!found) {
+                        if (found == 0) {
                             ++exponent;
                         }
                     }
@@ -255,7 +251,7 @@ __kernel void solveJoin(sJVars params,
     iparams2.numCE = params.numCE2;
     iparams2.startIDEdge = params.startIDEdge2;
     iparams2.id = id;
-    tmp_ = solveIntroduce_(iparams2, clauseIds, clauseIdsE2, numVarsC, numVarsCE2, solE1, variables, varsE2, clauseVars, clauseVarsE2);
+    tmp_ = solveIntroduce_(iparams2, clauseIds, clauseIdsE2, numVarsC, numVarsCE2, solE2, variables, varsE2, clauseVars, clauseVarsE2);
     // we have some solutions in edge1
 
     if (tmp >= 0.0) {
@@ -264,9 +260,9 @@ __kernel void solveJoin(sJVars params,
         for (int j = 0; j < params.numV; ++j) {
             int found = 0;
             long varNum = 0;
-            for (int i = 0; i < params.numC && !found; i++) {
+            for (int i = 0; i < params.numC; i++) {
                 if (((id >> i) & 1) == 1) {
-                    for (int a = 0; a < numVarsC[i] && !found; a++) {
+                    for (int a = 0; a < numVarsC[i]; a++) {
                         if (variables[j] == abs(clauseVars[varNum + a])) {
                             found = 1;
                         }
@@ -274,13 +270,12 @@ __kernel void solveJoin(sJVars params,
                 }
                 varNum += numVarsC[i];
             }
-            if (!found) {
+            if (found == 0) {
                 exponent++;
             }
 
         }
-        sol[id - (params.startIDNode)] *= tmp;
-        sol[id - (params.startIDNode)] /= 1 << exponent;
+        sol[id - (params.startIDNode)] *= tmp / (1 << exponent);
 
     }
 
@@ -288,7 +283,6 @@ __kernel void solveJoin(sJVars params,
     if (tmp_ >= 0.0) {
         sol[id - (params.startIDNode)] *= tmp_;
     }
-
     if (sol[id - (params.startIDNode)] > 0) {
         *sols = 1;
     }
@@ -319,9 +313,9 @@ stype solveIntroduceF(sIVars params,
         for (int j = 0; j < params.numV; ++j) {
             int found = 0;
             long varNum = 0;
-            for (int i = 0; i < params.numC && !found; i++) {
+            for (int i = 0; i < params.numC; i++) {
                 if (((params.id >> i) & 1) == 1) {
-                    for (int a = 0; a < numVarsC[i] && !found; a++) {
+                    for (int a = 0; a < numVarsC[i]; a++) {
                         if (vars[j] == abs(clauseVars[varNum + a])) {
                             found = 1;
                         }
@@ -329,7 +323,7 @@ stype solveIntroduceF(sIVars params,
                 }
                 varNum += numVarsC[i];
             }
-            if (!found) {
+            if (found == 0) {
                 exponent++;
             }
 
@@ -381,7 +375,10 @@ solveIntroduceForget(sIFVars params,
             iparams.numCE = params.numCE;
             iparams.startIDEdge = params.startIDE;
             iparams.id = otherId;
-            solsF[id - (params.startIDF)] += solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE) * (1 - ((popcount(i) % 2 == 1) * 2));
+            stype tmp = solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE);
+            if (tmp > 0) {
+                solsF[id - (params.startIDF)] += tmp * (1 - ((popcount(i) % 2 == 1) * 2));
+            }
         }
     } else {
         // no forget variables, only introduce
@@ -394,7 +391,10 @@ solveIntroduceForget(sIFVars params,
         iparams.numCE = params.numCE;
         iparams.startIDEdge = params.startIDE;
         iparams.id = id;
-        solsF[id - (params.startIDF)] += solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE);
+        stype tmp = solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE);
+        if (tmp > 0) {
+            solsF[id - (params.startIDF)] += tmp;
+        }
     }
     if (solsF[id - (params.startIDF)] > 0) {
         *sols = 1;

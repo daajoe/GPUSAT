@@ -821,11 +821,11 @@ namespace gpusat {
         std::vector<cl_long> clauseVars;
         std::vector<cl_long> numVarsC;
         for (cl_long i = 0; i < node.variables.size(); i++) {
-            for (int j = 0; j < formula.clauses[node.variables[i]-1].size(); ++j) {
-                nodeVariablesSet.insert(abs(formula.clauses[node.variables[i]-1][j]));
+            for (int j = 0; j < formula.clauses[node.variables[i] - 1].size(); ++j) {
+                nodeVariablesSet.insert(abs(formula.clauses[node.variables[i] - 1][j]));
             }
-            clauseVars.insert(clauseVars.end(), formula.clauses[node.variables[i]-1].begin(), formula.clauses[node.variables[i]-1].end());
-            numVarsC.push_back(formula.clauses[node.variables[i]-1].size());
+            clauseVars.insert(clauseVars.end(), formula.clauses[node.variables[i] - 1].begin(), formula.clauses[node.variables[i] - 1].end());
+            numVarsC.push_back(formula.clauses[node.variables[i] - 1].size());
         }
         std::vector<cl_long> nodeVariables;
         nodeVariables.insert(nodeVariables.begin(), nodeVariablesSet.begin(), nodeVariablesSet.end());
@@ -836,11 +836,11 @@ namespace gpusat {
         std::vector<cl_long> numVarsCE1;
         std::vector<cl_long> varsE1;
         for (cl_long i = 0; i < edge1.variables.size(); i++) {
-            for (int j = 0; j < formula.clauses[edge1.variables[i]-1].size(); ++j) {
-                edge1VariablesSet.insert(abs(formula.clauses[edge1.variables[i]-1][j]));
+            for (int j = 0; j < formula.clauses[edge1.variables[i] - 1].size(); ++j) {
+                edge1VariablesSet.insert(abs(formula.clauses[edge1.variables[i] - 1][j]));
             }
-            clauseVarsEdge1.insert(clauseVarsEdge1.end(), formula.clauses[edge1.variables[i]-1].begin(), formula.clauses[edge1.variables[i]-1].end());
-            numVarsCE1.push_back(formula.clauses[edge1.variables[i]-1].size());
+            clauseVarsEdge1.insert(clauseVarsEdge1.end(), formula.clauses[edge1.variables[i] - 1].begin(), formula.clauses[edge1.variables[i] - 1].end());
+            numVarsCE1.push_back(formula.clauses[edge1.variables[i] - 1].size());
         }
         varsE1.insert(varsE1.begin(), edge1VariablesSet.begin(), edge1VariablesSet.end());
         std::sort(varsE1.begin(), varsE1.end());
@@ -850,11 +850,11 @@ namespace gpusat {
         std::vector<cl_long> numVarsCE2;
         std::vector<cl_long> varsE2;
         for (cl_long i = 0; i < edge2.variables.size(); i++) {
-            for (int j = 0; j < formula.clauses[edge2.variables[i]-1].size(); ++j) {
-                edge2VariablesSet.insert(abs(formula.clauses[edge2.variables[i]-1][j]));
+            for (int j = 0; j < formula.clauses[edge2.variables[i] - 1].size(); ++j) {
+                edge2VariablesSet.insert(abs(formula.clauses[edge2.variables[i] - 1][j]));
             }
-            clauseVarsEdge2.insert(clauseVarsEdge2.end(), formula.clauses[edge2.variables[i]-1].begin(), formula.clauses[edge2.variables[i]-1].end());
-            numVarsCE2.push_back(formula.clauses[edge2.variables[i]-1].size());
+            clauseVarsEdge2.insert(clauseVarsEdge2.end(), formula.clauses[edge2.variables[i] - 1].begin(), formula.clauses[edge2.variables[i] - 1].end());
+            numVarsCE2.push_back(formula.clauses[edge2.variables[i] - 1].size());
         }
         varsE2.insert(varsE2.begin(), edge2VariablesSet.begin(), edge2VariablesSet.end());
         std::sort(varsE2.begin(), varsE2.end());
@@ -1062,11 +1062,11 @@ namespace gpusat {
         std::vector<cl_long> clauseVarsF;
         std::vector<cl_long> numVarsF;
         for (cl_long i = 0; i < params.numCF; i++) {
-            for (int j = 0; j < formula.clauses[clauseIdsF[i]-1].size(); ++j) {
-                varsFSet.insert(abs(formula.clauses[clauseIdsF[i]-1][j]));
+            for (int j = 0; j < formula.clauses[clauseIdsF[i] - 1].size(); ++j) {
+                varsFSet.insert(abs(formula.clauses[clauseIdsF[i] - 1][j]));
             }
-            clauseVarsF.insert(clauseVarsF.end(), formula.clauses[clauseIdsF[i]-1].begin(), formula.clauses[clauseIdsF[i]-1].end());
-            numVarsF.push_back(formula.clauses[clauseIdsF[i]-1].size());
+            clauseVarsF.insert(clauseVarsF.end(), formula.clauses[clauseIdsF[i] - 1].begin(), formula.clauses[clauseIdsF[i] - 1].end());
+            numVarsF.push_back(formula.clauses[clauseIdsF[i] - 1].size());
         }
         std::vector<cl_long> varsF;
         varsF.insert(varsF.begin(), varsFSet.begin(), varsFSet.end());
@@ -1078,11 +1078,11 @@ namespace gpusat {
         std::vector<cl_long> clauseVarsE;
         std::vector<cl_long> numVarsE;
         for (cl_long i = 0; i < params.numCE; i++) {
-            for (int j = 0; j < formula.clauses[clauseIdsE[i]-1].size(); ++j) {
-                varsESet.insert(abs(formula.clauses[clauseIdsE[i]-1][j]));
+            for (int j = 0; j < formula.clauses[clauseIdsE[i] - 1].size(); ++j) {
+                varsESet.insert(abs(formula.clauses[clauseIdsE[i] - 1][j]));
             }
-            clauseVarsE.insert(clauseVarsE.end(), formula.clauses[clauseIdsE[i]-1].begin(), formula.clauses[clauseIdsE[i]-1].end());
-            numVarsE.push_back(formula.clauses[clauseIdsE[i]-1].size());
+            clauseVarsE.insert(clauseVarsE.end(), formula.clauses[clauseIdsE[i] - 1].begin(), formula.clauses[clauseIdsE[i] - 1].end());
+            numVarsE.push_back(formula.clauses[clauseIdsE[i] - 1].size());
         }
         std::vector<cl_long> varsE;
         varsE.insert(varsE.begin(), varsESet.begin(), varsESet.end());
@@ -1094,11 +1094,11 @@ namespace gpusat {
         std::vector<cl_long> clauseVarsI;
         std::vector<cl_long> numVarsI;
         for (cl_long i = 0; i < params.numCI; i++) {
-            for (int j = 0; j < formula.clauses[node.variables[i]-1].size(); ++j) {
-                varsISet.insert(abs(formula.clauses[clauseIdsI[i]-1][j]));
+            for (int j = 0; j < formula.clauses[node.variables[i] - 1].size(); ++j) {
+                varsISet.insert(abs(formula.clauses[clauseIdsI[i] - 1][j]));
             }
-            clauseVarsI.insert(clauseVarsI.end(), formula.clauses[clauseIdsI[i]-1].begin(), formula.clauses[clauseIdsI[i]-1].end());
-            numVarsI.push_back(formula.clauses[clauseIdsI[i]-1].size());
+            clauseVarsI.insert(clauseVarsI.end(), formula.clauses[clauseIdsI[i] - 1].begin(), formula.clauses[clauseIdsI[i] - 1].end());
+            numVarsI.push_back(formula.clauses[clauseIdsI[i] - 1].size());
         }
         std::vector<cl_long> varsI;
         varsI.insert(varsI.begin(), varsISet.begin(), varsISet.end());

@@ -53,6 +53,9 @@ namespace gpusat {
         std::cout << "\nsolutions: \n";
         for (int i = 0; i < numS / bagSize; i++) {
             if (sol[i] == nullptr) {
+                for (int a = 0; a < bagSize; a++) {
+                    std::cout << i * bagSize + a << ": 0\n";
+                }
                 continue;
             }
             for (int a = 0; a < bagSize; a++) {

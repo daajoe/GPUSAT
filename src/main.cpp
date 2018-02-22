@@ -267,6 +267,9 @@ int main(int argc, char *argv[]) {
         }
 #else
         switch (graph) {
+            case DUAL:
+                binPath = kernelPath + "SAT_d4_d.clbin";
+                break;
             case PRIMAL:
                 binPath = kernelPath + "SAT_d4_p.clbin";
                 break;
@@ -284,26 +287,26 @@ int main(int argc, char *argv[]) {
 
 #ifdef sType_Double
         switch (graph) {
+            case DUAL:
+                sourcePath = kernelPath + "SAT_d_dual.cl";
+                break;
             case PRIMAL:
                 sourcePath = kernelPath + "SAT_d_primal.cl";
                 break;
             case INCIDENCE:
                 sourcePath = kernelPath + "SAT_d_inci.cl";
                 break;
-            case DUAL:
-                sourcePath = kernelPath + "SAT_d_dual.cl";
-                break;
         }
 #else
         switch (graph) {
+            case DUAL:
+                sourcePath = kernelPath + "SAT_d4_dual.cl";
+                break;
             case PRIMAL:
                 sourcePath = kernelPath + "SAT_d4_primal.cl";
                 break;
             case INCIDENCE:
                 sourcePath = kernelPath + "SAT_d4_inci.cl";
-                break;
-            case DUAL:
-                sourcePath = kernelPath + "SAT_d4_dual.cl";
                 break;
         }
 #endif
@@ -374,6 +377,7 @@ int main(int argc, char *argv[]) {
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next);
         time_solving = getTime() - time_solving;
 
+        //sum up last node solutions
         long long int time_model = getTime();
         __float128 solutions = 0.0;
         if ((*sol).isSat > 0) {
@@ -405,7 +409,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (graph == DUAL) {
-                std::set<cl_long > varSet;
+                std::set<cl_long> varSet;
                 for (int j = 0; j < satFormula.clauses.size(); ++j) {
                     for (int i = 0; i < satFormula.clauses[j].size(); ++i) {
                         varSet.insert(satFormula.clauses[j][i]);

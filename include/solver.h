@@ -16,6 +16,7 @@ namespace gpusat {
         //max with before splitting the bags
         cl_long maxWidth;
         cl_long inci;
+        graphTypes graph;
 
     public:
         cl_long isSat = 1;
@@ -79,7 +80,7 @@ namespace gpusat {
     public:
         Solver_Primal(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
                       cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                        getStats) {}
+                                                                                        getStats) { graph = PRIMAL; }
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
@@ -94,7 +95,7 @@ namespace gpusat {
         Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
                          cl::Program &program_,
                          cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                           getStats) {}
+                                                                                           getStats) { graph = INCIDENCE; }
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
@@ -107,8 +108,8 @@ namespace gpusat {
     class Solver_Dual : public Solver {
     public:
         Solver_Dual(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-                      cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                        getStats) {}
+                    cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
+                                                                                      getStats) { graph = DUAL; }
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
