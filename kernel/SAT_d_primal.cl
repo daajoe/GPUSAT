@@ -1,6 +1,30 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
+//#define __global
+//#define __kernel
 
+/**
+ * Operation to solve a Introduce node in the decomposition.
+ *
+ * @param clauses
+ *      array containing the clauses in the sat formula
+ * @param numVarsC
+ *      array containing the number of variables for each clause
+ * @param numclauses
+ *      the number of clauses
+ * @param solutions
+ *      array for saving the number of models for each assignment
+ * @param numV
+ *      the number of variables in the current bag
+ * @param edge
+ *      the number of models for each assignment of the next bag
+ * @param numVE
+ *      the number of variables in the next bag
+ * @param variables
+ *      the ids of the variables in the current bag
+ * @param edgeVariables
+ *      the ids of the variables in the next bag
+ */
 stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId,
                       long startIDEdge, __global double *weights, long id) {
     long otherId = 0;
@@ -35,6 +59,25 @@ stype solveIntroduce_(long numV, __global stype *edge, long numVE, __global long
     }
 }
 
+/**
+ * Operation to check if an assignment satisfies the clauses of a SAT formula.
+ *
+ * @param clauses
+ *      the clauses in the SAT formula
+ * @param numVarsC
+ *      array containing the number of Variables in each clause
+ * @param numclauses
+ *      the number of clauses in the sat formula
+ * @param id
+ *      the id of the thread - used to get the variable assignment
+ * @param numV
+ *      the number of variables
+ * @param variables
+ *      a vector containing the ids of the variables
+ * @return
+ *      1 - if the assignment satisfies the formula
+ *      0 - if the assignment doesn't satisfy the formula
+ */
 int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
@@ -75,6 +118,28 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
     return 1;
 }
 
+/**
+ * Operation to solve a Join node in the decomposition.
+ *
+ * @param solutions
+ *      array to save the number of solutions of the join
+ * @param edge1
+ *      array containing the number of solutions in the first edge
+ * @param edge2
+ *      array containing the number of solutions in the second edge
+ * @param variables
+ *      the variables in the join bag
+ * @param edgeVariables1
+ *      the variables in the bag of the first edge
+ * @param edgeVariables2
+ *      the variables in the bag of the second edge
+ * @param numV
+ *      the number of variables in the join bag
+ * @param numVE1
+ *      the number of variables in the first edge
+ * @param numVE2
+ *      the number of variables in the second edge
+ */
 __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1,
                         __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
                         long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global int *sols) {
@@ -108,6 +173,28 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
     }
 }
 
+/**
+ * Operation to solve a Introduce node in the decomposition.
+ *
+ * @param clauses
+ *      array containing the clauses in the sat formula
+ * @param numVarsC
+ *      array containing the number of variables for each clause
+ * @param numclauses
+ *      the number of clauses
+ * @param solutions
+ *      array for saving the number of models for each assignment
+ * @param numV
+ *      the number of variables in the current bag
+ * @param edge
+ *      the number of models for each assignment of the next bag
+ * @param numVE
+ *      the number of variables in the next bag
+ * @param variables
+ *      the ids of the variables in the current bag
+ * @param edgeVariables
+ *      the ids of the variables in the next bag
+ */
 stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global stype *edge, long numVE,
                       __global long *variables, __global long *edgeVariables, long minId, long maxId,
                       long startIDEdge, __global double *weights, long id) {
@@ -139,6 +226,43 @@ stype solveIntroduceF(__global long *clauses, __global long *numVarsC, long numc
     }
 }
 
+
+/**
+ * Operation to solve a Forget node in the decomposition.
+ *
+ * @param solutions
+ *      array for saving the number of models for each assignment
+ * @param variablesCurrent
+ *      array containing the ids of the variables in the current bag
+ * @param edge
+ *      array containing the solutions in the last node
+ * @param numVarsEdge
+ *      number of variables in the edge bag
+ * @param variablesEdge
+ *      array containing the ids of the variables in the next bag
+ * @param combinations
+ *      the number of solutions that relate to this bag from the next bag
+ * @param numVarsCurrent
+ *      number of variables in the current bag
+ * @param clauses
+ *      array containing the clauses in the sat formula
+ * @param numVarsC
+ *      array containing the number of variables for each clause
+ * @param numclauses
+ *      the number of clauses
+ * @param solutions
+ *      array for saving the number of models for each assignment
+ * @param numV
+ *      the number of variables in the current bag
+ * @param edge
+ *      the number of models for each assignment of the next bag
+ * @param numVE
+ *      the number of variables in the next bag
+ * @param variables
+ *      the ids of the variables in the current bag
+ * @param edgeVariables
+ *      the ids of the variables in the next bag
+ */
 __kernel void solveIntroduceForget(__global stype *solsF, __global long *varsF, __global stype *solsE,
                                    long numVE, __global long *varsE, long combinations, long numVF,
                                    long minIdE, long maxIdE, long startIDF,

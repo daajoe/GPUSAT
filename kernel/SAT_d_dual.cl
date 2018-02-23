@@ -62,8 +62,6 @@ stype checkFalsifiable(cFVars params,
             if ((params.clauseId >> i) & 1) {
                 // iterate through clause
                 for (long a = 0; a < numVarsC[i]; a++) {
-                    //only works with printf don't know why.
-                    printf("");
                     long c = clauseVars[varNum + a];
                     if (c == v) {
                         // variable is contained positive in a clause

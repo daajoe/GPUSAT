@@ -3,6 +3,32 @@
 
 int isNotSat(unsigned long assignment, __global long *clause, __global unsigned long *variables);
 
+/**
+ * Operation to solve a Join node in the decomposition.
+ *
+ * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
+ * @param e1Sol
+ *      array containing the number of solutions for each assignment for the first edge
+ * @param e2Sol
+ *      array containing the number of solutions for each assignment for the second edge
+ * @param minIDe1
+ *      min id of the first edge
+ * @param maxIDe1
+ *      max id of the first edge
+ * @param minIDe2
+ *      min id of the second edge
+ * @param maxIDe2
+ *      max id of the second edge
+ * @param startIDn
+ *      start id of the current node
+ * @param startIDe1
+ *      start id of the first edge
+ * @param startIDe2
+ *      of the second edge
+ * @param numClauses
+ *      number of clauses in the current node
+ */
 __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global stype *e2Sol,
                         unsigned long minIDe1, unsigned long maxIDe1,
                         unsigned long minIDe2, unsigned long maxIDe2,
@@ -45,6 +71,42 @@ __kernel void solveJoin(__global stype *nSol, __global stype *e1Sol, __global st
     }
 }
 
+/**
+ * Operation to solve a Introduce node in the decomposition.
+ *
+ * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
+ * @param eSol
+ *      array containing the number of solutions for each assignment for the edge
+ * @param clauses
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param cLen
+ *      length of the clauses array
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param eVars
+ *      array containing the ids of the variables in the edge
+ * @param numNV
+ *      number of variables in the current node
+ * @param numEV
+ *      number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
+ * @param startIDn
+ *      start id of the current node
+ * @param startIDe
+ *      start id of the edge
+ * @param minID
+ *      min id of the edge
+ * @param maxID
+ *      max id of the edge
+ */
 __kernel void solveIntroduce(__global stype *nSol, __global stype *eSol,
                              __global long *clauses, unsigned long cLen,
                              __global unsigned long *nVars, __global unsigned long *eVars,
@@ -185,6 +247,40 @@ int isNotSat(unsigned long assignment, __global long *clause, __global unsigned 
     return 1;
 }
 
+/**
+ * introduce function for the introduce forget operation
+ *
+ * @param nSol
+ *      array containing the number of solutions for each assignment for the current node
+ * @param eSol
+ *      array containing the number of solutions for each assignment for the edge
+ * @param clauses
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param cLen
+ *      length of the clauses array
+ * @param nVars
+ *      array containing the ids of the variables in the current node
+ * @param eVars
+ *      array containing the ids of the variables in the edge
+ * @param numNV
+ *      number of variables in the current node
+ * @param numEV
+ *      number of variables in the edge
+ * @param nClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge
+ * @param numNC
+ *      number of clauses in the current node
+ * @param numEC
+ *      number of clauses in the edge
+ * @param startIDe
+ *      start id of the edge
+ * @param minIDe
+ *      min id of the edge
+ * @param maxIDe
+ *      max id of the edge
+ */
 stype solveIntroduceF(__global stype *eSol,
                       __global long *clauses, unsigned long cLen,
                       __global unsigned long *nVars, __global unsigned long *eVars,
@@ -312,6 +408,54 @@ stype solveIntroduceF(__global stype *eSol,
     return tmp;
 }
 
+/**
+ * combination of the introduce and forget operation
+ *
+ * @param solsF
+ *      array containing the number of solutions for each assignment for the current node
+ * @param solsE
+ *      array containing the number of solutions for each assignment for the edge
+ * @param varsF
+ *      array containing the ids of the variables in the current node
+ * @param varsE
+ *      array containing the ids of the variables in the edge node
+ * @param numVF
+ *      the number of variables in the current node
+ * @param numVE
+ *      the number of variables in the edge node
+ * @param fClauses
+ *      array containing the clause ids of the current node
+ * @param eClauses
+ *      array containing the clause ids of the edge node
+ * @param numCF
+ *      number of clauses in the current node
+ * @param numCE
+ *      number of clauses in the edge node
+ * @param startIDf
+ *      start id of the current node
+ * @param startIDe
+ *      start id of the edge node
+ * @param minIDE
+ *      min id of the edge
+ * @param maxIDE
+ *      max id of the edge
+ * @param sols
+ *      flag, indicating that there are solutions in the current bag
+ * @param varsI
+ *      array containing the ids of the variables in the introduce node
+ * @param numVI
+ *      array containing the number of variables in the introduce node
+ * @param iClauses
+ *      array containing the clause ids of the introduce node
+ * @param numCI
+ *      number of clauses in the introduce node
+ * @param clauses
+ *      array containing the clauses of the current node, negated atoms are negative
+ * @param cLen
+ *      length of the clauses array
+ * @param weights
+ *      array containing the weights of each variable
+ */
 __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
                                    __global unsigned long *varsF, __global unsigned long *varsE,
                                    unsigned long numVF, unsigned long numVE,

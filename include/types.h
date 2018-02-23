@@ -139,7 +139,7 @@ namespace gpusat {
     };
 
     enum graphTypes {
-        INCIDENCE, PRIMAL, DUAL
+        INCIDENCE, PRIMAL, DUAL, NONE
     };
 
     enum precisionTypes {
