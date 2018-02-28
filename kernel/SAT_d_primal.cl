@@ -140,16 +140,10 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables, __global long *edgeVariables1,
-                        __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global int *sols) {
+__kernel void solveJoin(__global stype *solutions, __global stype *edge1, __global stype *edge2, __global long *variables,
+                        long numV, long startIDNode, __global double *weights, __global int *sols) {
     long id = get_global_id(0);
-    stype tmp = -1, tmp_ = -1;
     double weight = 1;
-    // get solution count from first edge
-    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights, id);
-    // get solution count from second edge
-    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights, id);
     // weighted model count
     if (weights != 0) {
         for (int a = 0; a < numV; a++) {
@@ -157,17 +151,12 @@ __kernel void solveJoin(__global stype *solutions, __global stype *edge1, __glob
         }
     }
 
-    // we have some solutions in edge1
-    if (tmp >= 0.0) {
-        solutions[id - (startIDNode)] *= tmp;
-        solutions[id - (startIDNode)] /= weight;
+    if (edge1 == 0 || edge2 == 0) {
+        solutions[id - (startIDNode)] = 0.0;
+    } else {
+        solutions[id - (startIDNode)] = edge1[id - (startIDNode)] / weight;
+        solutions[id - (startIDNode)] *= edge2[id - (startIDNode)];
     }
-
-    // we have some solutions in edge2
-    if (tmp_ >= 0.0) {
-        solutions[id - (startIDNode)] *= tmp_;
-    }
-
     if (solutions[id - (startIDNode)] > 0) {
         *sols = 1;
     }
