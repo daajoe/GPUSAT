@@ -62,18 +62,6 @@ namespace gpusat {
          *      the second edge
          */
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type)=0;
-
-        /**
-         * function to solve a introduce node
-         *
-         * @param formula
-         *      the sat formula
-         * @param node
-         *      the node to save the solutions in
-         * @param edge
-         *      the next node
-         */
-        virtual void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge)=0;
     };
 
     class Solver_Primal : public Solver {
@@ -84,8 +72,6 @@ namespace gpusat {
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
-
-        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
@@ -100,8 +86,6 @@ namespace gpusat {
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
 
-        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
-
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
 
@@ -113,8 +97,6 @@ namespace gpusat {
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
-
-        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
