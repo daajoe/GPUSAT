@@ -3,10 +3,10 @@
 
 #define alloca __builtin_alloca
 
-#include <CL/cl.hpp>
 #include <CL/cl_platform.h>
 #include <cmath>
 #include <list>
+#include <vector>
 #include <set>
 
 struct d4_Type {
@@ -139,7 +139,7 @@ namespace gpusat {
     };
 
     enum graphTypes {
-        INCIDENCE, PRIMAL, DUAL, NONE
+        PRIMAL, INCIDENCE, DUAL, NONE
     };
 
     enum precisionTypes {

@@ -2,6 +2,7 @@
 #define GPUSAT_SOLVER_H_H
 #define alloca __builtin_alloca
 
+#include <CL/cl.hpp>
 #include <types.h>
 
 namespace gpusat {

@@ -4,7 +4,6 @@
 #include <d4_utils.h>
 #include <gpusautils.h>
 #include <solver.h>
-#include <types.h>
 
 namespace gpusat {
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode) {

@@ -3,7 +3,6 @@
 #include <fstream>
 #include <iostream>
 #include <gpusautils.h>
-#include <d4_utils.h>
 
 namespace gpusat {
 

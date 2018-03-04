@@ -4,9 +4,6 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
-#include <d4_utils.h>
-#include <gpusautils.h>
-#include <unordered_map>
 
 namespace gpusat {
 
