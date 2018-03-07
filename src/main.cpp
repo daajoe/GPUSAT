@@ -13,10 +13,12 @@
 #include <numeric>
 #include <solver.h>
 #include <CLI11.hpp>
-//#include <quadmath.h>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
-extern "C" {
-#include "quadmath.h"
+cl_long popcount(cl_long x) {
+    x -= (x >> 1) & 0x5555555555555555;
+    x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
+    return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f) * 0x0101010101010101) >> 56;
 }
 
 using namespace gpusat;
@@ -86,7 +88,7 @@ int main(int argc, char *argv[]) {
     //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula);
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula, graph);
     //found unsat during preprocessing
     if (satFormula.unsat) {
         std::cout << "{\n    \"Model Count\": " << 0;
@@ -138,6 +140,9 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
+            /*if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
+                continue;
+            }*/
 
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
@@ -290,7 +295,7 @@ int main(int argc, char *argv[]) {
 
         //sum up last node solutions
         long long int time_model = getTime();
-        __float128 solutions = 0.0;
+        boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
             cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
             if (graph == DUAL) {
@@ -299,7 +304,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
                     for (cl_long i = 0; i < bagSizeNode; i++) {
-                        solutions = solutions + treeDecomp.bags[0].solution[a][i] * (1 - ((__builtin_popcount(i + a * bagSizeNode) % 2 == 1) * 2));
+                        sols = sols + ((popcount(i + a * bagSizeNode) % 2) == 1 ? -treeDecomp.bags[0].solution[a][i] : treeDecomp.bags[0].solution[a][i]);
                     }
                 }
             } else {
@@ -308,15 +313,15 @@ int main(int argc, char *argv[]) {
                         continue;
                     }
                     for (cl_long i = 0; i < bagSizeNode; i++) {
-                        solutions = solutions + treeDecomp.bags[0].solution[a][i];
+                        sols = sols + treeDecomp.bags[0].solution[a][i];
                     }
                 }
             }
             if (!weighted && graph != DUAL) {
-                __float128 base = 0.78, exponent = satFormula.numVars;
-                solutions = solutions / powq(base, exponent);
+                boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
+                sols = sols / pow(base, exponent);
             } else if (graph != DUAL) {
-                solutions = solutions * tdParser.defaultWeight;
+                sols = sols * tdParser.defaultWeight;
             }
 
             if (graph == DUAL) {
@@ -328,12 +333,16 @@ int main(int argc, char *argv[]) {
                 }
                 for (int i = 1; i <= satFormula.numVars; ++i) {
                     if (varSet.find(i) == varSet.end() && varSet.find(-i) == varSet.end())
-                        solutions *= 2;
+                        sols *= 2;
                 }
             }
             char buf[128];
-            quadmath_snprintf(buf, sizeof buf, "%.30Qe", solutions);
-            std::cout << "{\n    \"Model Count\": " << buf;
+
+#ifdef sType_Double
+            std::cout << std::setprecision(20) << "{\n    \"Model Count\": " << sols;
+#else
+            std::cout << std::setprecision(80) << "{\n    \"Model Count\": " << sols;
+#endif
 
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
@@ -356,11 +365,10 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Num Forget\": " << sol->numForget;
         std::cout << "\n        ,\"Num Introduce\": " << sol->numIntroduce;
         std::cout << "\n        ,\"Num Leaf\": " << sol->numLeafs;
-
         std::cout << "\n    }";
         std::cout << "\n}";
         std::cout.flush();
-        if (solutions > 0.0) {
+        if (sols > 0) {
             exit(10);
         } else {
             exit(20);

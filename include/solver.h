@@ -1,6 +1,8 @@
 #ifndef GPUSAT_SOLVER_H_H
 #define GPUSAT_SOLVER_H_H
+#if defined __CYGWIN__ || defined __MINGW32__
 #define alloca __builtin_alloca
+#endif
 
 #include <CL/cl.hpp>
 #include <types.h>

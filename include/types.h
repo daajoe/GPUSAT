@@ -1,7 +1,9 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
 
+#if defined __CYGWIN__ || defined __MINGW32__
 #define alloca __builtin_alloca
+#endif
 
 #include <CL/cl_platform.h>
 #include <cmath>
@@ -121,6 +123,7 @@ namespace gpusat {
 
     /// type for saving a tree decomposition
     struct preetreedecType {
+
         cl_long numb = 0;
         cl_long numVars = 0;
         preebagType *bags = nullptr;

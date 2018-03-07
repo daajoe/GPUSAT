@@ -1,6 +1,5 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
-#define alloca __builtin_alloca
 
 #include <queue>
 #include <types.h>
@@ -52,7 +51,7 @@ namespace gpusat {
          * @return
          *      the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
+        treedecType parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType);
 
         solType defaultWeight = 1.0;
 
@@ -101,7 +100,7 @@ namespace gpusat {
 
         void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
 
-        void preprocessFacts(preetreedecType &decomp, satformulaType &formula);
+        void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType);
 
         void relableDecomp(preebagType *decomp, cl_long id);
 

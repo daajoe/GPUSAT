@@ -1,6 +1,5 @@
 #ifndef GPUSAT_GPUSAUTILS_H
 #define GPUSAT_GPUSAUTILS_H
-#define alloca __builtin_alloca
 
 #include <queue>
 #include <types.h>

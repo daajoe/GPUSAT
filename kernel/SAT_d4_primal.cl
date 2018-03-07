@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
-//#define __global
-//#define __kernel
 
 typedef struct {
     stype x[4];
@@ -195,7 +193,8 @@ __kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __
 // we have some solutions in edge1
     if (tmp.x[0] >= 0.0) {
         d4_mul(&tmp, &solutions[id - (startIDNode)], &solutions[id - (startIDNode)]);
-        d4_div( &solutions[id - (startIDNode)],&weight, &solutions[id - (startIDNode)]);
+d4_div(&solutions[id - (startIDNode)], &weight, &solutions[id - (startIDNode)]
+);
     }
 
 // we have some solutions in edge2
@@ -253,14 +252,14 @@ d4_Type solveIntroduceF(__global long *clauses, __global long *numVarsC, long nu
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
         if (sat != 1) {
             d4_Type ret;
-            new_d4(0.0,0.0,0.0,0.0,&ret);
+new_d4(0.0, 0.0, 0.0, 0.0, &ret);
             return ret;
         } else {
             return tmp;
         }
     } else {
         d4_Type ret;
-        new_d4(0.0,0.0,0.0,0.0,&ret);
+new_d4(0.0, 0.0, 0.0, 0.0, &ret);
         return ret;
     }
 }

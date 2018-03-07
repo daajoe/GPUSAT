@@ -2,6 +2,7 @@
 #include <regex>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <gpusautils.h>
 
 namespace gpusat {

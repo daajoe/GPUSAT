@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
-//#define __global
-//#define __kernel
 
 /**
  * Operation to solve a Introduce node in the decomposition.

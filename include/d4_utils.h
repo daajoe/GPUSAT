@@ -4,11 +4,11 @@
 
 #ifndef GPUSAT_D4_UTILS_H
 #define GPUSAT_D4_UTILS_H
-#define alloca __builtin_alloca
 
 #include <types.h>
 #include <iostream>
 #include <limits>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
 #define _QD_SPLITTER 134217729.0               // = 2^27 + 1
 #define _QD_SPLIT_THRESH 6.69692879491417e+299 // = 2^996
@@ -162,12 +162,12 @@ namespace gpusat {
         return d4_add(a, b);
     }
 
-    inline __float128 operator+(__float128 b, d4_Type a) {
+    inline boost::multiprecision::cpp_bin_float_100 operator+(boost::multiprecision::cpp_bin_float_100 b, d4_Type a) {
         return b + a.x[0] + a.x[1] + a.x[2] + a.x[3];
     }
 
-    inline __float128 operator*(__float128 b, d4_Type a) {
-        __float128 tmp;
+    inline boost::multiprecision::cpp_bin_float_100 operator*(boost::multiprecision::cpp_bin_float_100 b, d4_Type a) {
+        boost::multiprecision::cpp_bin_float_100 tmp;
         tmp = a.x[0] + a.x[1] + a.x[2] + a.x[3];
         return tmp * b;
     }
