@@ -14,6 +14,7 @@
 #include <solver.h>
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
+#include <d4_utils.h>
 
 cl_long popcount(cl_long x) {
     x -= (x >> 1) & 0x5555555555555555;
@@ -226,6 +227,7 @@ int main(int argc, char *argv[]) {
                     break;
             }
 #endif
+            // read source file
             std::string kernelStr = GPUSATUtils::readFile(sourcePath);
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
             program = cl::Program(context, sources);
@@ -241,6 +243,7 @@ int main(int argc, char *argv[]) {
                 binChunk += binSize;
             }
 
+            // write binaries
             program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
             std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
             for (unsigned int i = 0; i < binaries.size(); ++i)
@@ -317,12 +320,12 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            if (!weighted && graph != DUAL) {
+            /*if (!weighted && graph != DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);
             } else if (graph != DUAL) {
                 sols = sols * tdParser.defaultWeight;
-            }
+            }*/
 
             if (graph == DUAL) {
                 std::set<cl_long> varSet;
@@ -362,9 +365,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    }";
         std::cout << "\n    ,\"Statistics\":{";
         std::cout << "\n        \"Num Join\": " << sol->numJoin;
-        std::cout << "\n        ,\"Num Forget\": " << sol->numForget;
-        std::cout << "\n        ,\"Num Introduce\": " << sol->numIntroduce;
-        std::cout << "\n        ,\"Num Leaf\": " << sol->numLeafs;
+        std::cout << "\n        ,\"Num Forget\": " << sol->numIntroduceForget;
         std::cout << "\n    }";
         std::cout << "\n}";
         std::cout.flush();

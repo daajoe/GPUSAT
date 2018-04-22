@@ -4,6 +4,8 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
+#include <d4_utils.h>
+#include <gpusatpreprocessor.h>
 
 namespace gpusat {
 
@@ -27,29 +29,7 @@ namespace gpusat {
                     this->parseWeightLine(item, weights);
                 } else {
                     //clause line
-                    std::stringstream sline(item);
-                    std::string i;
-
-                    cl_long num = 0;
-                    while (!sline.eof()) {
-                        getline(sline, i, ' ');
-                        if (i.size() > 0) {
-                            num = std::stol(i);
-                            if (num != 0) {
-                                clause->push_back(num);
-                            }
-                        }
-                    }
-                    if (clause->size() > 1 && num == 0) {
-                        std::sort(clause->begin(), clause->end(), compVars);
-                        ret.clauses.push_back(*clause);
-                        clause->clear();
-                    } else if (clause->size() == 1 && num == 0) {
-                        if (std::find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
-                            ret.facts.push_back((*clause)[0]);
-                        ret.clauses.push_back(*clause);
-                        clause->clear();
-                    }
+                    parseClauseLine(ret, item, clause);
                 }
             }
         }
@@ -67,14 +47,14 @@ namespace gpusat {
                         ret.variableWeights[i * 2 + 1] = 1;
                     } else {
                         ret.variableWeights[i * 2] = weights[i];
-                        ret.variableWeights[i * 2 + 1] = 1.0 - weights[i];
+                        ret.variableWeights[i * 2 + 1] = weights[i] - 1.0;
                     }
                 } else {
                     ret.variableWeights[i * 2] = 0.5;
                     ret.variableWeights[i * 2 + 1] = 0.5;
                 }
             }
-        } else {
+        } /*else {
             ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
@@ -82,8 +62,34 @@ namespace gpusat {
                 ret.variableWeights[i * 2] = 0.78;
                 ret.variableWeights[i * 2 + 1] = 0.78;
             }
-        }
+        }*/
         return ret;
+    }
+
+    void CNFParser::parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause) {
+        std::stringstream sline(item);
+        std::string i;
+
+        cl_long num = 0;
+        while (!sline.eof()) {
+                        getline(sline, i, ' ');
+                        if (i.size() > 0) {
+                            num = stol(i);
+                            if (num != 0) {
+                                clause->push_back(num);
+                            }
+                        }
+                    }
+        if (clause->size() > 1 && num == 0) {
+                        sort(clause->begin(), clause->end(), compVars);
+                        ret.clauses.push_back(*clause);
+                        clause->clear();
+                    } else if (clause->size() == 1 && num == 0) {
+                        if (find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
+                            ret.facts.push_back((*clause)[0]);
+                        ret.clauses.push_back(*clause);
+                        clause->clear();
+                    }
     }
 
     void CNFParser::parseProblemLine(satformulaType &satformula, std::string item) {
@@ -118,7 +124,6 @@ namespace gpusat {
     TDParser::TDParser(int i, bool b, int i1) {
         combineWidth = i;
         factR = b;
-        maxBag = i1;
     }
 
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType) {
@@ -166,13 +171,13 @@ namespace gpusat {
 
         // remove facts form decomp and formula
         if (factR) {
-            preprocessFacts(ret, formula, gType);
+            Preprocessor::preprocessFacts(ret, formula, gType, defaultWeight);
             if (formula.unsat) {
                 return treedecType();
             }
         }
         // combine small bags
-        preprocessDecomp(&ret.bags[0]);
+        Preprocessor::preprocessDecomp(&ret.bags[0], combineWidth);
         treedecType ret_ = treedecType();
         ret_.numb = 0;
         std::list<preebagType *> bags;
@@ -203,18 +208,6 @@ namespace gpusat {
         }
         ret_.numVars = ret.numVars;
         return ret_;
-    }
-
-    void TDParser::removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID) {
-        for (int b = 0; b < node[id].size(); b++) {
-            if (preID != (node[id][b] - 1)) {
-                removeEdges(node, node[id][b] - 1, id);
-            }
-        }
-        std::vector<cl_long>::iterator it = std::find(node[id].begin(), node[id].end(), preID + 1);
-        if (it != node[id].end()) {
-            node[id].erase(it);
-        }
     }
 
     void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {
@@ -273,202 +266,15 @@ namespace gpusat {
         std::sort(ret.bags[bnum - 1].variables.begin(), ret.bags[bnum - 1].variables.end());
     }
 
-    void TDParser::preprocessDecomp(preebagType *decomp) {
-
-        bool changed = true;
-        // try to merge child nodes
-        while (changed) {
-            changed = false;
-            for (int a = 0; a < decomp->edges.size() && !changed; a++) {
-                for (int b = 0; b < decomp->edges.size() && !changed; b++) {
-                    if (a != b && ((decomp->edges[a]->variables.size() < combineWidth &&
-                                    decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 ||
-                                   decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
-                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->variables.size() + decomp->edges[b]->variables.size()));
-                        std::vector<cl_long>::iterator it;
-                        it = std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(),
-                                            decomp->edges[b]->variables.end(), v.begin());
-                        v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                        if (v.size() < combineWidth || decomp->edges[a]->variables.size() == 0 ||
-                            decomp->edges[b]->variables.size() == 0) {
-                            changed = true;
-                            cl_long cid = decomp->edges[b]->id;
-                            decomp->edges[a]->variables.assign(v.begin(), v.end());
-
-                            std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges[a]->edges.size() + decomp->edges[b]->edges.size()));
-                            std::vector<preebagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(),
-                                                 decomp->edges[b]->edges.end(), v_.begin(), compTreedType);
-                            v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                            decomp->edges[a]->edges.assign(v_.begin(), v_.end());
-                            if (b < decomp->edges.size()) {
-                                decomp->edges.erase(decomp->edges.begin() + b);
-                            }
-                        }
-                    }
-                }
+    void TDParser::removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID) {
+        for (int b = 0; b < node[id].size(); b++) {
+            if (preID != (node[id][b] - 1)) {
+                removeEdges(node, node[id][b] - 1, id);
             }
         }
-
-        changed = true;
-        // try to merge with child nodes
-        if (decomp->variables.size() < combineWidth || decomp->variables.size() == 0) {
-            while (changed) {
-                changed = false;
-                for (int i = 0; i < decomp->edges.size(); i++) {
-                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->variables.size() + decomp->edges[i]->variables.size()));
-                    std::vector<cl_long>::iterator it;
-                    it = std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
-                                        v.begin());
-                    v.resize(static_cast<unsigned long long int>(it - v.begin()));
-                    if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
-                        changed = true;
-                        cl_long cid = decomp->edges[i]->id;
-                        decomp->variables.assign(v.begin(), v.end());
-
-                        std::vector<preebagType *> v_(static_cast<unsigned long long int>(decomp->edges.size() + decomp->edges[i]->edges.size()));
-                        std::vector<preebagType *>::iterator it_;
-                        it_ = std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), v_.begin(),
-                                             compTreedType);
-                        v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                        decomp->edges.clear();
-                        for (int asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
-                            preebagType *&sdggg = v_[asdf];
-                            if (v_[asdf]->id == cid) {
-                                x++;
-                            }
-                            if (x < v_.size()) {
-                                decomp->edges.push_back(v_[x]);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // process child nodes
-        for (int i = 0; i < decomp->edges.size(); i++) {
-            preprocessDecomp((decomp->edges)[i]);
-        }
-
-        for (int i = 0; i < decomp->edges.size(); i++) {
-            std::vector<cl_long> fVars;
-            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
-                                  std::back_inserter(fVars));
-            unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
-            if (numForgetVars >= 4) {
-                preebagType *newEdge = new preebagType;
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
-                fVars.clear();
-                std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(),
-                                    std::back_inserter(fVars));
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 3);
-                newEdge->edges.push_back(decomp->edges[i]);
-                decomp->edges[i] = newEdge;
-                std::sort(newEdge->variables.begin(), newEdge->variables.end());
-            }
-        }
-
-        if (decomp->variables.size() > 61) {
-            std::cout << "ERROR: width > 60";
-            exit(0);
-        }
-
-    }
-
-    void TDParser::preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType) {
-        for (cl_long i = 0; i < formula.facts.size(); i++) {
-            cl_long fact = formula.facts[i];
-            for (cl_long a = 0; a < formula.clauses.size(); a++) {
-                std::vector<cl_long>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
-                if (elem != formula.clauses[a].end()) {
-                    if (*elem == (fact)) {
-                        //remove clause from formula
-                        formula.clauses.erase(formula.clauses.begin() + a);
-                        if (gType == INCIDENCE || (gType == NONE && (formula.numVars + formula.clauses.size() == decomp.numVars))) {
-                            relableDecomp(&decomp.bags[0], a + formula.numVars + 1);
-                            decomp.numVars--;
-                        } else if (gType == DUAL || (gType == NONE && (formula.clauses.size() == decomp.numVars))) {
-                            relableDecomp(&decomp.bags[0], a);
-                            decomp.numVars--;
-                        }
-                        a--;
-                    } else if (*elem == (-fact)) {
-                        if (formula.clauses[a].size() == 1) {
-                            //found contradiction
-                            formula.unsat = true;
-                            return;
-                        } else {
-                            //erase variable from clause
-                            formula.clauses[a].erase(elem);
-                            if (formula.clauses[a].size() == 1 &&
-                                std::find(formula.facts.begin() + i, formula.facts.end(), formula.clauses[a][0]) == formula.facts.end() &&
-                                std::find(formula.facts.begin() + i, formula.facts.end(), -formula.clauses[a][0]) == formula.facts.end()) {
-                                formula.facts.push_back(formula.clauses[a][0]);
-                            }
-                        }
-                    }
-                }
-            }
-            for (int j = i; j < formula.facts.size(); ++j) {
-                if (std::abs(formula.facts[j]) > std::abs(fact)) {
-                    if (formula.facts[j] > 0) {
-                        formula.facts[j]--;
-                    } else if (formula.facts[j] < 0) {
-                        formula.facts[j]++;
-                    }
-                }
-            }
-            if (gType != DUAL && !(gType == NONE && (formula.clauses.size() == decomp.numVars))) {
-                relableDecomp(&decomp.bags[0], std::abs(fact));
-            }
-            decomp.numVars--;
-            if (formula.variableWeights != nullptr) {
-                //make product of removed variable weights
-                if (fact < 0) {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2 + 1];
-                } else {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
-                }
-                formula.numWeights -= 2;
-                for (int j = std::abs(fact); j < formula.numVars; ++j) {
-                    formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
-                    formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
-                }
-            }
-            relableFormula(formula, std::abs(fact));
-            formula.numVars--;
+        std::vector<cl_long>::iterator it = std::find(node[id].begin(), node[id].end(), preID + 1);
+        if (it != node[id].end()) {
+            node[id].erase(it);
         }
     }
-
-
-    void TDParser::relableDecomp(preebagType *decomp, cl_long id) {
-        for (int i = 0; i < decomp->variables.size(); i++) {
-            if (decomp->variables[i] > id) {
-                decomp->variables[i]--;
-            } else if (decomp->variables[i] == id) {
-                decomp->variables.erase(decomp->variables.begin() + i);
-                i--;
-            }
-        }
-        for (int j = 0; j < decomp->edges.size(); ++j) {
-            relableDecomp(decomp->edges[j], id);
-        }
-    }
-
-
-    void TDParser::relableFormula(satformulaType &formula, cl_long id) {
-        for (int i = 0; i < formula.clauses.size(); i++) {
-            for (int j = 0; j < formula.clauses[i].size(); ++j) {
-                if (std::abs(formula.clauses[i][j]) > id) {
-                    if (formula.clauses[i][j] > 0) {
-                        formula.clauses[i][j]--;
-                    } else if (formula.clauses[i][j] < 0) {
-                        formula.clauses[i][j]++;
-                    }
-                }
-            }
-        }
-    }
-
 }

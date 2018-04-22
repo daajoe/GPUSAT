@@ -19,6 +19,8 @@ void d4_add_g(d4_Type *a, __global d4_Type *b, __global d4_Type *ret);
 
 void d4_div(__global d4_Type *a, d4_Type *b, __global d4_Type *ret);
 
+void d4_div_(d4_Type *a, d4_Type *b, d4_Type *ret);
+
 void d4_assign(d4_Type *a, d4_Type *b);
 
 void new_d4(stype d, stype d1, stype d2, stype d3, d4_Type *ret);
@@ -27,58 +29,223 @@ void new_d4_(stype d, stype d1, stype d2, stype d3, __global d4_Type *ret);
 
 void to_d4(stype x, d4_Type *ret);
 
-/**
- * Operation to solve a Introduce node in the decomposition.
- *
- * @param clauses
- *      array containing the clauses in the sat formula
- * @param numVarsC
- *      array containing the number of variables for each clause
- * @param numclauses
- *      the number of clauses
- * @param solutions
- *      array for saving the number of models for each assignment
- * @param numV
- *      the number of variables in the current bag
- * @param edge
- *      the number of models for each assignment of the next bag
- * @param numVE
- *      the number of variables in the next bag
- * @param variables
- *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the next bag
- */
-d4_Type solveIntroduce_(long numV, __global d4_Type *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId,
-                        long startIDEdge, __global d4_Type *weights, long id) {
+typedef struct {
+    long numC;
+    long numCE1;
+    long numCE2;
+    long minId1;
+    long maxId1;
+    long minId2;
+    long maxId2;
+    long startIDNode;
+    long startIDEdge1;
+    long startIDEdge2;
+    long numV;
+    long numVE1;
+    long numVE2;
+} sJVars;
+
+typedef struct {
+    long numCI;
+    long numCE;
+    long numVF;
+    long numVI;
+    long numVE;
+    long combinations;
+    long minIdE;
+    long maxIdE;
+    long startIDF;
+    long startIDE;
+    long numCF;
+} sIFVars;
+
+typedef struct {
+    long numV;
+    long numVE;
+    long minId;
+    long maxId;
+    long numC;
+    long numCE;
+    long startIDEdge;
+    long id;
+} sIVars;
+
+typedef struct {
+    long numC;
+    long numV;
+    long clauseId;
+} cFVars;
+
+
+d4_Type checkFalsifiable(cFVars params,
+                       __global long *clauseVars,
+                       __global long *numVarsC,
+                       __global long *vars) {
+    // iterate through all clauses
+    for (long b = 0; b < params.numV; b++) {
+        int negative = 0, positive = 0;
+        long varNum = 0;
+        long v = vars[b];
+        for (long i = 0; i < params.numC; i++) {
+            if ((params.clauseId >> i) & 1) {
+                // iterate through clause
+                for (long a = 0; a < numVarsC[i]; a++) {
+                    long c = clauseVars[varNum + a];
+                    if (c == v) {
+                        // variable is contained positive in a clause
+                        positive = 1;
+                    }
+                    if (c == -v) {
+                        // variable is contained negative in a clause
+                        negative = 1;
+                    }
+                }
+            }
+            varNum += numVarsC[i];
+        }
+        if (positive == 1 && negative == 1) {
+            d4_Type ret;
+            new_d4(0.0, 0.0, 0.0, 0.0, &ret);
+            return ret;
+        }
+    }
+    d4_Type ret;
+    new_d4(1.0, 0.0, 0.0, 0.0, &ret);
+    return ret;
+}
+
+d4_Type solveIntroduce_(sIVars params,
+                       __global long *clauseIds, __global long *clauseIdsE,
+                       __global long *numVarsC, __global long *numVarsCE,
+                       __global d4_Type *solsE,
+                       __global long *vars, __global long *varsE,
+                       __global long *clauseVars, __global long *clauseVarsE) {
     long otherId = 0;
     long a = 0, b = 0;
-    d4_Type weight;
-    new_d4(1.0, 0.0, 0.0, 0.0, &weight);
-    for (b = 0; b < numVE && a < numV; b++) {
-        while ((variables[a] != edgeVariables[b])) {
+    for (b = 0; b < params.numCE && a < params.numC; b++) {
+        while (clauseIds[a] != clauseIdsE[b]) {
             a++;
         }
-        otherId = otherId | (((id >> a) & 1) << b);
+        otherId = otherId | (((params.id >> a) & 1) << b);
         a++;
     };
 
-    //weighted model count
-    if (weights != 0) {
-        for (b = 0, a = 0; a < numV; a++) {
-            if (edgeVariables == 0 || (variables[a] != edgeVariables[b])) {
-                d4_mul_w(&weight, &weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1], &weight);
-            }
-            if (edgeVariables != 0 && (variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
+    if (solsE != 0 && otherId >= (params.minId) && otherId < (params.maxId)) {
+        int a = 0;
+        d4_Type tmp = solsE[otherId - (params.startIDEdge)];
+        for (int b = 0; a < params.numC; a++) {
+            while (b < params.numCE && a < params.numC && clauseIds[a] == clauseIdsE[b]) {
                 b++;
+                a++;
             }
-        }
-    }
+            if (a < params.numC && (b >= params.numCE || clauseIds[a] != clauseIdsE[b])) {
+                if ((params.id >> a) & 1) {
+                    //|var(C) /\ (var(x(t'))\var(A\{C}))|
+                    long startIDC = 0;
+                    for (int i = 0; i < a; ++i) {
+                        startIDC += numVarsC[i];
+                    }
+                    long exponent = 0;
+                    //var(C)
+                    for (int j = 0; j < numVarsC[a]; ++j) {
+                        long var = abs(clauseVars[j + startIDC]);
+                        int found = 0;
+                        int subfound = 0;
+                        //var(x(t'))
+                        for (int k = 0; k < params.numVE; ++k) {
+                            if (var == varsE[k]) {
+                                found = 1;
+                            }
+                        }
+                        long startClauses = 0;
+                        for (int k = 0; k < a; ++k) {
+                            for (int i = 0; i < numVarsC[k]; ++i) {
+                                if (var == abs(clauseVars[i + startClauses])) {
+                                    found = 1;
+                                }
+                            }
+                            startClauses += numVarsC[k];
+                        }
+                        //var(A\{C})
+                        long startIDCE = 0;
+                        for (int i = 0; i < params.numCE; ++i) {
+                            if ((otherId >> i) & 1) {
+                                for (int l = 0; l < numVarsCE[i]; ++l) {
+                                    if (var == abs(clauseVarsE[l + startIDCE])) {
+                                        subfound = 1;
+                                    }
+                                }
+                                if (subfound == 1) {
+                                }
+                            }
+                            startIDCE += numVarsCE[i];
+                        }
 
-    if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
-        d4_mul_w(&weight, &edge[otherId - (startIDEdge)], &weight);
-        return weight;
-    } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
+                        startClauses = 0;
+                        for (int k = 0; k < a; ++k) {
+                            if ((params.id >> k) & 1) {
+                                for (int i = 0; i < numVarsC[k]; ++i) {
+                                    if (var == abs(clauseVars[i + startClauses])) {
+                                        subfound = 1;
+                                    }
+                                }
+                            }
+                            startClauses += numVarsC[k];
+                        }
+
+                        if (found == 1 && subfound == 0) {
+                            ++exponent;
+                        }
+                    }
+                    d4_Type ret;
+                    new_d4( 1 << exponent, 0.0, 0.0, 0.0, &ret);
+                    d4_div_(&tmp,&ret,&tmp);
+                } else {
+                    //|var(C)\var(x(t'))|
+                    long startIDC = 0;
+                    for (int i = 0; i < a; ++i) {
+                        startIDC += numVarsC[i];
+                    }
+                    long exponent = 0;
+                    for (int j = 0; j < numVarsC[a]; ++j) {
+                        long found = 0;
+                        long varNum = 0;
+                        long var = abs(clauseVars[j + startIDC]);
+                        //var(x(t'))
+                        for (int l = 0; l < params.numVE; ++l) {
+                            if (var == varsE[l]) {
+                                found = 1;
+                            }
+                        }
+                        long startClauses = 0;
+                        for (int k = 0; k < a; ++k) {
+                            for (int i = 0; i < numVarsC[k]; ++i) {
+                                if (var == abs(clauseVars[i + startClauses])) {
+                                    found = 1;
+                                }
+                            }
+                            startClauses += numVarsC[k];
+                        }
+                        if (found == 0) {
+                            ++exponent;
+                        }
+                    }
+                    d4_Type ret;
+                    new_d4( 1 << exponent, 0.0, 0.0, 0.0, &ret);
+                    d4_mul_w_(&ret,&tmp,&tmp);
+                }
+            }
+        };
+        if (tmp.x[0] > 0.0) {
+            cFVars cFparams;
+            cFparams.clauseId = params.id;
+            cFparams.numC = params.numC;
+            cFparams.numV = params.numV;
+            d4_Type ret=checkFalsifiable(cFparams, clauseVars, numVarsC, vars);
+            d4_mul_w_(&ret,&tmp,&tmp);
+        }
+        return tmp;
+    } else if (solsE == 0 && otherId >= (params.minId) && otherId < (params.maxId)) {
         d4_Type ret;
         new_d4(0.0, 0.0, 0.0, 0.0, &ret);
         return ret;
@@ -89,257 +256,199 @@ d4_Type solveIntroduce_(long numV, __global d4_Type *edge, long numVE, __global 
     }
 }
 
-/**
- * Operation to check if an assignment satisfies the clauses of a SAT formula.
- *
- * @param clauses
- *      the clauses in the SAT formula
- * @param numVarsC
- *      array containing the number of Variables in each clause
- * @param numclauses
- *      the number of clauses in the sat formula
- * @param id
- *      the id of the thread - used to get the variable assignment
- * @param numV
- *      the number of variables
- * @param variables
- *      a vector containing the ids of the variables
- * @return
- *      1 - if the assignment satisfies the formula
- *      0 - if the assignment doesn't satisfy the formula
- */
-int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
-    long i, varNum = 0;
-    long satC = 0, a, b;
-    // iterate through all clauses
-    for (i = 0; i < numclauses; i++) {
-        satC = 0;
-        // iterate through clause variables
-        for (a = 0; a < numVarsC[i] && !satC; a++) {
-            satC = 1;
-            //check current variables
-            for (b = 0; b < numV; b++) {
-                // check if clause is satisfied
-                if ((clauses[varNum + a] == variables[b]) ||
-                    (clauses[varNum + a] == -variables[b])) {
-                    satC = 0;
-                    if (clauses[varNum + a] < 0) {
-                        //clause contains negative var and var is assigned negative
-                        if ((id & (1 << (b))) == 0) {
-                            satC = 1;
-                            break;
-                        }
-                    } else {
-                        //clause contains positive var and var is assigned positive
-                        if ((id & (1 << (b))) > 0) {
-                            satC = 1;
-                            break;
+
+__kernel void solveJoin(sJVars params,
+                        __global d4_Type *sol, __global d4_Type *solE1, __global d4_Type *solE2,
+                        __global int *sols,
+                        __global long *clauseVars,
+                        __global long *clauseIds, __global long *clauseIdsE1, __global long *clauseIdsE2,
+                        __global long *numVarsC,
+                        __global long *variables, __global long *varsE1, __global long *varsE2,
+                        __global long *numVarsCE1, __global long *numVarsCE2,
+                        __global long *clauseVarsE1, __global long *clauseVarsE2) {
+    long id = get_global_id(0);
+    d4_Type tmp, tmp_;
+    new_d4(-1.0, 0.0, 0.0, 0.0, &tmp);
+    new_d4(-1.0, 0.0, 0.0, 0.0, &tmp_);
+    long otherId = 0;
+    // get solution count from first edge
+    sIVars iparams1;
+    iparams1.numV = params.numV;
+    iparams1.numVE = params.numVE1;
+    iparams1.minId = params.minId1;
+    iparams1.maxId = params.maxId1;
+    iparams1.numC = params.numC;
+    iparams1.numCE = params.numCE1;
+    iparams1.startIDEdge = params.startIDEdge1;
+    iparams1.id = id;
+    tmp = solveIntroduce_(iparams1, clauseIds, clauseIdsE1, numVarsC, numVarsCE1, solE1, variables, varsE1, clauseVars, clauseVarsE1);
+    // get solution count from second edge
+    sIVars iparams2;
+    iparams2.numV = params.numV;
+    iparams2.numVE = params.numVE2;
+    iparams2.minId = params.minId2;
+    iparams2.maxId = params.maxId2;
+    iparams2.numC = params.numC;
+    iparams2.numCE = params.numCE2;
+    iparams2.startIDEdge = params.startIDEdge2;
+    iparams2.id = id;
+    tmp_ = solveIntroduce_(iparams2, clauseIds, clauseIdsE2, numVarsC, numVarsCE2, solE2, variables, varsE2, clauseVars, clauseVarsE2);
+    // we have some solutions in edge1
+
+    if (tmp.x[0] >= 0.0) {
+        // |var(x(t))\var(A)|
+        long exponent = 0;
+        for (int j = 0; j < params.numV; ++j) {
+            int found = 0;
+            long varNum = 0;
+            for (int i = 0; i < params.numC; i++) {
+                if (((id >> i) & 1) == 1) {
+                    for (int a = 0; a < numVarsC[i]; a++) {
+                        if (variables[j] == abs(clauseVars[varNum + a])) {
+                            found = 1;
                         }
                     }
                 }
+                varNum += numVarsC[i];
             }
-        }
-        varNum += numVarsC[i];
-        // we have an unsattisifed clause
-        if (!satC) {
-            return 0;
-        }
-    }
-    return 1;
-}
+            if (found == 0) {
+                exponent++;
+            }
 
-/**
- * Operation to solve a Join node in the decomposition.
- *
- * @param solutions
- *      array to save the number of solutions of the join
- * @param edge1
- *      array containing the number of solutions in the first edge
- * @param edge2
- *      array containing the number of solutions in the second edge
- * @param variables
- *      the variables in the join bag
- * @param edgeVariables1
- *      the variables in the bag of the first edge
- * @param edgeVariables2
- *      the variables in the bag of the second edge
- * @param numV
- *      the number of variables in the join bag
- * @param numVE1
- *      the number of variables in the first edge
- * @param numVE2
- *      the number of variables in the second edge
- */
-__kernel void solveJoin(__global d4_Type *solutions, __global d4_Type *edge1, __global d4_Type *edge2, __global long *variables, __global long *edgeVariables1,
-                        __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global d4_Type *weights, __global int *sols) {
-    long id = get_global_id(0);
-    d4_Type tmp, tmp_;
-    d4_Type weight;
-    new_d4(1.0, 0.0, 0.0, 0.0, &weight);
-    new_d4(-1.0, 0.0, 0.0, 0.0, &tmp);
-    new_d4(-1.0, 0.0, 0.0, 0.0, &tmp_);
-// get solution count from first edge
-    tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, startIDEdge1, weights, id);
-// get solution count from second edge
-    tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, startIDEdge2, weights, id);
-// weighted model count
-    if (weights != 0) {
-        for (int a = 0; a < numV; a++) {
-            d4_mul_w(&weight, &weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1], &weight);
         }
+        d4_Type ret;
+        new_d4( 1 << exponent, 0.0, 0.0, 0.0, &ret);
+        d4_div_(&tmp,&ret,&tmp);
+        d4_mul(&tmp,&sol[id - (params.startIDNode)] ,&sol[id - (params.startIDNode)] );
+
     }
 
-// we have some solutions in edge1
-    if (tmp.x[0] >= 0.0) {
-        d4_mul(&tmp, &solutions[id - (startIDNode)], &solutions[id - (startIDNode)]);
-        d4_div(&solutions[id - (startIDNode)], &weight, &solutions[id - (startIDNode)]);
-    }
-
-// we have some solutions in edge2
+    // we have some solutions in edge2
     if (tmp_.x[0] >= 0.0) {
-        d4_mul(&tmp_, &solutions[id - (startIDNode)], &solutions[id - (startIDNode)]);
+        d4_mul(&tmp_,&sol[id - (params.startIDNode)] ,&sol[id - (params.startIDNode)] );
     }
-
-    if (solutions[id - (startIDNode)].x[0] > 0) {
+    if (sol[id - (params.startIDNode)].x[0] > 0) {
         *sols = 1;
     }
 }
 
-/**
- * Operation to solve a Introduce node in the decomposition.
- *
- * @param clauses
- *      array containing the clauses in the sat formula
- * @param numVarsC
- *      array containing the number of variables for each clause
- * @param numclauses
- *      the number of clauses
- * @param solutions
- *      array for saving the number of models for each assignment
- * @param numV
- *      the number of variables in the current bag
- * @param edge
- *      the number of models for each assignment of the next bag
- * @param numVE
- *      the number of variables in the next bag
- * @param variables
- *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the next bag
- */
-d4_Type solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global d4_Type *edge, long numVE,
-                        __global long *variables, __global long *edgeVariables, long minId, long maxId,
-                        long startIDEdge, __global d4_Type *weights, long id) {
+d4_Type solveIntroduceF(sIVars params,
+                      __global long *clauseIds, __global long *clauseIdsE,
+                      __global long *numVarsC, __global long *numVarsCE,
+                      __global d4_Type *edge,
+                      __global long *vars, __global long *varsE,
+                      __global long *clauseVars, __global long *clauseVarsE) {
     d4_Type tmp;
     if (edge != 0) {
-// get solutions count edge
-        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, startIDEdge, weights, id);
+        // get solutions count edge
+        sIVars iparams1;
+        iparams1.numC = params.numC;
+        iparams1.numCE = params.numCE;
+        iparams1.minId = params.minId;
+        iparams1.maxId = params.maxId;
+        iparams1.startIDEdge = params.startIDEdge;
+        iparams1.id = params.id;
+        iparams1.numV = params.numV;
+        iparams1.numVE = params.numVE;
+        tmp = solveIntroduce_(params, clauseIds, clauseIdsE, numVarsC, numVarsCE, edge, vars, varsE, clauseVars, clauseVarsE);
     } else {
-// no edge - solve leaf
-        new_d4(1.0, 0.0, 0.0, 0.0, &tmp);
-
-//weighted model count
-        if (weights != 0) {
-            for (int i = 0; i < numV; i++) {
-                d4_mul_w(&tmp, &weights[((id >> i) & 1) > 0 ? variables[i] * 2 : variables[i] * 2 + 1], &tmp);
+        // no edge - solve leaf
+        long exponent = 0;
+        for (int j = 0; j < params.numV; ++j) {
+            int found = 0;
+            long varNum = 0;
+            for (int i = 0; i < params.numC; i++) {
+                if (((params.id >> i) & 1) == 1) {
+                    for (int a = 0; a < numVarsC[i]; a++) {
+                        if (vars[j] == abs(clauseVars[varNum + a])) {
+                            found = 1;
+                        }
+                    }
+                }
+                varNum += numVarsC[i];
             }
+            if (found == 0) {
+                exponent++;
+            }
+
         }
+        new_d4(1 << exponent,0.0,0.0,0.0,&tmp);
+        cFVars cFparams;
+        cFparams.clauseId = params.id;
+        cFparams.numC = params.numC;
+        cFparams.numV = params.numV;
+        d4_Type tmp2 =checkFalsifiable(cFparams, clauseVars, numVarsC, vars);
+        d4_mul_w_(&tmp,&tmp2,&tmp);
     }
-    if (tmp.x[0] > 0.0) {
-// check if assignment satisfies the given clauses
-        int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
-        if (sat != 1) {
-            d4_Type ret;
-new_d4(0.0, 0.0, 0.0, 0.0, &ret);
-            return ret;
-        } else {
-            return tmp;
-        }
-    } else {
-        d4_Type ret;
-new_d4(0.0, 0.0, 0.0, 0.0, &ret);
-        return ret;
-    }
+    return tmp;
 }
 
-
-/**
- * Operation to solve a Forget node in the decomposition.
- *
- * @param solutions
- *      array for saving the number of models for each assignment
- * @param variablesCurrent
- *      array containing the ids of the variables in the current bag
- * @param edge
- *      array containing the solutions in the last node
- * @param numVarsEdge
- *      number of variables in the edge bag
- * @param variablesEdge
- *      array containing the ids of the variables in the next bag
- * @param combinations
- *      the number of solutions that relate to this bag from the next bag
- * @param numVarsCurrent
- *      number of variables in the current bag
- * @param clauses
- *      array containing the clauses in the sat formula
- * @param numVarsC
- *      array containing the number of variables for each clause
- * @param numclauses
- *      the number of clauses
- * @param solutions
- *      array for saving the number of models for each assignment
- * @param numV
- *      the number of variables in the current bag
- * @param edge
- *      the number of models for each assignment of the next bag
- * @param numVE
- *      the number of variables in the next bag
- * @param variables
- *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the next bag
- */
-__kernel void solveIntroduceForget(__global d4_Type *solsF, __global long *varsF, __global d4_Type *solsE,
-                                   long numVE, __global long *varsE, long combinations, long numVF,
-                                   long minIdE, long maxIdE, long startIDF,
-                                   long startIDE, __global int *sols,
-                                   long numVI, __global long *varsI,
-                                   __global long *clauses, __global long *numVarsC, long numclauses, __global d4_Type *weights) {
+__kernel void
+solveIntroduceForget(sIFVars params,
+                     __global d4_Type *solsF, __global d4_Type *solsE,
+                     __global long *clauseIdsF, __global long *clauseIdsI, __global long *clauseIdsE,
+                     __global long *varsF, __global long *varsE, __global long *varsI,
+                     __global int *sols,
+                     __global long *numVarsCE, __global long *numVarsCI,
+                     __global long *clauseVarsI, __global long *clauseVarsE) {
     long id = get_global_id(0);
-    if (numVI != numVF) {
+    if (params.numCI != params.numCF) {
         long templateId = 0;
         // generate templateId
-        for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
-            if (varsI[i] == varsF[a]) {
+        for (int i = 0, a = 0; i < params.numCI && a < params.numCF; i++) {
+            if (clauseIdsI[i] == clauseIdsF[a]) {
                 templateId = templateId | (((id >> a) & 1) << i);
                 a++;
             }
         }
-
-        // iterate through all corresponding edge solutions
-        for (int i = 0; i < combinations; i++) {
+        for (int i = 0; i < params.combinations; ++i) {
             long b = 0, otherId = templateId;
-            for (int a = 0; a < numVI; a++) {
-                if (b >= numVF || varsI[a] != varsF[b]) {
+            for (int a = 0; a < params.numCI; a++) {
+                if (b >= params.numCF || clauseIdsI[a] != clauseIdsF[b]) {
                     otherId = otherId | (((i >> (a - b)) & 1) << a);
                 } else {
                     b++;
                 }
             }
             // get solution count of the corresponding assignment in the edge
-            d4_Type tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId);
-            d4_add_g(&tmp, &solsF[id - (startIDF)], &solsF[id - (startIDF)]);
+            sIVars iparams;
+            iparams.numV = params.numVI;
+            iparams.numVE = params.numVE;
+            iparams.minId = params.minIdE;
+            iparams.maxId = params.maxIdE;
+            iparams.numC = params.numCI;
+            iparams.numCE = params.numCE;
+            iparams.startIDEdge = params.startIDE;
+            iparams.id = otherId;
+            d4_Type tmp = solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE);
+            if (tmp.x[0] > 0) {
+                d4_Type ret;
+                new_d4((1 - ((popcount(i) % 2 == 1) * 2)), 0.0, 0.0, 0.0, &ret);
+                d4_mul_w_(&tmp,&ret,&tmp);
+                d4_add_g(&tmp, &solsF[id - (params.startIDF)], &solsF[id - (params.startIDF)]);
+            }
         }
     } else {
         // no forget variables, only introduce
-        d4_Type tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id);
-        d4_add_g(&tmp, &solsF[id - (startIDF)], &solsF[id - (startIDF)]);
+        sIVars iparams;
+        iparams.numV = params.numVI;
+        iparams.numVE = params.numVE;
+        iparams.minId = params.minIdE;
+        iparams.maxId = params.maxIdE;
+        iparams.numC = params.numCI;
+        iparams.numCE = params.numCE;
+        iparams.startIDEdge = params.startIDE;
+        iparams.id = id;
+        d4_Type tmp = solveIntroduceF(iparams, clauseIdsI, clauseIdsE, numVarsCI, numVarsCE, solsE, varsI, varsE, clauseVarsI, clauseVarsE);
+        if (tmp.x[0] > 0) {
+            d4_add_g(&tmp, &solsF[id - (params.startIDF)], &solsF[id - (params.startIDF)]);
+        }
     }
-    if (solsF[id - (startIDF)].x[0] > 0) {
+    if (solsF[id - (params.startIDF)].x[0] > 0) {
         *sols = 1;
     }
 }
+
 
 /**
  * adaptation of https://github.com/scibuilder/QD for opencl
@@ -928,6 +1037,38 @@ void d4_div(__global d4_Type *a, d4_Type *b, __global d4_Type *ret) {
     d4_renorm_(&q0, &q1, &q2, &q3, &q4);
 
     new_d4_(q0, q1, q2, q3, ret);
+}
+
+void d4_div_(d4_Type *a, d4_Type *b, d4_Type *ret) {
+    stype q0, q1, q2, q3;
+
+    d4_Type r, tmp, tmp_a;
+
+    q0 = a->x[0] / b->x[0];
+    tmp_a.x[0] = a->x[0];
+    tmp_a.x[1] = a->x[1];
+    tmp_a.x[2] = a->x[2];
+    tmp_a.x[3] = a->x[3];
+    d4_mul_qd_d(b, q0, &tmp);
+    d4_minus(&tmp_a, &tmp, &r);
+
+    q1 = r.x[0] / b->x[0];
+    d4_mul_qd_d(b, q1, &tmp);
+    d4_minus(&r, &tmp, &r);
+
+    q2 = r.x[0] / b->x[0];
+    d4_mul_qd_d(b, q2, &tmp);
+    d4_minus(&r, &tmp, &r);
+
+    q3 = r.x[0] / b->x[0];
+    d4_mul_qd_d(b, q3, &tmp);
+    d4_minus(&r, &tmp, &r);
+
+    stype q4 = r.x[0] / b->x[0];
+
+    d4_renorm_(&q0, &q1, &q2, &q3, &q4);
+
+    new_d4(q0, q1, q2, q3, ret);
 }
 
 void d4_assign(d4_Type *a, d4_Type *b) {

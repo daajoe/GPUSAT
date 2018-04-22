@@ -10,26 +10,26 @@
 namespace gpusat {
     class Solver {
     protected:
-        std::vector<cl::Platform> &platforms;
+        std::vector<cl::Platform> &platforms; //TODO remove
         cl::Context &context;
-        std::vector<cl::Device> &devices;
+        std::vector<cl::Device> &devices; //TODO remove
         cl::CommandQueue &queue;
         cl::Program &program;
-        cl::Kernel &kernel;
+        cl::Kernel &kernel; //TODO remove
         //max with before splitting the bags
         cl_long maxWidth;
-        cl_long inci;
-        graphTypes graph;
+        cl_long inci; //TODO remove
+        graphTypes graph; //TODO remove
 
     public:
         cl_long isSat = 1;
-        cl_long getStats = 1;
+        cl_long getStats = 1; //TODO remove
         cl_long numJoin = 0;
-        cl_long numIntroduce = 0;
-        cl_long numForget = 0;
-        cl_long numLeafs = 0;
-        std::vector<cl_long> numHoldPaths;
-        std::vector<cl_long> numSolPaths;
+        cl_long numIntroduce = 0; //TODO remove
+        cl_long numIntroduceForget = 0;
+        cl_long numLeafs = 0; //TODO remove
+        std::vector<cl_long> numHoldPaths; //TODO remove
+        std::vector<cl_long> numSolPaths; //TODO remove
 
         Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
                cl::Kernel &kernel_, int width, bool incidence, int getStats) : platforms(platforms_), context(context_), devices(devices_), queue(queue_),

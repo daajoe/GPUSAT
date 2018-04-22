@@ -176,6 +176,14 @@ namespace gpusat {
         return d4_mul(a, b);
     }
 
+    inline d4_Type operator*(cl_double a, d4_Type b) {
+        return d4_Type(a) * b;
+    }
+
+    inline d4_Type operator*(d4_Type a, cl_double b) {
+        return d4_Type(b) * a;
+    }
+
     inline d4_Type operator/(d4_Type a, d4_Type b) {
         return d4_div(a, b);
     }

@@ -37,6 +37,8 @@ namespace gpusat {
         void parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights);
 
         bool wmc;
+
+        void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
     };
 
     class TDParser {
@@ -54,6 +56,7 @@ namespace gpusat {
         treedecType parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType);
 
         solType defaultWeight = 1.0;
+        int combineWidth;
 
     private:
         /**
@@ -88,26 +91,9 @@ namespace gpusat {
          */
         void parseBagLine(preetreedecType &ret, std::string item);
 
-        /**
-         * preprocess the tree decomposition
-         *
-         * @param decomp
-         *      the tree decomposition
-         */
-        void preprocessDecomp(preebagType *decomp);
-
-        int combineWidth;
-
-        void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
-
-        void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType);
-
-        void relableDecomp(preebagType *decomp, cl_long id);
-
-        void relableFormula(satformulaType &formula, cl_long id);
+        static void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
 
         bool factR;
-        int maxBag;
     };
 }
 #endif //GPUSAT_PARSER_H

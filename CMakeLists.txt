@@ -33,10 +33,6 @@ else ()
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 endif ()
 
-if (WIN32)
-    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
-endif ()
-
 file(GLOB gpusat_SRC "src/*.cpp")
 add_executable(gpusat ${gpusat_SRC})
-target_link_libraries(gpusat OpenCL quadmath)
+target_link_libraries(gpusat OpenCL)
