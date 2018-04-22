@@ -320,12 +320,12 @@ int main(int argc, char *argv[]) {
                     }
                 }
             }
-            /*if (!weighted && graph != DUAL) {
+            if (!weighted && graph != DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);
             } else if (graph != DUAL) {
                 sols = sols * tdParser.defaultWeight;
-            }*/
+            }
 
             if (graph == DUAL) {
                 std::set<cl_long> varSet;
