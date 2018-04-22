@@ -4,9 +4,6 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
-#include <d4_utils.h>
-#include <gpusautils.h>
-#include <unordered_map>
 
 namespace gpusat {
 
@@ -65,12 +62,12 @@ namespace gpusat {
                 std::unordered_map<cl_long, solType>::const_iterator elem = weights.find(i);
                 if (elem != weights.end()) {
                     solType we = weights[i];
-                    if (we < 0) {
+                    if (we < 0.0) {
                         ret.variableWeights[i * 2] = 1;
                         ret.variableWeights[i * 2 + 1] = 1;
                     } else {
                         ret.variableWeights[i * 2] = weights[i];
-                        ret.variableWeights[i * 2 + 1] = 1 - weights[i];
+                        ret.variableWeights[i * 2 + 1] = 1.0 - weights[i];
                     }
                 } else {
                     ret.variableWeights[i * 2] = 0.5;
@@ -118,12 +115,13 @@ namespace gpusat {
         wmc = weighted;
     }
 
-    TDParser::TDParser(int i, bool b) {
+    TDParser::TDParser(int i, bool b, int i1) {
         combineWidth = i;
         factR = b;
+        maxBag = i1;
     }
 
-    treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
+    treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType) {
         preetreedecType ret = preetreedecType();
         std::stringstream ss(graph);
         std::string item;
@@ -168,7 +166,7 @@ namespace gpusat {
 
         // remove facts form decomp and formula
         if (factR) {
-            preprocessFacts(ret, formula);
+            preprocessFacts(ret, formula, gType);
             if (formula.unsat) {
                 return treedecType();
             }
@@ -352,26 +350,56 @@ namespace gpusat {
         for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i]);
         }
+
+        for (int i = 0; i < decomp->edges.size(); i++) {
+            std::vector<cl_long> fVars;
+            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
+                                  std::back_inserter(fVars));
+            unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
+            if (numForgetVars >= 4) {
+                preebagType *newEdge = new preebagType;
+                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
+                fVars.clear();
+                std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(),
+                                    std::back_inserter(fVars));
+                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 3);
+                newEdge->edges.push_back(decomp->edges[i]);
+                decomp->edges[i] = newEdge;
+                std::sort(newEdge->variables.begin(), newEdge->variables.end());
+            }
+        }
+
+        if (decomp->variables.size() > 61) {
+            std::cout << "ERROR: width > 60";
+            exit(0);
+        }
+
     }
 
-    void TDParser::preprocessFacts(preetreedecType &decomp, satformulaType &formula) {
+    void TDParser::preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType) {
         for (cl_long i = 0; i < formula.facts.size(); i++) {
             cl_long fact = formula.facts[i];
             for (cl_long a = 0; a < formula.clauses.size(); a++) {
                 std::vector<cl_long>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
                 if (elem != formula.clauses[a].end()) {
                     if (*elem == (fact)) {
+                        //remove clause from formula
                         formula.clauses.erase(formula.clauses.begin() + a);
-                        if (decomp.numVars > formula.numVars) {
+                        if (gType == INCIDENCE || (gType == NONE && (formula.numVars + formula.clauses.size() == decomp.numVars))) {
                             relableDecomp(&decomp.bags[0], a + formula.numVars + 1);
+                            decomp.numVars--;
+                        } else if (gType == DUAL || (gType == NONE && (formula.clauses.size() == decomp.numVars))) {
+                            relableDecomp(&decomp.bags[0], a);
                             decomp.numVars--;
                         }
                         a--;
                     } else if (*elem == (-fact)) {
                         if (formula.clauses[a].size() == 1) {
+                            //found contradiction
                             formula.unsat = true;
                             return;
                         } else {
+                            //erase variable from clause
                             formula.clauses[a].erase(elem);
                             if (formula.clauses[a].size() == 1 &&
                                 std::find(formula.facts.begin() + i, formula.facts.end(), formula.clauses[a][0]) == formula.facts.end() &&
@@ -391,9 +419,12 @@ namespace gpusat {
                     }
                 }
             }
-            relableDecomp(&decomp.bags[0], std::abs(fact));
+            if (gType != DUAL && !(gType == NONE && (formula.clauses.size() == decomp.numVars))) {
+                relableDecomp(&decomp.bags[0], std::abs(fact));
+            }
             decomp.numVars--;
             if (formula.variableWeights != nullptr) {
+                //make product of removed variable weights
                 if (fact < 0) {
                     defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2 + 1];
                 } else {

@@ -1,7 +1,5 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define stype double
-//#define __global
-//#define __kernel
 
 typedef struct {
     stype x[4];
@@ -74,7 +72,7 @@ __kernel void solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __globa
     unsigned long mask = id & (((unsigned long) exp2((double) numClauses)) - 1);
     unsigned long templateID = id >> numClauses << numClauses;
     d4_Type tmpSol;
-    new_d4(0.0,0.0,0.0,0.0,&tmpSol);
+new_d4(0.0, 0.0, 0.0, 0.0, &tmpSol);
     //sum up the solution count for all subsets of Clauses (A1,A2) where the intersection of A1 and A2 = A
     for (; start2 < (combinations - 1) && e2Sol[(templateID | start2) - (startIDe2)].x[0] == 0; start2++);
     for (; end2 > 0 && e2Sol[(templateID | end2) - (startIDe2)].x[0] == 0; end2--);
@@ -92,7 +90,7 @@ __kernel void solveJoin(__global d4_Type *nSol, __global d4_Type *e1Sol, __globa
     if (tmpSol.x[0] != 0.0) {
         if (weights != 0) {
             d4_Type weight;
-            new_d4(1.0,0.0,0.0,0.0,&weight);
+new_d4(1.0, 0.0, 0.0, 0.0, &weight);
             unsigned long assignment = id >> numClauses;
             for (int a = 0; nVars[a] != 0; a++) {
                 d4_mul_w(&weight, &weights[((assignment >> a) & 1) > 0 ? nVars[a] * 2 : nVars[a] * 2 + 1], &weight);
@@ -162,7 +160,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
             if (nClauses[a] == eClauses[b]) {
                 b++;
             } else if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
-                new_d4_(0.0,0.0,0.0,0.0,&nSol[id - startIDn]);
+new_d4_(0.0, 0.0, 0.0, 0.0, &nSol[id - startIDn]);
                 return;
             }
             a++;
@@ -181,7 +179,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
         } else {
             for (a = 0; a < numNV; a++) {
                 if ((((id >> c) & 1) == 0) && (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
-                    new_d4_(0.0,0.0,0.0,0.0,&nSol[id - startIDn]);
+new_d4_(0.0, 0.0, 0.0, 0.0, &nSol[id - startIDn]);
                     return;
                 }
                 if ((baseSum == 0) && (nClauses[c] == eClauses[d]) && (((id >> c) & 1) == 1) &&
@@ -213,7 +211,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
     d4_Type weight;
-    new_d4(1.0,0.0,0.0,0.0,&weight);
+new_d4(1.0, 0.0, 0.0, 0.0, &weight);
 
     if (weights != 0) {
         for (b = 0, a = 0; nVars[a] != 0; a++) {
@@ -226,7 +224,7 @@ __kernel void solveIntroduce(__global d4_Type *nSol, __global d4_Type *eSol,
         }
     }
     d4_Type tmp;
-    new_d4(0.0,0.0,0.0,0.0,&tmp);
+new_d4(0.0, 0.0, 0.0, 0.0, &tmp);
     if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -340,7 +338,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
                 b++;
             } else if (isNotSat(assignment, &clauses[i], nVars) == ((id >> a) & 1)) {
                 d4_Type tmp;
-                new_d4(0.0,0.0,0.0,0.0,&tmp);
+new_d4(0.0, 0.0, 0.0, 0.0, &tmp);
                 return tmp;
             }
             a++;
@@ -360,7 +358,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
             for (a = 0; a < numNV; a++) {
                 if ((((id >> c) & 1) == 0) && (clauses[i] == nVars[a] * (((assignment >> a) & 1) > 0 ? 1 : -1))) {
                     d4_Type tmp;
-                    new_d4(0.0,0.0,0.0,0.0,&tmp);
+new_d4(0.0, 0.0, 0.0, 0.0, &tmp);
                     return tmp;
                 }
                 if ((baseSum == 0) && (nClauses[c] == eClauses[d]) && (((id >> c) & 1) == 1) &&
@@ -392,7 +390,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
     unsigned long otherID = templateID, nc = 0, ec = 0, x = 0, index = 0, rec;
 
     d4_Type weight;
-    new_d4(1.0,0.0,0.0,0.0,&weight);
+new_d4(1.0, 0.0, 0.0, 0.0, &weight);
 
     if (weights != 0) {
         for (b = 0, a = 0; nVars[a] != 0; a++) {
@@ -405,7 +403,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
         }
     }
     d4_Type tmp;
-    new_d4(0.0,0.0,0.0,0.0,&tmp);
+new_d4(0.0, 0.0, 0.0, 0.0, &tmp);
     if (numNV != numEV) {
         for (i = 0, c = 0; i < combinations; i++) {
             otherID = templateID;
@@ -438,7 +436,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
                     d4_add1(&tmp, &eSol[otherID - startIDe], &tmp);
                 } else {
                     d4_Type one;
-                    new_d4(1.0,0.0,0.0,0.0,&one);
+new_d4(1.0, 0.0, 0.0, 0.0, &one);
                     d4_add_(&tmp, &one, &tmp);
                 }
             }
@@ -449,7 +447,7 @@ d4_Type solveIntroduceF(__global d4_Type *eSol,
                 d4_add1(&tmp, &eSol[otherID - startIDe], &tmp);
             } else {
                 d4_Type one;
-                new_d4(1.0,0.0,0.0,0.0,&one);
+new_d4(1.0, 0.0, 0.0, 0.0, &one);
                 d4_add_(&tmp, &one, &tmp);
             }
         }

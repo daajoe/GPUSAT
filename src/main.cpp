@@ -3,7 +3,6 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
-#include <getopt.h>
 #include <regex>
 #include <math.h>
 #include <chrono>
@@ -13,135 +12,69 @@
 #include <sys/stat.h>
 #include <numeric>
 #include <solver.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <CLI11.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
-#ifdef sType_Double
-
-#include <double_kernel.h>
-
-#else
-
-#include <d4_kernel.h>
-#include <d4_utils.h>
-
-#endif
-
-extern "C" {
-#include <quadmath.h>
+cl_long popcount(cl_long x) {
+    x -= (x >> 1) & 0x5555555555555555;
+    x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
+    return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f) * 0x0101010101010101) >> 56;
 }
 
 using namespace gpusat;
 
 long long int getTime();
 
-void printUsage(char *argv[]) {
-    std::cout << "Usage: \n" << argv[0] << "\n"
-              << "    --decomposition,-f <treedecomp> : <treedecomp> path to the file containing the tree decomposition\n"
-              << "    --formula,-s <formula>          : <formula> path to the file containing the sat formula\n"
-              << "    --combineWidth,-w <width>       : <width> maximum width to combine bags of the decomposition\n"
-              << "    --maxBagSize,-m <size>          : <size> maximum size of a bag before splitting it\n"
-              << "    --help,-h                       : prints this message\n"
-              << "    --weighted                      : calculates the weighted model count of the formula\n";
-}
-
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
     std::stringbuf treeD, sat;
     std::string inputLine;
-    bool file = false, formula = false;
-    int opt, combineWidth = 12, maxBag = 22;
-    graphTypes graph = INCIDENCE;
-    cl_long getStats = 0;
-    bool factR = true;
-    bool cpu = false;
-    bool weighted = false;
-    static struct option flags[] = {
-            {"formula",       required_argument, 0, 's'},
-            {"decomposition", required_argument, 0, 'f'},
-            {"combineWidth",  required_argument, 0, 'w'},
-            {"maxBagSize",    required_argument, 0, 'm'},
-            {"help",          no_argument,       0, 'h'},
-            {"getStats",      no_argument,       0, 'a'},
-            {"noFactRemoval", no_argument,       0, 'b'},
-            {"CPU",           no_argument,       0, 'd'},
-            {"weighted",      no_argument,       0, 'e'},
-            {0,               0,                 0, 0}
-    };
-    //parse flags
-    while ((opt = getopt_long(argc, argv, "f:s:w:m:ah", flags, NULL)) != -1) {
-        switch (opt) {
-            case 'e': {
-                weighted = true;
-            }
-            case 'f': {
-                // input tree decomposition file
-                file = true;
-                std::ifstream fileIn(optarg);
-                while (getline(fileIn, inputLine)) {
-                    treeD.sputn(inputLine.c_str(), inputLine.size());
-                    treeD.sputn("\n", 1);
-                }
-                break;
-            }
-            case 'b': {
-                factR = false;
-            }
-            case 's': {
-                // input sat formula
-                formula = true;
-                std::ifstream fileIn(optarg);
-                while (getline(fileIn, inputLine)) {
-                    sat.sputn(inputLine.c_str(), inputLine.size());
-                    sat.sputn("\n", 1);
-                }
-                break;
-            }
-            case 'w': {
-                combineWidth = std::atoi(optarg);
-                break;
-            }
-            case 'm': {
-                maxBag = std::atoi(optarg);
-                break;
-            }
-            case 'a': {
-                getStats = 1;
-                break;
-            }
-            case 'd': {
-                cpu = true;
-                break;
-            }
-            case 'h': {
-                printUsage(argv);
-                exit(EXIT_SUCCESS);
-            }
-            default:
-                std::cerr << "Error: Unknown option\n";
-                printUsage(argv);
-                exit(EXIT_FAILURE);
-        }
-    }
+    std::string formulaDir;
+    std::string decompDir;
+    int combineWidth = 12, maxBag = 22;
+    std::string kernelPath = "./kernel/";
+    graphTypes graph = NONE;
+    bool factR, cpu, weighted;
 
-    // no decomposition file flag
-    if (!file) {
+    CLI::App app{};
+
+    std::string filename = "default";
+    app.add_option("-s,--formula", formulaDir, "path to the file containing the sat formula")->required();
+    app.add_option("-f,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
+    app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("10");
+    app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("24");
+    app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
+    app.add_set("-g,--graph", graph, {PRIMAL, INCIDENCE, DUAL}, "graph type")->set_type_name(
+            "<0=Primal|1=Incidence|2=Dual>");
+    app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
+    app.add_flag("--CPU", cpu, "run the solver on the gpu");
+    app.add_flag("--weighted", weighted, "use weighted model count");
+
+
+    CLI11_PARSE(app, argc, argv);
+
+    if (decompDir.compare("") != 0) {
+        std::ifstream fileIn(decompDir);
+        while (getline(fileIn, inputLine)) {
+            treeD.sputn(inputLine.c_str(), inputLine.size());
+            treeD.sputn("\n", 1);
+        }
+    } else {
         while (getline(std::cin, inputLine)) {
             treeD.sputn(inputLine.c_str(), inputLine.size());
             treeD.sputn("\n", 1);
         }
     }
 
-    // error no sat formula given
-    if (!formula) {
-        std::cerr << "Error: No SAT formula\n";
-        printUsage(argv);
-        exit(EXIT_FAILURE);
+    std::ifstream fileIn(formulaDir);
+    while (getline(fileIn, inputLine)) {
+        sat.sputn(inputLine.c_str(), inputLine.size());
+        sat.sputn("\n", 1);
     }
 
     long long int time_parsing = getTime();
     CNFParser cnfParser(weighted);
-    TDParser tdParser(combineWidth, factR);
+    TDParser tdParser(combineWidth, factR, maxBag);
     std::string satString = sat.str();
     std::string treeDString = treeD.str();
     if (satString.size() < 10) {
@@ -155,7 +88,7 @@ int main(int argc, char *argv[]) {
     //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula);
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula, graph);
     //found unsat during preprocessing
     if (satFormula.unsat) {
         std::cout << "{\n    \"Model Count\": " << 0;
@@ -173,34 +106,25 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Num Forget\": " << 0;
         std::cout << "\n        ,\"Num Introduce\": " << 0;
         std::cout << "\n        ,\"Num Leaf\": " << 0;
-
-        if (getStats) {
-            std::cout << "\n        ,\"Actual Paths\":{";
-            std::cout << "\n            \"min\": " << 0;
-            std::cout << "\n            ,\"max\": " << 0;
-            std::cout << "\n            ,\"mean\": " << 0;
-            std::cout << "\n        }";
-            std::cout << "\n        ,\"Current Paths\":{";
-            std::cout << "\n            \"min\": " << 0;
-            std::cout << "\n            ,\"max\": " << 0;
-            std::cout << "\n            ,\"mean\": " << 0;
-            std::cout << "\n        }";
-        }
         std::cout << "\n    }";
         std::cout << "\n}";
         exit(20);
 
     }
-    if (satFormula.numVars == treeDecomp.numVars) {
-        // decomposition is of the incidence graph
-        graph = PRIMAL;
-    } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
-        // decomposition is of the primal graph
-        graph = INCIDENCE;
-    } else {
-        std::cerr << "Error: Unknown graph type\n";
-        printUsage(argv);
-        exit(EXIT_FAILURE);
+    if (graph == NONE) {
+        if (satFormula.clauses.size() == treeDecomp.numVars) {
+            // decomposition is of the dual
+            graph = DUAL;
+        } else if (satFormula.numVars == treeDecomp.numVars) {
+            // decomposition is of the incidence graph
+            graph = PRIMAL;
+        } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
+            // decomposition is of the primal graph
+            graph = INCIDENCE;
+        } else {
+            std::cerr << "Error: Unknown graph type\n";
+            exit(EXIT_FAILURE);
+        }
     }
     time_parsing = getTime() - time_parsing;
 
@@ -216,6 +140,10 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
+            /*if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
+                continue;
+            }*/
+
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
@@ -237,34 +165,118 @@ int main(int argc, char *argv[]) {
 
         long long int time_build_kernel = getTime();
         struct stat buffer;
+        std::string binPath;
 
-        //create kernel binary if it doesn't exist
-        std::string kernelStr;
+#ifdef sType_Double
         switch (graph) {
+            case DUAL:
+                binPath = kernelPath + "SAT_d_d.clbin";
+                break;
             case PRIMAL:
-                kernelStr = prim_kernel;
+                binPath = kernelPath + "SAT_d_p.clbin";
                 break;
             case INCIDENCE:
-                kernelStr = inc_kernel;
+                binPath = kernelPath + "SAT_d_i.clbin";
+                break;
+            default:
                 break;
         }
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
+#else
+        switch (graph) {
+            case DUAL:
+                binPath = kernelPath + "SAT_d4_d.clbin";
+                break;
+            case PRIMAL:
+                binPath = kernelPath + "SAT_d4_p.clbin";
+                break;
+            case INCIDENCE:
+                binPath = kernelPath + "SAT_d4_i.clbin";
+                break;
+        }
+#endif
 
+#ifndef DEBUG
+        if (stat(binPath.c_str(), &buffer) != 0) {
+#endif
+            //create kernel binary if it doesn't exist
+            std::string sourcePath;
+
+#ifdef sType_Double
+            switch (graph) {
+                case DUAL:
+                    sourcePath = kernelPath + "SAT_d_dual.cl";
+                    break;
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d_inci.cl";
+                    break;
+            }
+#else
+            switch (graph) {
+                case DUAL:
+                    sourcePath = kernelPath + "SAT_d4_dual.cl";
+                    break;
+                case PRIMAL:
+                    sourcePath = kernelPath + "SAT_d4_primal.cl";
+                    break;
+                case INCIDENCE:
+                    sourcePath = kernelPath + "SAT_d4_inci.cl";
+                    break;
+            }
+#endif
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+            program = cl::Program(context, sources);
+            program.build(devices);
+
+            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+            char *binChunk = &binData[0];
+
+            std::vector<char *> binaries;
+            for (const size_t &binSize : binSizes) {
+                binaries.push_back(binChunk);
+                binChunk += binSize;
+            }
+
+            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+            for (unsigned int i = 0; i < binaries.size(); ++i)
+                binaryfile.write(binaries[i], binSizes[i]);
+            binaryfile.close();
+#ifndef DEBUG
+        } else {
+            //load kernel binary
+
+            long size = 0;
+            cl_int err;
+            std::string kernelStr = GPUSATUtils::readBinary(binPath);
+            cl::Program::Binaries bins(1, std::make_pair((const void *) kernelStr.data(), kernelStr.size()));
+            program = cl::Program(context, devices, bins, nullptr, &err);
+            program.build(devices);
+        }
+#endif
         time_build_kernel = getTime() - time_build_kernel;
 
         Solver *sol;
         bagType next;
         switch (graph) {
             case PRIMAL:
-                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false, getStats);
+                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false, 0);
+                next.numSol = pow(2, next.variables.size());
+                next.variables.assign(treeDecomp.bags[0].variables.begin(),
+                                      treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
+                break;
+            case DUAL:
+                sol = new Solver_Dual(platforms, context, devices, queue, program, kernel, maxBag, false, 0);
                 next.numSol = pow(2, next.variables.size());
                 next.variables.assign(treeDecomp.bags[0].variables.begin(),
                                       treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
             case INCIDENCE:
-                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true, getStats);
+                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true, 0);
                 std::vector<cl_long> *vars = new std::vector<cl_long>;
                 for (int i = 0; i < treeDecomp.bags[0].variables.size(); ++i) {
                     if (treeDecomp.bags[0].variables[i] <= satFormula.numVars) {
@@ -281,27 +293,56 @@ int main(int argc, char *argv[]) {
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next);
         time_solving = getTime() - time_solving;
 
+        //sum up last node solutions
         long long int time_model = getTime();
-        __float128 solutions = 0.0;
+        boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
             cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
-            for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
-                if (treeDecomp.bags[0].solution[a] == nullptr) {
-                    continue;
+            if (graph == DUAL) {
+                for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
+                    if (treeDecomp.bags[0].solution[a] == nullptr) {
+                        continue;
+                    }
+                    for (cl_long i = 0; i < bagSizeNode; i++) {
+                        sols = sols + ((popcount(i + a * bagSizeNode) % 2) == 1 ? -treeDecomp.bags[0].solution[a][i] : treeDecomp.bags[0].solution[a][i]);
+                    }
                 }
-                for (cl_long i = 0; i < bagSizeNode; i++) {
-                    solutions = solutions + treeDecomp.bags[0].solution[a][i];
+            } else {
+                for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
+                    if (treeDecomp.bags[0].solution[a] == nullptr) {
+                        continue;
+                    }
+                    for (cl_long i = 0; i < bagSizeNode; i++) {
+                        sols = sols + treeDecomp.bags[0].solution[a][i];
+                    }
                 }
             }
-            if (!weighted) {
-                __float128 base = 0.78, exponent = satFormula.numVars;
-                solutions = solutions / powq(base, exponent);
-            } else {
-                solutions = solutions * tdParser.defaultWeight;
+            if (!weighted && graph != DUAL) {
+                boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
+                sols = sols / pow(base, exponent);
+            } else if (graph != DUAL) {
+                sols = sols * tdParser.defaultWeight;
+            }
+
+            if (graph == DUAL) {
+                std::set<cl_long> varSet;
+                for (int j = 0; j < satFormula.clauses.size(); ++j) {
+                    for (int i = 0; i < satFormula.clauses[j].size(); ++i) {
+                        varSet.insert(satFormula.clauses[j][i]);
+                    }
+                }
+                for (int i = 1; i <= satFormula.numVars; ++i) {
+                    if (varSet.find(i) == varSet.end() && varSet.find(-i) == varSet.end())
+                        sols *= 2;
+                }
             }
             char buf[128];
-            quadmath_snprintf(buf, sizeof buf, "%.30Qe", solutions);
-            std::cout << "{\n    \"Model Count\": " << buf;
+
+#ifdef sType_Double
+            std::cout << std::setprecision(20) << "{\n    \"Model Count\": " << sols;
+#else
+            std::cout << std::setprecision(80) << "{\n    \"Model Count\": " << sols;
+#endif
 
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
@@ -324,22 +365,10 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Num Forget\": " << sol->numForget;
         std::cout << "\n        ,\"Num Introduce\": " << sol->numIntroduce;
         std::cout << "\n        ,\"Num Leaf\": " << sol->numLeafs;
-
-        if (getStats) {
-            std::cout << "\n        ,\"Actual Paths\":{";
-            std::cout << "\n            \"min\": " << sol->numSolPaths[0];
-            std::cout << "\n            ,\"max\": " << sol->numSolPaths[sol->numSolPaths.size() - 1];
-            std::cout << "\n            ,\"mean\": " << sol->numSolPaths[sol->numSolPaths.size() / 2];
-            std::cout << "\n        }";
-            std::cout << "\n        ,\"Current Paths\":{";
-            std::cout << "\n            \"min\": " << sol->numHoldPaths[0];
-            std::cout << "\n            ,\"max\": " << sol->numHoldPaths[sol->numHoldPaths.size() - 1];
-            std::cout << "\n            ,\"mean\": " << sol->numHoldPaths[sol->numHoldPaths.size() / 2];
-            std::cout << "\n        }";
-        }
         std::cout << "\n    }";
         std::cout << "\n}";
-        if (solutions > 0.0) {
+        std::cout.flush();
+        if (sols > 0) {
             exit(10);
         } else {
             exit(20);

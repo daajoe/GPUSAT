@@ -1,7 +1,10 @@
 #ifndef GPUSAT_SOLVER_H_H
 #define GPUSAT_SOLVER_H_H
+#if defined __CYGWIN__ || defined __MINGW32__
 #define alloca __builtin_alloca
+#endif
 
+#include <CL/cl.hpp>
 #include <types.h>
 
 namespace gpusat {
@@ -16,6 +19,7 @@ namespace gpusat {
         //max with before splitting the bags
         cl_long maxWidth;
         cl_long inci;
+        graphTypes graph;
 
     public:
         cl_long isSat = 1;
@@ -61,30 +65,16 @@ namespace gpusat {
          *      the second edge
          */
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type)=0;
-
-        /**
-         * function to solve a introduce node
-         *
-         * @param formula
-         *      the sat formula
-         * @param node
-         *      the node to save the solutions in
-         * @param edge
-         *      the next node
-         */
-        virtual void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge)=0;
     };
 
     class Solver_Primal : public Solver {
     public:
         Solver_Primal(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
                       cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                        getStats) {}
+                                                                                        getStats) { graph = PRIMAL; }
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
-
-        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };
@@ -94,12 +84,22 @@ namespace gpusat {
         Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
                          cl::Program &program_,
                          cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                           getStats) {}
+                                                                                           getStats) { graph = INCIDENCE; }
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
 
-        void solveIntroduce(satformulaType &formula, bagType &node, bagType &edge);
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
+    };
+
+    class Solver_Dual : public Solver {
+    public:
+        Solver_Dual(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
+                    cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
+                                                                                      getStats) { graph = DUAL; }
+
+    protected:
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
     };

@@ -1,6 +1,5 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
-#define alloca __builtin_alloca
 
 #include <queue>
 #include <types.h>
@@ -42,7 +41,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        explicit TDParser(int i, bool b);
+        explicit TDParser(int i, bool b, int i1);
 
         /**
          * generates a treedec from a given string
@@ -52,7 +51,7 @@ namespace gpusat {
          * @return
          *      the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
+        treedecType parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType);
 
         solType defaultWeight = 1.0;
 
@@ -101,13 +100,14 @@ namespace gpusat {
 
         void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
 
-        void preprocessFacts(preetreedecType &decomp, satformulaType &formula);
+        void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType);
 
         void relableDecomp(preebagType *decomp, cl_long id);
 
         void relableFormula(satformulaType &formula, cl_long id);
 
         bool factR;
+        int maxBag;
     };
 }
 #endif //GPUSAT_PARSER_H

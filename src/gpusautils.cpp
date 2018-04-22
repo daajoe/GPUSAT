@@ -2,8 +2,8 @@
 #include <regex>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <gpusautils.h>
-#include <d4_utils.h>
 
 namespace gpusat {
 
@@ -53,17 +53,15 @@ namespace gpusat {
         std::cout << "\nsolutions: \n";
         for (int i = 0; i < numS / bagSize; i++) {
             if (sol[i] == nullptr) {
+                for (int a = 0; a < bagSize; a++) {
+                    std::cout << i * bagSize + a << ": 0\n";
+                }
                 continue;
             }
             for (int a = 0; a < bagSize; a++) {
-                int b = 0, c = 0;
-                for (b = 0; b < vars.size() && vars[b] <= formula.numVars; b++) {
-                    cl_long asdf = vars[b];
-                    int xyz = 0;
-                };
                 std::cout << i * bagSize + a << ": ";
 #ifdef sType_Double
-                //std::cout << sol[i][a] << "\n";
+                std::cout << sol[i][a] << "\n";
 #else
                 std::cout << d4_to_string(sol[i][a]) << "\n";
 #endif
