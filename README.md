@@ -1,26 +1,26 @@
-#gpusat
+# gpusat
 
 A SAT solver based on dynamic programming running on the GPU.
 
-##Dependencies
+## Dependencies
 
 * OpenCL 1.2
 
-##Build
+## Build
 
-###Dependencies
+### Dependencies
 
 * cmake 3.2
 * gcc 5.4
 * AMD APP SDK 3.0/CUDA Toolkit 9.1 or newer
 * Boost Multiprecision 1.66
 
-###Compilation
+### Compilation
 
 To build the program with normal double precision use `cmake -Ddouble=ON` and the `make`, to build with double4 precision use `cmake` and the `make
 The double4 Type is an adaption of [https://github.com/scibuilder/QD]
 
-##Usage
+## Usage
 
 First one needs the generate the primal, incidence or dual graph of the formula and generate the tree decomposition of the graph with a decomposer such as htd [https://github.com/mabseher/htd].
 
