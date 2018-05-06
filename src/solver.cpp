@@ -67,7 +67,7 @@ namespace gpusat {
         cl_long numIterationsEdge2 = (cl_long) ceil(edge2.numSol / bagSizeEdge2);
         cl_long numHpath = pow(2, node.variables.size());
         this->numJoin++;
-        kernel = cl::Kernel(program, "solveJoin");
+        cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
         if (node.variables.size() > 0) {
             bufSolVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.variables.size(), &node.variables[0]);
@@ -156,12 +156,12 @@ namespace gpusat {
             }
             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
             solutions += bagsolutions;
-            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
                 this->isSat = 1;
             }
         }
@@ -221,7 +221,7 @@ namespace gpusat {
             }
         }
 
-        kernel = cl::Kernel(program, "solveIntroduceForget");
+        cl::Kernel kernel = cl::Kernel(program, "solveIntroduceForget");
 
         kernel.setArg(3, eVars.size());
 
@@ -314,12 +314,12 @@ namespace gpusat {
             }
             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
             solutions += bagsolutions;
-            queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(solType) * (bagSizeForget), node.solution[a]);
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeForget;
             } else {
+                queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(solType) * (bagSizeForget), node.solution[a]);
                 this->isSat = 1;
             }
         }
@@ -374,7 +374,7 @@ namespace gpusat {
         nClausesVector.push_back(0);
 
         cl_long numIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, (cl_long) node.variables.size() - maxWidth)));
-        kernel = cl::Kernel(program, "solveJoin");
+        cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         //number of clauses - 10
         cl_long numClauses = nClausesVector.size() - 1;
         kernel.setArg(10, numClauses);
@@ -460,12 +460,12 @@ namespace gpusat {
             if (bagsolutions > 0) {
                 solutions = 1;
             }
-            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
                 this->isSat = 1;
             }
         }
@@ -570,7 +570,7 @@ namespace gpusat {
         }
 
         cl_long numSubIterations = static_cast<cl_long>(pow(2, std::max((cl_long) 0, (cl_long) eNode.size() - maxWidth)));
-        kernel = cl::Kernel(program, "solveIntroduceForget");
+        cl::Kernel kernel = cl::Kernel(program, "solveIntroduceForget");
         //node variables - 2
         cl::Buffer bufNodeVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
         kernel.setArg(2, bufNodeVars);
@@ -655,7 +655,6 @@ namespace gpusat {
                 }
             }
             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
-            queue.enqueueReadBuffer(bufNodeSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
             if (bagsolutions != 0) {
                 solutions = 1;
                 isSat = 1;
@@ -665,6 +664,7 @@ namespace gpusat {
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
+                queue.enqueueReadBuffer(bufNodeSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
                 this->isSat = 1;
             }
         }
@@ -691,7 +691,7 @@ namespace gpusat {
         cl_long numIterationsEdge2 = (cl_long) ceil(edge2.numSol / bagSizeEdge2);
         cl_long numHpath = pow(2, node.variables.size());
         this->numJoin++;
-        kernel = cl::Kernel(program, "solveJoin");
+        cl::Kernel kernel = cl::Kernel(program, "solveJoin");
 
         std::set<cl_long> nodeVariablesSet;
         std::vector<cl_long> clauseVars;
@@ -880,12 +880,12 @@ namespace gpusat {
             }
             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
             solutions += bagsolutions;
-            queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeNode;
             } else {
+                queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(solType) * (bagSizeNode), node.solution[a]);
                 this->isSat = 1;
             }
         }
@@ -900,20 +900,6 @@ namespace gpusat {
                 delete[] edge2.solution[a];
                 edge2.solution[a] = nullptr;
             }
-        }
-        if (this->getStats) {
-            cl_long numSpath = 0;
-            this->numHoldPaths.push_back(numHpath);
-            for (cl_long a = 0; a < numIterations; a++) {
-                if (node.solution[a] != nullptr) {
-                    for (cl_long b = 0; b < bagSizeNode; b++) {
-                        if (node.solution[a][b] > 0) {
-                            numSpath++;
-                        }
-                    }
-                }
-            }
-            this->numSolPaths.push_back(numSpath);
         }
 #ifdef DEBUG
         std::cout << "Join:\n";
@@ -996,7 +982,7 @@ namespace gpusat {
         cl_long numHpath = pow(2, clauseIdsF.size());
         this->numIntroduceForget++;
 
-        kernel = cl::Kernel(program, "solveIntroduceForget");
+        cl::Kernel kernel = cl::Kernel(program, "solveIntroduceForget");
 
         cl::Buffer buf_clauseIdsE;
         if (clauseIdsE.size() > 0) {
@@ -1114,12 +1100,12 @@ namespace gpusat {
             }
             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
             solutions += bagsolutions;
-            queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(solType) * (bagSizeForget), node.solution[a]);
             if (solutions == 0) {
                 delete[] node.solution[a];
                 node.solution[a] = nullptr;
                 numHpath -= bagSizeForget;
             } else {
+                queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(solType) * (bagSizeForget), node.solution[a]);
                 this->isSat = 1;
             }
         }

@@ -134,7 +134,6 @@ int main(int argc, char *argv[]) {
     std::vector<cl::Device> devices;
     cl::CommandQueue queue;
     cl::Program program;
-    cl::Kernel kernel;
 
     try {
         long long int time_init_opencl = getTime();
@@ -267,19 +266,19 @@ int main(int argc, char *argv[]) {
         bagType next;
         switch (graph) {
             case PRIMAL:
-                sol = new Solver_Primal(platforms, context, devices, queue, program, kernel, maxBag, false, 0);
+                sol = new Solver_Primal(context, queue, program, maxBag);
                 next.numSol = pow(2, next.variables.size());
                 next.variables.assign(treeDecomp.bags[0].variables.begin(),
                                       treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
             case DUAL:
-                sol = new Solver_Dual(platforms, context, devices, queue, program, kernel, maxBag, false, 0);
+                sol = new Solver_Dual(context, queue, program, maxBag);
                 next.numSol = pow(2, next.variables.size());
                 next.variables.assign(treeDecomp.bags[0].variables.begin(),
                                       treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
             case INCIDENCE:
-                sol = new Solver_Incidence(platforms, context, devices, queue, program, kernel, maxBag, true, 0);
+                sol = new Solver_Incidence(context, queue, program, maxBag);
                 std::vector<cl_long> *vars = new std::vector<cl_long>;
                 for (int i = 0; i < treeDecomp.bags[0].variables.size(); ++i) {
                     if (treeDecomp.bags[0].variables[i] <= satFormula.numVars) {
@@ -352,8 +351,6 @@ int main(int argc, char *argv[]) {
         }
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
-        std::sort(sol->numSolPaths.begin(), sol->numSolPaths.end());
-        std::sort(sol->numHoldPaths.begin(), sol->numHoldPaths.end());
         std::cout.precision(6);
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;

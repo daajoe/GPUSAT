@@ -72,24 +72,24 @@ namespace gpusat {
 
         cl_long num = 0;
         while (!sline.eof()) {
-                        getline(sline, i, ' ');
-                        if (i.size() > 0) {
-                            num = stol(i);
-                            if (num != 0) {
-                                clause->push_back(num);
-                            }
-                        }
-                    }
+            getline(sline, i, ' ');
+            if (i.size() > 0) {
+                num = stol(i);
+                if (num != 0) {
+                    clause->push_back(num);
+                }
+            }
+        }
         if (clause->size() > 1 && num == 0) {
-                        sort(clause->begin(), clause->end(), compVars);
-                        ret.clauses.push_back(*clause);
-                        clause->clear();
-                    } else if (clause->size() == 1 && num == 0) {
-                        if (find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
-                            ret.facts.push_back((*clause)[0]);
-                        ret.clauses.push_back(*clause);
-                        clause->clear();
-                    }
+            sort(clause->begin(), clause->end(), compVars);
+            ret.clauses.push_back(*clause);
+            clause->clear();
+        } else if (clause->size() == 1 && num == 0) {
+            if (find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
+                ret.facts.push_back((*clause)[0]);
+            ret.clauses.push_back(*clause);
+            clause->clear();
+        }
     }
 
     void CNFParser::parseProblemLine(satformulaType &satformula, std::string item) {

@@ -10,31 +10,18 @@
 namespace gpusat {
     class Solver {
     protected:
-        std::vector<cl::Platform> &platforms; //TODO remove
         cl::Context &context;
-        std::vector<cl::Device> &devices; //TODO remove
         cl::CommandQueue &queue;
         cl::Program &program;
-        cl::Kernel &kernel; //TODO remove
         //max with before splitting the bags
         cl_long maxWidth;
-        cl_long inci; //TODO remove
-        graphTypes graph; //TODO remove
 
     public:
         cl_long isSat = 1;
-        cl_long getStats = 1; //TODO remove
         cl_long numJoin = 0;
-        cl_long numIntroduce = 0; //TODO remove
         cl_long numIntroduceForget = 0;
-        cl_long numLeafs = 0; //TODO remove
-        std::vector<cl_long> numHoldPaths; //TODO remove
-        std::vector<cl_long> numSolPaths; //TODO remove
 
-        Solver(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-               cl::Kernel &kernel_, int width, bool incidence, int getStats) : platforms(platforms_), context(context_), devices(devices_), queue(queue_),
-                                                                               program(program_),
-                                                                               kernel(kernel_), maxWidth(width), inci(incidence), getStats(getStats) {
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : context(context_), queue(queue_), program(program_), maxWidth(width) {
             int test = 1;
         }
 
@@ -69,9 +56,7 @@ namespace gpusat {
 
     class Solver_Primal : public Solver {
     public:
-        Solver_Primal(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-                      cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                        getStats) { graph = PRIMAL; }
+        Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
@@ -81,10 +66,7 @@ namespace gpusat {
 
     class Solver_Incidence : public Solver {
     public:
-        Solver_Incidence(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_,
-                         cl::Program &program_,
-                         cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                           getStats) { graph = INCIDENCE; }
+        Solver_Incidence(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
@@ -94,9 +76,7 @@ namespace gpusat {
 
     class Solver_Dual : public Solver {
     public:
-        Solver_Dual(std::vector<cl::Platform> &platforms_, cl::Context &context_, std::vector<cl::Device> &devices_, cl::CommandQueue &queue_, cl::Program &program_,
-                    cl::Kernel &kernel_, int width, bool inzi, int getStats) : Solver(platforms_, context_, devices_, queue_, program_, kernel_, width, inzi,
-                                                                                      getStats) { graph = DUAL; }
+        Solver_Dual(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
