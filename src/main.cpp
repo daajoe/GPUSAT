@@ -45,8 +45,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("10");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("24");
     app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
-    app.add_set("-g,--graph", graph, {PRIMAL, INCIDENCE, DUAL}, "graph type")->set_type_name(
-            "<0=Primal|1=Incidence|2=Dual>");
+    app.add_set("-g,--graph", graph, {PRIMAL, INCIDENCE, DUAL}, "graph type")->set_type_name("<0=Primal|1=Incidence|2=Dual>");
     app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
     app.add_flag("--CPU", cpu, "run the solver on the gpu");
     app.add_flag("--weighted", weighted, "use weighted model count");
@@ -140,10 +139,6 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            /*if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
-                continue;
-            }*/
-
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);

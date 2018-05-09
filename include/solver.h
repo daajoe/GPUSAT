@@ -26,12 +26,9 @@ namespace gpusat {
         /**
          * function to solve the sat problem
          *
-         * @param decomp
-         *      the tree decomposition
-         * @param formula
-         *      the sat formula
-         * @param node
-         *      the node to start from in the tree decompostion
+         * @param decomp    the tree decomposition
+         * @param formula   the sat formula
+         * @param node      the node to start from in the tree decompostion
          */
         void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &lastNode);
 
@@ -40,30 +37,21 @@ namespace gpusat {
         /**
          * function to solve an introduce forget node
          *
-         * @param formula
-         *      the sat formula
-         * @param pnode
-         *      the parent of the current node
-         * @param node
-         *      the current node
-         * @param cnode
-         *      the child of the current node
-         * @param leaf
-         *      indicates that the current node is a leaf node
+         * @param formula   the sat formula
+         * @param pnode     the parent of the current node
+         * @param node      the current node
+         * @param cnode     the child of the current node
+         * @param leaf      indicates that the current node is a leaf node
          */
         virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf)=0;
 
         /**
          * function to solve a join node
          *
-         * @param node
-         *      the node to save the solutions in
-         * @param edge1
-         *      the first child node
-         * @param edge2
-         *      the second child node
-         * @param formula
-         *      the sat formula
+         * @param node      the node to save the solutions in
+         * @param edge1     the first child node
+         * @param edge2     the second child node
+         * @param formula   the sat formula
          */
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula)=0;
     };

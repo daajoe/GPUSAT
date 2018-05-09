@@ -11,15 +11,9 @@
 #include <vector>
 #include <set>
 
-/**
- *
- */
 struct d4_Type {
     cl_double x[4];
 
-    /**
-     *
-     */
     d4_Type() {
         x[0] = 0.0;
         x[1] = 0.0;
@@ -27,13 +21,6 @@ struct d4_Type {
         x[3] = 0.0;
     }
 
-    /**
-     *
-     * @param a
-     * @param b
-     * @param c
-     * @param d
-     */
     d4_Type(double a, double b, double c, double d) {
         x[0] = a;
         x[1] = b;
@@ -41,10 +28,6 @@ struct d4_Type {
         x[3] = d;
     }
 
-    /**
-     *
-     * @param a
-     */
     d4_Type(double a) {
         x[0] = a;
         x[1] = 0.0;
@@ -52,11 +35,6 @@ struct d4_Type {
         x[3] = 0.0;
     }
 
-    /**
-     *
-     * @param a
-     * @return
-     */
     d4_Type &operator=(double a) {
         x[0] = a;
         x[1] = 0.0;
@@ -65,11 +43,6 @@ struct d4_Type {
         return *this;
     }
 
-    /**
-     *
-     * @param a
-     * @return
-     */
     d4_Type &operator=(d4_Type a) {
         x[0] = a.x[0];
         x[1] = a.x[1];
@@ -78,11 +51,6 @@ struct d4_Type {
         return *this;
     }
 
-    /**
-     *
-     * @param a
-     * @return
-     */
     d4_Type &operator=(d4_Type *a) {
         x[0] = a->x[0];
         x[1] = a->x[1];
@@ -166,6 +134,13 @@ namespace gpusat {
         preebagType *bags = nullptr;
     };
 
+    /**
+     * Function that compares two tree decompostions by id.
+     *
+     * @param a     the first tree decompostion
+     * @param b     the second tree decomposition
+     * @return      a < b
+     */
     inline bool compTreedType(const preebagType *a, const preebagType *b) {
         return a->id < b->id;
     }
@@ -180,10 +155,18 @@ namespace gpusat {
         std::vector<cl_long> facts;
     };
 
+    /// the graph type which was the base for the tree decomposition
     enum graphTypes {
         PRIMAL, INCIDENCE, DUAL, NONE
     };
 
+    /**
+     * Function that compares two variables.
+     *
+     * @param a     the first variable
+     * @param b     the second variable
+     * @return      true if abs a < b
+     */
     inline bool compVars(const cl_long &a, const cl_long &b) {
         return std::abs(a) < std::abs(b);
     }

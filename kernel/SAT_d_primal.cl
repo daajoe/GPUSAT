@@ -1,4 +1,10 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
+#if defined(cl_khr_fp64)
+#  pragma OPENCL EXTENSION cl_khr_fp64: enable
+#elif defined(cl_amd_fp64)
+#  pragma OPENCL EXTENSION cl_amd_fp64: enable
+#else
+#  error double precision is not supported
+#endif
 #define stype double
 
 /**

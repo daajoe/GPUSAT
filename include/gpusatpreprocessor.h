@@ -11,24 +11,18 @@ namespace gpusat {
         /**
         * preprocess the tree decomposition
         *
-        * @param decomp
-        *      the tree decomposition
-         * @param combineWidth
-         *      max width to combine bags
+        * @param decomp             the tree decomposition
+         * @param combineWidth      max width to combine bags
          */
         static void preprocessDecomp(preebagType *decomp, cl_long combineWidth);
 
         /**
          * removes facts from the sat formula
          *
-         * @param decomp
-         *      the tree decomposition
-         * @param formula
-         *      the sat formula
-         * @param gType
-         *      the type of graph
-         * @param defaultWeight
-         *      for WMC the product of the weights of the removed literals
+         * @param decomp            the tree decomposition
+         * @param formula           the sat formula
+         * @param gType             the type of graph
+         * @param defaultWeight     for WMC the product of the weights of the removed literals
          */
         static void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType, solType &defaultWeight);
 
