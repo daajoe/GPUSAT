@@ -9,21 +9,29 @@ namespace gpusat {
     class CNFParser {
     public:
 
+        /**
+         *  Constructor for an CNF parser.
+         *
+         * @param weighted
+         *      indicates if weights should be assiciated with literals
+         */
         CNFParser(bool weighted);
 
         /**
-                 * generates a treedec from a given string
-                 *
-                 * @param formula
-                 *      the string representation of the tree decomposition
-                 * @return
-                 *      the tree decomposition
-                 */
+         * generates a sat formula from a given string
+         *
+         * @param formula
+         *      the string representation of the sat formula
+         * @return
+         *      the sat formula
+         */
         satformulaType parseSatFormula(std::string formula);
 
     private:
+        bool wmc;
+
         /**
-         * parses a problem line from the sat formula
+         * parses a problem line of the sat formula
          *
          * @param satformula
          *      object containing the sat formula
@@ -34,10 +42,24 @@ namespace gpusat {
          */
         void parseProblemLine(satformulaType &satformula, std::string item);
 
+        /**
+         * parses a weight line of the sat formula
+         *
+         * @param
+         *      the line
+         * @param weights
+         *      map containing the weights for each literal
+         */
         void parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights);
 
-        bool wmc;
-
+        /**
+         * parses a clause line of the sat formula
+         *
+         * @param ret
+         * @param item
+         *      the line
+         * @param clause
+         */
         void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
     };
 
@@ -59,6 +81,8 @@ namespace gpusat {
         int combineWidth;
 
     private:
+        bool factR;
+
         /**
          * parse an edge from the tree decomposition
          *
@@ -92,8 +116,6 @@ namespace gpusat {
         void parseBagLine(preetreedecType &ret, std::string item);
 
         static void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
-
-        bool factR;
     };
 }
 #endif //GPUSAT_PARSER_H

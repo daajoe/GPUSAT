@@ -13,7 +13,7 @@ namespace gpusat {
         cl::Context &context;
         cl::CommandQueue &queue;
         cl::Program &program;
-        //max with before splitting the bags
+        ///max with before splitting the bags
         cl_long maxWidth;
 
     public:
@@ -21,9 +21,7 @@ namespace gpusat {
         cl_long numJoin = 0;
         cl_long numIntroduceForget = 0;
 
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : context(context_), queue(queue_), program(program_), maxWidth(width) {
-            int test = 1;
-        }
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : context(context_), queue(queue_), program(program_), maxWidth(width) {}
 
         /**
          * function to solve the sat problem
@@ -39,6 +37,20 @@ namespace gpusat {
 
     protected:
 
+        /**
+         * function to solve an introduce forget node
+         *
+         * @param formula
+         *      the sat formula
+         * @param pnode
+         *      the parent of the current node
+         * @param node
+         *      the current node
+         * @param cnode
+         *      the child of the current node
+         * @param leaf
+         *      indicates that the current node is a leaf node
+         */
         virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf)=0;
 
         /**
@@ -47,11 +59,13 @@ namespace gpusat {
          * @param node
          *      the node to save the solutions in
          * @param edge1
-         *      the first edge
+         *      the first child node
          * @param edge2
-         *      the second edge
+         *      the second child node
+         * @param formula
+         *      the sat formula
          */
-        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &type)=0;
+        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula)=0;
     };
 
     class Solver_Primal : public Solver {

@@ -11,9 +11,15 @@
 #include <vector>
 #include <set>
 
+/**
+ *
+ */
 struct d4_Type {
     cl_double x[4];
 
+    /**
+     *
+     */
     d4_Type() {
         x[0] = 0.0;
         x[1] = 0.0;
@@ -21,6 +27,13 @@ struct d4_Type {
         x[3] = 0.0;
     }
 
+    /**
+     *
+     * @param a
+     * @param b
+     * @param c
+     * @param d
+     */
     d4_Type(double a, double b, double c, double d) {
         x[0] = a;
         x[1] = b;
@@ -28,6 +41,10 @@ struct d4_Type {
         x[3] = d;
     }
 
+    /**
+     *
+     * @param a
+     */
     d4_Type(double a) {
         x[0] = a;
         x[1] = 0.0;
@@ -35,6 +52,11 @@ struct d4_Type {
         x[3] = 0.0;
     }
 
+    /**
+     *
+     * @param a
+     * @return
+     */
     d4_Type &operator=(double a) {
         x[0] = a;
         x[1] = 0.0;
@@ -43,6 +65,11 @@ struct d4_Type {
         return *this;
     }
 
+    /**
+     *
+     * @param a
+     * @return
+     */
     d4_Type &operator=(d4_Type a) {
         x[0] = a.x[0];
         x[1] = a.x[1];
@@ -51,6 +78,11 @@ struct d4_Type {
         return *this;
     }
 
+    /**
+     *
+     * @param a
+     * @return
+     */
     d4_Type &operator=(d4_Type *a) {
         x[0] = a->x[0];
         x[1] = a->x[1];
@@ -67,6 +99,9 @@ struct d4_Type {
 #endif
 
 namespace dual {
+    /**
+     * parameters for the dual join kernel
+     */
     typedef struct {
         cl_long numC;
         cl_long numCE1;
@@ -83,6 +118,9 @@ namespace dual {
         cl_long numVE2;
     } sJVars;
 
+    /**
+     * parameters for the dual introduce forget kernel
+     */
     typedef struct {
         cl_long numCI;
         cl_long numCE;
@@ -123,13 +161,14 @@ namespace gpusat {
 
     /// type for saving a tree decomposition
     struct preetreedecType {
-
         cl_long numb = 0;
         cl_long numVars = 0;
         preebagType *bags = nullptr;
     };
 
-    bool compTreedType(const preebagType *a, const preebagType *b);
+    inline bool compTreedType(const preebagType *a, const preebagType *b) {
+        return a->id < b->id;
+    }
 
     /// type for saving the sat formula
     struct satformulaType {
@@ -145,13 +184,9 @@ namespace gpusat {
         PRIMAL, INCIDENCE, DUAL, NONE
     };
 
-    enum precisionTypes {
-        DOUBLE, D4
-    };
-
-    bool compVars(const cl_long &a, const cl_long &b);
-
-    bool compVarsEq(const cl_long &a, const cl_long &b);
+    inline bool compVars(const cl_long &a, const cl_long &b) {
+        return std::abs(a) < std::abs(b);
+    }
 }
 
 #endif //GPUSAT_TYPES_H_H

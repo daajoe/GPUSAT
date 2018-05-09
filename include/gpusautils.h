@@ -7,32 +7,10 @@
 namespace gpusat {
     class GPUSATUtils {
     public:
-        /**
-         * function to print the tree decomposition in human readable form
-         *
-         * @param decomp
-         *      the tree decomposition to print
-         */
-        static void printTreeD(treedecType decomp);
-
-        /**
-         * function to print the solution for each bag in tree decomposition in human readable form
-         *
-         * @param decomp
-         *      the tree decomposition containing the solutions
-         */
-        static void printSolutions(treedecType decomp);
-
-        /**
-         * function to print the sat formula in human readable form
-         *
-         * @param formula
-         *      the sat formula to print
-         */
-        static void printFormula(satformulaType formula);
 
         /**
          * function to read a file into a string
+         *
          * @param path
          *      the path of the file
          * @return
@@ -63,20 +41,6 @@ namespace gpusat {
          *      the file contents
          */
         static std::string readBinary(std::string path);
-
-        /**
-         * writes data into a file in binary format
-         *
-         * @param path
-         *      path to the fil
-         * @param data
-         *      the data to write
-         * @param size
-         *      the size of the data
-         */
-        static void writeBinary(char *data, size_t size, std::string path);
-
-        static void printTreeD(preetreedecType decomp);
     };
 }
 #endif //GPUSAT_GPUSAUTILS_H

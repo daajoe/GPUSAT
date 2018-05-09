@@ -8,44 +8,6 @@
 
 namespace gpusat {
 
-    void GPUSATUtils::printTreeD(treedecType decomp) {
-        cl_long size = decomp.numb;
-        for (int i = 0; i < size; i++) {
-            std::cout << "\nbagnum: " << i + 1 << "\n";
-            cl_long vsize = decomp.bags[i].variables.size();
-            std::cout << "variables: ";
-            for (int a = 0; a < vsize; a++) {
-                std::cout << decomp.bags[i].variables[a] << " ";
-            }
-            std::cout << "\n";
-            cl_long esize = decomp.bags[i].edges.size();
-            std::cout << "edgeschild nodes: ";
-            for (int a = 0; a < esize; a++) {
-                std::cout << decomp.bags[i].edges[a] << " ";
-            }
-            std::cout << "\n";
-        }
-    }
-
-    void GPUSATUtils::printTreeD(preetreedecType decomp) {
-        cl_long size = decomp.numb;
-        for (int i = 0; i < size; i++) {
-            std::cout << "\nbagnum: " << i + 1 << "\n";
-            cl_long vsize = decomp.bags[i].variables.size();
-            std::cout << "variables: ";
-            for (int a = 0; a < vsize; a++) {
-                std::cout << decomp.bags[i].variables[a] << " ";
-            }
-            std::cout << "\n";
-            cl_long esize = decomp.bags[i].edges.size();
-            std::cout << "edgeschild nodes: ";
-            for (int a = 0; a < esize; a++) {
-                std::cout << decomp.bags[i].edges[a]->id + 1 << " ";
-            }
-            std::cout << "\n";
-        }
-    }
-
     void GPUSATUtils::printSol(cl_long numS, std::vector<cl_long> vars, solType **sol, satformulaType &formula, cl_long bagSize) {
         std::cout << "variables: \n";
         for (int j = 0; j < vars.size(); ++j) {
@@ -94,11 +56,6 @@ namespace gpusat {
         buffer.assign(binary, size);
         free(binary);
         return buffer;
-    }
-
-    void GPUSATUtils::writeBinary(char *data, size_t size, std::string path) {
-        std::ofstream fileOut(path, std::ios::binary);
-        fileOut.write(data, size);
     }
 
 }
