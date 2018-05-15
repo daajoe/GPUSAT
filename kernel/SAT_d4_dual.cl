@@ -1,3 +1,4 @@
+R"(
 #if defined(cl_khr_fp64)
 #  pragma OPENCL EXTENSION cl_khr_fp64: enable
 #elif defined(cl_amd_fp64)
@@ -1091,3 +1092,4 @@ void d4_assign_(__global d4_Type *a, d4_Type *b) {
     a->x[2] = b->x[2];
     a->x[3] = b->x[3];
 }
+)"

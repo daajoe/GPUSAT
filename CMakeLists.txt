@@ -21,6 +21,10 @@ if (debug)
     add_definitions(-DDEBUG)
 endif ()
 
+if (test)
+    add_definitions(-DTEST)
+endif ()
+
 if (valgrind)
     # compiler flags
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g -O0")

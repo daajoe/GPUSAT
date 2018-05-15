@@ -162,6 +162,10 @@ namespace gpusat {
         return d4_add(a, b);
     }
 
+    inline double operator+(double a, d4_Type b) {
+        return a + b.x[0];
+    }
+
     inline boost::multiprecision::cpp_bin_float_100 operator+(boost::multiprecision::cpp_bin_float_100 b, d4_Type a) {
         return b + a.x[0] + a.x[1] + a.x[2] + a.x[3];
     }

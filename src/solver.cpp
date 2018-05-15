@@ -901,6 +901,23 @@ namespace gpusat {
                 edge2.solution[a] = nullptr;
             }
         }
+
+#ifdef TEST
+        cl_double sols=0;
+        for (cl_long a = 0; a < node.numSol / bagSizeNode; a++) {
+            if (node.solution[a] == nullptr) {
+                continue;
+            }
+            for (cl_long i = 0; i < bagSizeNode; i++) {
+                sols = sols + ((popcount(i + a * bagSizeNode) % 2) == 1 ? -node.solution[a][i] : node.solution[a][i]);
+            }
+        }
+        if(sols<0){
+            std::cerr << "Join - Value error: " << sols << "\n";
+            exit(1);
+        }
+#endif
+
 #ifdef DEBUG
         std::cout << "Join:\n";
         GPUSATUtils::printSol(node.numSol, node.variables, node.solution, formula, bagSizeNode);
@@ -1115,6 +1132,22 @@ namespace gpusat {
                 cnode.solution[a] = nullptr;
             }
         }
+
+#ifdef TEST
+        cl_double sols=0;
+        for (cl_long a = 0; a < node.numSol / bagSizeForget; a++) {
+            if (node.solution[a] == nullptr) {
+                continue;
+            }
+            for (cl_long i = 0; i < bagSizeForget; i++) {
+                sols = sols + ((popcount(i + a * bagSizeForget) % 2) == 1 ? -node.solution[a][i] : node.solution[a][i]);
+            }
+        }
+        if(sols<0){
+            std::cerr << "IF - Value error: " << sols << "\n";
+            exit(1);
+        }
+#endif
 #ifdef DEBUG
         std::cout << "solveIntroduceForget:\n";
         GPUSATUtils::printSol(node.numSol, node.variables, node.solution, formula, bagSizeForget);

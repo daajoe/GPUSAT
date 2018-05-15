@@ -16,11 +16,29 @@
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <d4_utils.h>
 
-cl_long popcount(cl_long x) {
-    x -= (x >> 1) & 0x5555555555555555;
-    x = (x & 0x3333333333333333) + ((x >> 2) & 0x3333333333333333);
-    return (((x + (x >> 4)) & 0x0f0f0f0f0f0f0f0f) * 0x0101010101010101) >> 56;
-}
+const char* kernel_str_d4_prim =
+#include "../kernel/SAT_d4_primal.cl"
+;
+
+const char* kernel_str_d4_inc =
+#include "../kernel/SAT_d4_inci.cl"
+;
+
+const char* kernel_str_d4_dual =
+#include "../kernel/SAT_d4_dual.cl"
+;
+
+const char* kernel_str_prim =
+#include "../kernel/SAT_d_primal.cl"
+;
+
+const char* kernel_str_inc =
+#include "../kernel/SAT_d_inci.cl"
+;
+
+const char* kernel_str_dual =
+#include "../kernel/SAT_d_dual.cl"
+;
 
 using namespace gpusat;
 
@@ -36,7 +54,6 @@ int main(int argc, char *argv[]) {
     std::string kernelPath = "./kernel/";
     graphTypes graph = NONE;
     bool factR, cpu, weighted;
-
     CLI::App app{};
 
     std::string filename = "default";
@@ -139,6 +156,10 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
+            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
+                continue;
+            }
+
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
@@ -194,35 +215,34 @@ int main(int argc, char *argv[]) {
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
             //create kernel binary if it doesn't exist
-            std::string sourcePath;
+            std::string kernelStr;
 
 #ifdef sType_Double
             switch (graph) {
                 case DUAL:
-                    sourcePath = kernelPath + "SAT_d_dual.cl";
+                    kernelStr.assign(kernel_str_dual);
                     break;
                 case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
+                    kernelStr.assign(kernel_str_prim);
                     break;
                 case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
+                    kernelStr.assign(kernel_str_inc);
                     break;
             }
 #else
             switch (graph) {
                 case DUAL:
-                    sourcePath = kernelPath + "SAT_d4_dual.cl";
+                    kernelStr.assign(kernel_str_d4_dual);
                     break;
                 case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d4_primal.cl";
+                    kernelStr.assign(kernel_str_d4_prim);
                     break;
                 case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d4_inci.cl";
+                    kernelStr.assign(kernel_str_d4_inc);
                     break;
             }
 #endif
             // read source file
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
             program = cl::Program(context, sources);
             program.build(devices);

@@ -1,3 +1,4 @@
+R"(
 #if defined(cl_khr_fp64)
 #  pragma OPENCL EXTENSION cl_khr_fp64: enable
 #elif defined(cl_amd_fp64)
@@ -515,3 +516,4 @@ __kernel void solveIntroduceForget(__global stype *solsF, __global stype *solsE,
         *sols = 1;
     }
 }
+)"

@@ -1,3 +1,4 @@
+R"(
 #if defined(cl_khr_fp64)
 #  pragma OPENCL EXTENSION cl_khr_fp64: enable
 #elif defined(cl_amd_fp64)
@@ -1270,3 +1271,4 @@ void d4_mul_w(d4_Type *a, __global d4_Type *b, d4_Type *ret) {
     ret->x[2] = s0;
     ret->x[3] = t0;
 }
+)"
