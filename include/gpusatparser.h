@@ -42,7 +42,7 @@ namespace gpusat {
          * @param  item         the line
          * @param weights      map containing the weights for each literal
          */
-        void parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights);
+        void parseWeightLine(std::string item, std::unordered_map<cl_long, cl_double> &weights);
 
         /**
          * parses a clause line of the sat formula
@@ -66,7 +66,7 @@ namespace gpusat {
          */
         treedecType parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType);
 
-        solType defaultWeight = 1.0;
+        cl_double defaultWeight = 1.0;
         int combineWidth;
 
     private:

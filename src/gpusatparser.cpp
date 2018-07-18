@@ -4,7 +4,6 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
-#include <d4_utils.h>
 #include <gpusatpreprocessor.h>
 
 namespace gpusat {
@@ -13,7 +12,7 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::unordered_map<cl_long, solType> weights;
+        std::unordered_map<cl_long, cl_double> weights;
         std::vector<cl_long> *clause = new std::vector<cl_long>();
         while (getline(ss, item)) {
             //ignore empty line
@@ -35,19 +34,19 @@ namespace gpusat {
         }
 
         if (wmc) {
-            ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
+            ret.variableWeights = new cl_double[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
             for (cl_long i = 0; i <= ret.numVars; i++) {
-                std::unordered_map<cl_long, solType>::const_iterator elem = weights.find(i);
+                std::unordered_map<cl_long, cl_double>::const_iterator elem = weights.find(i);
                 if (elem != weights.end()) {
-                    solType we = weights[i];
+                    cl_double we = weights[i];
                     if (we < 0.0) {
                         ret.variableWeights[i * 2] = 1;
                         ret.variableWeights[i * 2 + 1] = 1;
                     } else {
                         ret.variableWeights[i * 2] = weights[i];
-                        ret.variableWeights[i * 2 + 1] = weights[i] - 1.0;
+                        ret.variableWeights[i * 2 + 1] = 1.0 - weights[i];
                     }
                 } else {
                     ret.variableWeights[i * 2] = 0.5;
@@ -55,7 +54,7 @@ namespace gpusat {
                 }
             }
         } else {
-            ret.variableWeights = new solType[(ret.numVars + 1) * 2]();
+            ret.variableWeights = new cl_double[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
             for (cl_long i = 0; i <= ret.numVars; i++) {
@@ -106,14 +105,14 @@ namespace gpusat {
         while (i.size() == 0) getline(sline, i, ' ');
     }
 
-    void CNFParser::parseWeightLine(std::string item, std::unordered_map<cl_long, solType> &weights) {
+    void CNFParser::parseWeightLine(std::string item, std::unordered_map<cl_long, cl_double> &weights) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //w
         getline(sline, i, ' '); //variable
         cl_long id = stol(i);
         getline(sline, i, ' '); //weight
-        solType val = stod(i);
+        cl_double val = stod(i);
         weights[id] = (id < 0) ? -val : val;
     }
 
@@ -190,20 +189,21 @@ namespace gpusat {
             }
             ret_.numb++;
         }
-        ret_.bags = new bagType[ret_.numb];
         cl_long id = 0, cid = 2;
         bags.push_back(&ret.bags[0]);
         while (!bags.empty()) {
             preebagType *bag = bags.front();
+            bagType b;
             bags.pop_front();
-            ret_.bags[id].variables = (*bag).variables;
-            ret_.bags[id].numSol = static_cast<cl_long>(pow(2, (cl_long) ret_.bags[id].variables.size()));
+            b.variables = (*bag).variables;
+            b.numSol = static_cast<cl_long>(pow(2, (cl_long) b.variables.size()));
             for (int a = 0; a < bag->edges.size(); a++) {
-                ret_.bags[id].edges.push_back(cid);
+                b.edges.push_back(cid);
                 bags.push_back(bag->edges[a]);
                 cid++;
             }
-            std::sort(ret_.bags[id].edges.begin(), ret_.bags[id].edges.end());
+            std::sort(b.edges.begin(), b.edges.end());
+            ret_.bags.push_back(b);
             id++;
         }
         ret_.numVars = ret.numVars;

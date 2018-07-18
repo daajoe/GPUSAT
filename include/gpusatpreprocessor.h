@@ -24,7 +24,7 @@ namespace gpusat {
          * @param gType             the type of graph
          * @param defaultWeight     for WMC the product of the weights of the removed literals
          */
-        static void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType, solType &defaultWeight);
+        static void preprocessFacts(preetreedecType decomp, satformulaType &formula, graphTypes gType, cl_double &defaultWeight);
 
     private:
 

@@ -14,35 +14,12 @@
 #include <solver.h>
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include <d4_utils.h>
-
-const char* kernel_str_d4_prim =
-#include "../kernel/SAT_d4_primal.cl"
-;
-
-const char* kernel_str_d4_inc =
-#include "../kernel/SAT_d4_inci.cl"
-;
-
-const char* kernel_str_d4_dual =
-#include "../kernel/SAT_d4_dual.cl"
-;
-
-const char* kernel_str_prim =
-#include "../kernel/SAT_d_primal.cl"
-;
-
-const char* kernel_str_inc =
-#include "../kernel/SAT_d_inci.cl"
-;
-
-const char* kernel_str_dual =
-#include "../kernel/SAT_d_dual.cl"
-;
 
 using namespace gpusat;
 
 long long int getTime();
+
+bool isPrimalGraph(satformulaType *formula, treedecType *decomp);
 
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
@@ -62,7 +39,6 @@ int main(int argc, char *argv[]) {
     app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("10");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("24");
     app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
-    app.add_set("-g,--graph", graph, {PRIMAL, INCIDENCE, DUAL}, "graph type")->set_type_name("<0=Primal|1=Incidence|2=Dual>");
     app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
     app.add_flag("--CPU", cpu, "run the solver on the gpu");
     app.add_flag("--weighted", weighted, "use weighted model count");
@@ -128,21 +104,27 @@ int main(int argc, char *argv[]) {
         exit(20);
 
     }
-    if (graph == NONE) {
-        if (satFormula.clauses.size() == treeDecomp.numVars) {
-            // decomposition is of the dual
-            graph = DUAL;
-        } else if (satFormula.numVars == treeDecomp.numVars) {
-            // decomposition is of the incidence graph
+
+    if (satFormula.clauses.size() == satFormula.numVars && satFormula.numVars == treeDecomp.numVars) {
+        if (isPrimalGraph(&satFormula, &treeDecomp)) {
             graph = PRIMAL;
-        } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
-            // decomposition is of the primal graph
-            graph = INCIDENCE;
         } else {
-            std::cerr << "Error: Unknown graph type\n";
-            exit(EXIT_FAILURE);
+            graph = DUAL;
         }
+    } else if (satFormula.clauses.size() == treeDecomp.numVars) {
+        // decomposition is of the dual
+        graph = DUAL;
+    } else if (satFormula.numVars == treeDecomp.numVars) {
+        // decomposition is of the incidence graph
+        graph = PRIMAL;
+    } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
+        // decomposition is of the primal graph
+        graph = INCIDENCE;
+    } else {
+        std::cerr << "Error: Unknown graph type\n";
+        exit(EXIT_FAILURE);
     }
+
     time_parsing = getTime() - time_parsing;
 
     std::vector<cl::Platform> platforms;
@@ -183,7 +165,6 @@ int main(int argc, char *argv[]) {
         struct stat buffer;
         std::string binPath;
 
-#ifdef sType_Double
         switch (graph) {
             case DUAL:
                 binPath = kernelPath + "SAT_d_d.clbin";
@@ -197,52 +178,26 @@ int main(int argc, char *argv[]) {
             default:
                 break;
         }
-#else
-        switch (graph) {
-            case DUAL:
-                binPath = kernelPath + "SAT_d4_d.clbin";
-                break;
-            case PRIMAL:
-                binPath = kernelPath + "SAT_d4_p.clbin";
-                break;
-            case INCIDENCE:
-                binPath = kernelPath + "SAT_d4_i.clbin";
-                break;
-        }
-#endif
 
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
             //create kernel binary if it doesn't exist
-            std::string kernelStr;
+            std::string sourcePath;
 
-#ifdef sType_Double
             switch (graph) {
                 case DUAL:
-                    kernelStr.assign(kernel_str_dual);
+                    sourcePath = kernelPath + "SAT_d_dual.cl";
                     break;
                 case PRIMAL:
-                    kernelStr.assign(kernel_str_prim);
+                    sourcePath = kernelPath + "SAT_d_primal.cl";
                     break;
                 case INCIDENCE:
-                    kernelStr.assign(kernel_str_inc);
+                    sourcePath = kernelPath + "SAT_d_inci.cl";
                     break;
             }
-#else
-            switch (graph) {
-                case DUAL:
-                    kernelStr.assign(kernel_str_d4_dual);
-                    break;
-                case PRIMAL:
-                    kernelStr.assign(kernel_str_d4_prim);
-                    break;
-                case INCIDENCE:
-                    kernelStr.assign(kernel_str_d4_inc);
-                    break;
-            }
-#endif
             // read source file
+            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
             cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
             program = cl::Program(context, sources);
             program.build(devices);
@@ -355,11 +310,7 @@ int main(int argc, char *argv[]) {
             }
             char buf[128];
 
-#ifdef sType_Double
             std::cout << std::setprecision(20) << "{\n    \"Model Count\": " << sols;
-#else
-            std::cout << std::setprecision(80) << "{\n    \"Model Count\": " << sols;
-#endif
 
         } else {
             std::cout << "{\n    \"Model Count\": " << 0;
@@ -397,6 +348,26 @@ int main(int argc, char *argv[]) {
     catch (std::string &msg) {
         std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
+}
+
+bool isPrimalGraph(satformulaType *satFormula, treedecType *treeDecomp) {
+    for (auto &clause : satFormula->clauses) {
+        for (int x = 0; x < clause.size(); x++) {
+            for (int y = x + 1; y < clause.size(); y++) {
+                bool found = false;
+                for (int j = 0; j < treeDecomp->numb; j++) {
+                    if (std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[x])) != treeDecomp->bags[j].variables.end() &&
+                        std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[y])) != treeDecomp->bags[j].variables.end()) {
+                        found = true;
+                    }
+                }
+                if (!found) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 long long int getTime() {

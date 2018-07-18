@@ -11,61 +11,6 @@
 #include <vector>
 #include <set>
 
-struct d4_Type {
-    cl_double x[4];
-
-    d4_Type() {
-        x[0] = 0.0;
-        x[1] = 0.0;
-        x[2] = 0.0;
-        x[3] = 0.0;
-    }
-
-    d4_Type(double a, double b, double c, double d) {
-        x[0] = a;
-        x[1] = b;
-        x[2] = c;
-        x[3] = d;
-    }
-
-    d4_Type(double a) {
-        x[0] = a;
-        x[1] = 0.0;
-        x[2] = 0.0;
-        x[3] = 0.0;
-    }
-
-    d4_Type &operator=(double a) {
-        x[0] = a;
-        x[1] = 0.0;
-        x[2] = 0.0;
-        x[3] = 0.0;
-        return *this;
-    }
-
-    d4_Type &operator=(d4_Type a) {
-        x[0] = a.x[0];
-        x[1] = a.x[1];
-        x[2] = a.x[2];
-        x[3] = a.x[3];
-        return *this;
-    }
-
-    d4_Type &operator=(d4_Type *a) {
-        x[0] = a->x[0];
-        x[1] = a->x[1];
-        x[2] = a->x[2];
-        x[3] = a->x[3];
-        return *this;
-    }
-};
-
-#ifdef sType_Double
-#define solType cl_double
-#else
-#define solType d4_Type
-#endif
-
 namespace dual {
     /**
      * parameters for the dual join kernel
@@ -107,17 +52,18 @@ namespace gpusat {
 
     /// type for a bag in the tree decomposition
     struct bagType {
+        cl_long id = 0;
         cl_long numSol = 0;
         std::vector<cl_long> variables;
         std::vector<cl_long> edges;
-        solType **solution = nullptr;
+        cl_double **solution = nullptr;
     };
 
     /// type for saving a tree decomposition
     struct treedecType {
         cl_long numb = 0;
         cl_long numVars = 0;
-        bagType *bags = nullptr;
+        std::vector<bagType> bags;
     };
 
     /// type for preprocessing a tree decomposition
@@ -150,7 +96,7 @@ namespace gpusat {
         cl_long numVars = 0;
         cl_long numWeights = 0;
         bool unsat = false;
-        solType *variableWeights = nullptr;
+        cl_double *variableWeights = nullptr;
         std::vector<std::vector<cl_long>> clauses;
         std::vector<cl_long> facts;
     };
