@@ -61,11 +61,11 @@ namespace gpusat {
         Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
 
     protected:
-        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) override;
 
-        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf) override;
     };
-
+/*
     class Solver_Incidence : public Solver {
     public:
         Solver_Incidence(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
@@ -84,6 +84,6 @@ namespace gpusat {
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula);
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf);
-    };
+    };*/
 }
 #endif //GPUSAT_SOLVER_H_H

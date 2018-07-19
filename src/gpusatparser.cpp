@@ -126,7 +126,7 @@ namespace gpusat {
     }
 
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType) {
-        preetreedecType ret = preetreedecType();
+        treedecType ret;
         std::stringstream ss(graph);
         std::string item;
         std::vector<std::vector<cl_long>> edges;
@@ -177,32 +177,34 @@ namespace gpusat {
         }
         // combine small bags
         Preprocessor::preprocessDecomp(&ret.bags[0], combineWidth);
-        treedecType ret_ = treedecType();
+        treedecType ret_;
         ret_.numb = 0;
-        std::list<preebagType *> bags;
+        ret_.numVars = 0;
+        ret_.bags.clear();
+        std::list<bagType *> bags;
         bags.push_back(&(ret.bags[0]));
         while (!bags.empty()) {
-            preebagType *bag = bags.front();
+            bagType *bag = bags.front();
             bags.pop_front();
             for (int a = 0; a < bag->edges.size(); a++) {
                 bags.push_back(bag->edges[a]);
             }
             ret_.numb++;
         }
-        cl_long id = 0, cid = 2;
+        cl_long id = 0, cid = 1;
         bags.push_back(&ret.bags[0]);
+        ret_.bags.reserve(ret_.numb);
         while (!bags.empty()) {
-            preebagType *bag = bags.front();
+            bagType *bag = bags.front();
             bagType b;
             bags.pop_front();
             b.variables = (*bag).variables;
-            b.numSol = static_cast<cl_long>(pow(2, (cl_long) b.variables.size()));
             for (int a = 0; a < bag->edges.size(); a++) {
-                b.edges.push_back(cid);
+                b.edges.push_back(&(ret_.bags[cid]));
                 bags.push_back(bag->edges[a]);
                 cid++;
             }
-            std::sort(b.edges.begin(), b.edges.end());
+            std::sort(b.edges.begin(), b.edges.end(), compTreedType);
             ret_.bags.push_back(b);
             id++;
         }
@@ -221,13 +223,13 @@ namespace gpusat {
         edges[end - 1].push_back(start);
     }
 
-    void TDParser::parseStartLine(preetreedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges) {
+    void TDParser::parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //s
         getline(sline, i, ' '); //td
         getline(sline, i, ' '); //num bags
-        ret.bags = new preebagType[stoi(i)];
+        ret.bags.resize(stoi(i));
         ret.numb = stoi(i);
         for (int a = 0; a < ret.numb; a++) {
             std::vector<cl_long> edge;
@@ -238,7 +240,7 @@ namespace gpusat {
         ret.numVars = stoi(i);
     }
 
-    void TDParser::parseBagLine(preetreedecType &ret, std::string item) {
+    void TDParser::parseBagLine(treedecType &ret, std::string item) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //b

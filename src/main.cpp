@@ -237,10 +237,10 @@ int main(int argc, char *argv[]) {
         switch (graph) {
             case PRIMAL:
                 sol = new Solver_Primal(context, queue, program, maxBag);
-                next.numSol = pow(2, next.variables.size());
                 next.variables.assign(treeDecomp.bags[0].variables.begin(),
                                       treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
+                /*
             case DUAL:
                 sol = new Solver_Dual(context, queue, program, maxBag);
                 next.numSol = pow(2, next.variables.size());
@@ -259,7 +259,7 @@ int main(int argc, char *argv[]) {
                 }
                 next.numSol = pow(2, next.variables.size());
                 next.variables = *vars;
-                break;
+                break;*/
         }
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next);
@@ -270,25 +270,19 @@ int main(int argc, char *argv[]) {
         boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
             cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
-            if (graph == DUAL) {
+            /*if (graph == DUAL) {
                 for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
-                    if (treeDecomp.bags[0].solution[a] == nullptr) {
-                        continue;
-                    }
                     for (cl_long i = 0; i < bagSizeNode; i++) {
                         sols = sols + ((popcount(i + a * bagSizeNode) % 2) == 1 ? -treeDecomp.bags[0].solution[a][i] : treeDecomp.bags[0].solution[a][i]);
                     }
                 }
-            } else {
-                for (cl_long a = 0; a < treeDecomp.bags[0].numSol / bagSizeNode; a++) {
-                    if (treeDecomp.bags[0].solution[a] == nullptr) {
-                        continue;
-                    }
-                    for (cl_long i = 0; i < bagSizeNode; i++) {
-                        sols = sols + treeDecomp.bags[0].solution[a][i];
-                    }
+            } else {*/
+            for (cl_long a = 0; a < treeDecomp.bags[0].solution.size(); a++) {
+                for (cl_long i = 0; i < treeDecomp.bags[0].solution[a].elements.size(); i++) {
+                    sols = sols + treeDecomp.bags[0].solution[a].elements[i].count;
                 }
             }
+            //}
             if (!weighted && graph != DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);

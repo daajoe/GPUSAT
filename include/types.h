@@ -50,13 +50,22 @@ namespace dual {
 }
 namespace gpusat {
 
+    struct myTableElement {
+        cl_long id = -1;
+        cl_double count = 0;
+    };
+
+    struct myHashTable {
+        std::vector<myTableElement> elements;
+        cl_long numSolutions=0;
+    };
+
     /// type for a bag in the tree decomposition
     struct bagType {
         cl_long id = 0;
-        cl_long numSol = 0;
         std::vector<cl_long> variables;
-        std::vector<cl_long> edges;
-        cl_double **solution = nullptr;
+        std::vector<bagType *> edges;
+        std::vector<myHashTable> solution;
     };
 
     /// type for saving a tree decomposition
@@ -66,20 +75,6 @@ namespace gpusat {
         std::vector<bagType> bags;
     };
 
-    /// type for preprocessing a tree decomposition
-    struct preebagType {
-        cl_long id = 0;
-        std::vector<cl_long> variables;
-        std::vector<preebagType *> edges;
-    };
-
-    /// type for saving a tree decomposition
-    struct preetreedecType {
-        cl_long numb = 0;
-        cl_long numVars = 0;
-        preebagType *bags = nullptr;
-    };
-
     /**
      * Function that compares two tree decompostions by id.
      *
@@ -87,7 +82,7 @@ namespace gpusat {
      * @param b     the second tree decomposition
      * @return      a < b
      */
-    inline bool compTreedType(const preebagType *a, const preebagType *b) {
+    inline bool compTreedType(const bagType *a, const bagType *b) {
         return a->id < b->id;
     }
 
