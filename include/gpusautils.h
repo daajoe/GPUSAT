@@ -19,12 +19,9 @@ namespace gpusat {
         /**
          * function to print the solution of a single bag in tree decomposition in human readable form
          *
-         * @param numS              the number of assignments
-         * @param numVariables      the number of variables
-         * @param vars              arrray containing the variables
-         * @param sol               array ontaining the number of models for each assignment
+         * @param bag
          */
-        static void printSol(cl_long numS, std::vector<cl_long> vars, cl_double **sol, satformulaType &type, cl_long i);
+        static void printSol(bagType &bag);
 
         /**
          * reads a binary file from @path and retuns the contents in a string

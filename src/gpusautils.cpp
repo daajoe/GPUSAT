@@ -7,22 +7,16 @@
 
 namespace gpusat {
 
-    void GPUSATUtils::printSol(cl_long numS, std::vector<cl_long> vars, cl_double **sol, satformulaType &formula, cl_long bagSize) {
+    void GPUSATUtils::printSol(bagType &bag) {
         std::cout << "variables: \n";
-        for (int j = 0; j < vars.size(); ++j) {
-            std::cout << vars[j] << " ";
+        for (int j = 0; j < bag.variables.size(); ++j) {
+            std::cout << bag.variables[j] << " ";
         }
         std::cout << "\nsolutions: \n";
-        for (int i = 0; i < numS / bagSize; i++) {
-            if (sol[i] == nullptr) {
-                for (int a = 0; a < bagSize; a++) {
-                    std::cout << i * bagSize + a << ": 0\n";
-                }
-                continue;
-            }
-            for (int a = 0; a < bagSize; a++) {
-                std::cout << i * bagSize + a << ": ";
-                std::cout << sol[i][a] << "\n";
+        for (int i = 0; i < bag.solution.size(); i++) {
+            for (int a = 0; a < bag.solution[i].elements.size(); a++) {
+                std::cout << bag.solution[i].elements[a].id << ": ";
+                std::cout << bag.solution[i].elements[a].count << "\n";
             }
         }
     }

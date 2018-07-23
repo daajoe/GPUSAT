@@ -18,7 +18,7 @@ typedef struct {
 } tableElement;
 
 double getCount(long id, __global tableElement *elements, long size) {
-    for (int i = 0; i < size; i++) {
+    for (long i = 0; i < size; i++) {
         if (elements[(id + i) % size].id == id) {
             double c = elements[(id + i) % size].count;
             if (c == -1.0) {
@@ -32,7 +32,7 @@ double getCount(long id, __global tableElement *elements, long size) {
 }
 
 void setCount(long id, __global tableElement *elements, long size, double count, __global long *counts) {
-    for (int i = 0; i < size; i++) {
+    for (long i = 0; i < size; i++) {
         long oldId = atom_cmpxchg(&(elements[(id + i) % size].id), -1, id);
         if (oldId == -1) {
             elements[(id + i) % size].count = count;
@@ -324,7 +324,7 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
         }
 
         // iterate through all corresponding edge solutions
-        for (int i = 0; i < combinations; i++) {
+        for (long i = 0; i < combinations; i++) {
             long b = 0, otherId = templateId;
             for (int a = 0; a < numVI; a++) {
                 if (b >= numVF || varsI[a] != varsF[b]) {
