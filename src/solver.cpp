@@ -55,6 +55,35 @@ namespace gpusat {
         }
     }
 
+    void Solver::resizeMap(myHashTable &table) {
+
+        myHashTable t;
+        t.numSolutions = 0;
+        t.elements.resize(table.numSolutions * 2);
+
+        cl::Kernel kernel_resize = cl::Kernel(program, "resize");
+        cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * table.elements.size(), &table.elements[0]);
+        kernel_resize.setArg(0, buf_sols_old);
+        cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
+        kernel_resize.setArg(1, buf_sols_new);
+        kernel_resize.setArg(2, t.elements.size());
+        cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
+        kernel_resize.setArg(3, buf_num_sol);
+
+        cl_long error1 = 0, error2 = 0;
+        error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.elements.size())));
+        error2 = queue.finish();
+        if (error1 != 0 || error2 != 0) {
+            std::cerr << "Introduce Forget resize - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
+            exit(1);
+        }
+        queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
+        queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
+        table.elements.clear();
+        table = t;
+
+    }
+
     void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
         cl_long bagSizeEdge1 = static_cast<cl_long>(pow(2, std::min(maxWidth, (cl_long) edge1.variables.size())));
         cl_long bagSizeEdge2 = static_cast<cl_long>(pow(2, std::min(maxWidth, (cl_long) edge2.variables.size())));
@@ -161,29 +190,7 @@ namespace gpusat {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
                 this->isSat = 1;
                 if (node.solution[a].elements.size() > node.solution[a].numSolutions * 2) {
-                    myHashTable t;
-                    t.numSolutions = 0;
-                    t.elements.resize(node.solution[a].numSolutions * 2);
-
-                    cl::Kernel kernel_resize = cl::Kernel(program, "resize");
-                    cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
-                    kernel_resize.setArg(0, buf_sols_old);
-                    cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
-                    kernel_resize.setArg(1, buf_sols_new);
-                    kernel_resize.setArg(2, t.elements.size());
-                    cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
-                    kernel_resize.setArg(3, buf_num_sol);
-
-                    cl_long error1 = 0, error2 = 0;
-                    error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(node.solution[a].elements.size())));
-                    error2 = queue.finish();
-                    if (error1 != 0 || error2 != 0) {
-                        std::cerr << "Introduce Forget resize - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
-                        exit(1);
-                    }
-                    queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
-                    queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
-                    node.solution[a] = t;
+                    this->resizeMap(node.solution[a]);
                 }
             }
         }
@@ -327,29 +334,7 @@ namespace gpusat {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
                 this->isSat = 1;
                 if (node.solution[a].elements.size() > node.solution[a].numSolutions * 2) {
-                    myHashTable t;
-                    t.numSolutions = 0;
-                    t.elements.resize(node.solution[a].numSolutions * 2);
-
-                    cl::Kernel kernel_resize = cl::Kernel(program, "resize");
-                    cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
-                    kernel_resize.setArg(0, buf_sols_old);
-                    cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
-                    kernel_resize.setArg(1, buf_sols_new);
-                    kernel_resize.setArg(2, t.elements.size());
-                    cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
-                    kernel_resize.setArg(3, buf_num_sol);
-
-                    cl_long error1 = 0, error2 = 0;
-                    error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(node.solution[a].elements.size())));
-                    error2 = queue.finish();
-                    if (error1 != 0 || error2 != 0) {
-                        std::cerr << "Introduce Forget resize - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
-                        exit(1);
-                    }
-                    queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(myTableElement) * t.elements.size(), &t.elements[0]);
-                    queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
-                    node.solution[a] = t;
+                    this->resizeMap(node.solution[a]);
                 }
             }
         }
