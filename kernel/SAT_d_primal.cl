@@ -20,7 +20,9 @@ typedef struct {
 double getCount(long id, __global tableElement *elements, long size) {
     for (long i = 0; i < size; i++) {
         if (elements[(id + i) % size].id == id) {
+
             double c = elements[(id + i) % size].count;
+
             if (c == -1.0) {
                 return 1.0;
             } else {
@@ -34,19 +36,31 @@ double getCount(long id, __global tableElement *elements, long size) {
 void setCount(long id, __global tableElement *elements, long size, double count, __global long *counts) {
     for (long i = 0; i < size; i++) {
         long oldId = atom_cmpxchg(&(elements[(id + i) % size].id), -1, id);
+
         if (oldId == -1) {
+
             elements[(id + i) % size].count = count;
             atom_add(counts, 1);
             return;
+
         } else if (oldId == id) {
+
             if (elements[(id + i) % size].count == -1.0) {
                 atom_add(counts, 1);
             } else if (elements[(id + i) % size].count > 0 && counts == 0) {
                 atom_sub(counts, 1);
             }
+
             elements[(id + i) % size].count = count;
             return;
         }
+    }
+}
+
+__kernel void resize(__global tableElement *solutions_old, __global tableElement *solutions_new, long tableSize_new, __global long *counts) {
+    long id = get_global_id(0);
+    if (solutions_old[id].count > 0) {
+        setCount(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count, counts);
     }
 }
 
@@ -81,6 +95,7 @@ stype solveIntroduce_(long numV, __global tableElement *edge, long numVE, __glob
         while ((variables[a] != edgeVariables[b])) {
             a++;
         }
+
         otherId = otherId | (((id >> a) & 1) << b);
         a++;
     };
@@ -206,8 +221,7 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
-        setCount(id, solutions, tableSize, getCount(id, solutions, tableSize) * tmp, sols);
-        setCount(id, solutions, tableSize, getCount(id, solutions, tableSize) / weight, sols);
+        setCount(id, solutions, tableSize, getCount(id, solutions, tableSize) * tmp / weight, sols);
     }
 
     // we have some solutions in edge2
@@ -314,6 +328,7 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
                                    __global long *clauses, __global long *numVarsC, long numclauses, __global double *weights, long tableSizeF, long tableSizeE) {
     long id = get_global_id(0);
     if (numVI != numVF) {
+        double tmp = 0;
         long templateId = 0;
         // generate templateId
         for (int i = 0, a = 0; i < numVI && a < numVF; i++) {
@@ -334,9 +349,9 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
                 }
             }
             // get solution count of the corresponding assignment in the edge
-            double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId, tableSizeE) + getCount(id, solsF, tableSizeF);
-            if (tmp > 0) setCount(id, solsF, tableSizeF, tmp, sols);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId, tableSizeE);
         }
+        if (tmp > 0) setCount(id, solsF, tableSizeF, tmp + getCount(id, solsF, tableSizeF), sols);
     } else {
         // no forget variables, only introduce
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id, tableSizeE) + getCount(id, solsF, tableSizeF);
