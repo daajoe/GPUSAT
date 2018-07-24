@@ -138,10 +138,6 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
-                continue;
-            }
-
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
