@@ -57,7 +57,9 @@ namespace gpusat {
 
     struct myHashTable {
         std::vector<myTableElement> elements;
-        cl_long numSolutions=0;
+        cl_long numSolutions = 0;
+        cl_long minId = 0;
+        cl_long maxId = 0;
     };
 
     /// type for a bag in the tree decomposition

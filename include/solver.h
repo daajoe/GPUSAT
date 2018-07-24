@@ -56,6 +56,8 @@ namespace gpusat {
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula)=0;
 
         void resizeMap(myHashTable &table);
+
+        void combineMap(myHashTable &to, myHashTable &from);
     };
 
     class Solver_Primal : public Solver {
