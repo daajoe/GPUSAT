@@ -138,6 +138,10 @@ int main(int argc, char *argv[]) {
         cl::Platform::get(&platforms);
         std::vector<cl::Platform>::iterator iter;
         for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
+            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
+                continue;
+            }
+
             cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
             if (cpu) {
                 context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
@@ -279,12 +283,12 @@ int main(int argc, char *argv[]) {
                 }
             }
             //}
-            if (!weighted && graph != DUAL) {
+            /*if (!weighted && graph != DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);
             } else if (graph != DUAL) {
                 sols = sols * tdParser.defaultWeight;
-            }
+            }*/
 
             if (graph == DUAL) {
                 std::set<cl_long> varSet;
