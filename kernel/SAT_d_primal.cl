@@ -9,9 +9,6 @@
 #endif
 #define stype double
 
-//#define __kernel
-//#define __global
-
 typedef struct {
     long id;
     double count;
@@ -20,37 +17,26 @@ typedef struct {
 double getCount(long id, __global tableElement *elements, long size) {
     for (long i = 0; i < size; i++) {
         if (elements[(id + i) % size].id == id) {
-
-            double c = elements[(id + i) % size].count;
-
-            if (c == -1.0) {
-                return 1.0;
-            } else {
-                return c;
-            }
+            return elements[(id + i) % size].count;
+        }else if(elements[(id + i) % size].id <0){
+            return 0;
         }
     }
     return 0;
 }
 
-void setCount(long id, __global tableElement *elements, long size, double count, __global long *counts) {
+void setCount_(long id, __global tableElement *elements, long size, double count, __global long *counts) {
     for (long i = 0; i < size; i++) {
         long oldId = atom_cmpxchg(&(elements[(id + i) % size].id), -1, id);
 
         if (oldId == -1) {
-
             elements[(id + i) % size].count = count;
             atom_add(counts, 1);
             return;
-
         } else if (oldId == id) {
-
-            if (elements[(id + i) % size].count == -1.0) {
-                atom_add(counts, 1);
-            } else if (elements[(id + i) % size].count > 0 && counts == 0) {
+            if (elements[(id + i) % size].count > 0 && counts == 0) {
                 atom_sub(counts, 1);
             }
-
             elements[(id + i) % size].count = count;
             return;
         }
@@ -60,7 +46,7 @@ void setCount(long id, __global tableElement *elements, long size, double count,
 __kernel void resize(__global tableElement *solutions_old, __global tableElement *solutions_new, long tableSize_new, __global long *counts) {
     long id = get_global_id(0);
     if (solutions_old[id].count > 0) {
-        setCount(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count, counts);
+        setCount_(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count, counts);
     }
 }
 
@@ -113,7 +99,7 @@ stype solveIntroduce_(long numV, __global tableElement *edge, long numVE, __glob
     }
 
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
-        return getCount(otherId, edge, tableSize) * weight;
+        return  getCount(otherId,edge,tableSize);
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
     } else {
@@ -221,12 +207,32 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
-        setCount(id, solutions, tableSize, getCount(id, solutions, tableSize) * tmp / weight, sols);
+        double oldVal = getCount(id,solutions,tableSize);
+        if (tmp>0 && oldVal<0){
+            atom_add(sols, 1);
+        }else if(oldVal>0 && tmp==0){
+            atom_sub(sols,1);
+        }
+        if (oldVal < 0){
+            oldVal *= -1.0;
+        }
+        solutions[id % tableSize].count = tmp*oldVal;
+        solutions[id % tableSize].id = id;
     }
 
     // we have some solutions in edge2
     if (tmp_ >= 0.0) {
-        setCount(id, solutions, tableSize, getCount(id, solutions, tableSize) * tmp_, sols);
+        double oldVal = getCount(id,solutions,tableSize);
+        if (tmp>0 && oldVal<0){
+            atom_add(sols, 1);
+        }else if(oldVal>0 && tmp==0){
+            atom_sub(sols,1);
+        }
+        if (oldVal < 0){
+            oldVal *= -1.0;
+        }
+        solutions[id % tableSize].count = tmp_*oldVal;
+        solutions[id % tableSize].id = id;
     }
 }
 
@@ -351,11 +357,19 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
             // get solution count of the corresponding assignment in the edge
             tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId, tableSizeE);
         }
-        if (tmp > 0) setCount(id, solsF, tableSizeF, tmp + getCount(id, solsF, tableSizeF), sols);
+        solsF[id % tableSizeF].count = tmp+getCount(id,solsF,tableSizeF);
+        solsF[id % tableSizeF].id = id;
+        if (tmp>0){
+            atom_add(sols, 1);
+        }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id, tableSizeE) + getCount(id, solsF, tableSizeF);
-        if (tmp > 0) setCount(id, solsF, tableSizeF, tmp, sols);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id, tableSizeE);
+        solsF[id % tableSizeF].count = tmp + getCount(id,solsF,tableSizeF);
+        solsF[id % tableSizeF].id = id;
+        if (tmp>0){
+            atom_add(sols, 1);
+        }
 
     }
 }
