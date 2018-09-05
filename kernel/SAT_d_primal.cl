@@ -25,18 +25,11 @@ double getCount(long id, __global tableElement *elements, long size) {
     return 0;
 }
 
-void setCount_(long id, __global tableElement *elements, long size, double count, __global long *counts) {
+void setCount(long id, __global tableElement *elements, long size, double count) {
     for (long i = 0; i < size; i++) {
         long oldId = atom_cmpxchg(&(elements[(id + i) % size].id), -1, id);
 
         if (oldId == -1) {
-            elements[(id + i) % size].count = count;
-            atom_add(counts, 1);
-            return;
-        } else if (oldId == id) {
-            if (elements[(id + i) % size].count > 0 && counts == 0) {
-                atom_sub(counts, 1);
-            }
             elements[(id + i) % size].count = count;
             return;
         }
@@ -46,7 +39,8 @@ void setCount_(long id, __global tableElement *elements, long size, double count
 __kernel void resize(__global tableElement *solutions_old, __global tableElement *solutions_new, long tableSize_new, __global long *counts) {
     long id = get_global_id(0);
     if (solutions_old[id].count > 0) {
-        setCount_(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count, counts);
+        setCount(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count);
+        atom_add(counts, 1);
     }
 }
 

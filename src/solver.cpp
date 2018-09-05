@@ -95,9 +95,9 @@ namespace gpusat {
     }
 
     void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
-        cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min(maxWidth, (cl_long) node.variables.size())));
+        cl_long bagSizeNode = 1l << std::min(maxWidth, (cl_long) node.variables.size());
 
-        node.solution.resize(ceil((1 << (node.variables.size())) / bagSizeNode));
+        node.solution.resize(static_cast<unsigned long>(ceil((1l << (node.variables.size())) / bagSizeNode)));
         this->numJoin++;
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
@@ -216,16 +216,22 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
                 this->isSat = 1;
-                if (a > 0 && node.solution[a].numSolutions + node.solution[a - 1].numSolutions < bagSizeNode) {
+                /*if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 4 < bagSizeNode)) {
                     this->combineMap(node.solution[a], node.solution[a - 1]);
                     node.solution.erase(node.solution.begin() + a);
                     a--;
-                }
-                if (node.solution[a].elements.size() > node.solution[a].numSolutions * 2) {
+                }*/
+
+                if (node.solution[a].elements.size() > node.solution[a].numSolutions * 4) {
                     this->resizeMap(node.solution[a]);
                 }
             }
         }
+        cl_long tableSize = 0;
+        for (int i = 0; i < node.solution.size(); i++) {
+            tableSize += node.solution[i].elements.size();
+        }
+        this->maxTableSize = std::max(this->maxTableSize, tableSize);
         //std::cout << "Join\n";
         //GPUSATUtils::printSol(node);
         for (cl_long a = 0; a < edge1.solution.size(); a++) {
@@ -369,16 +375,24 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].elements.size(), &node.solution[a].elements[0]);
                 this->isSat = 1;
-                if (a > 0 && node.solution[a].numSolutions + node.solution[a - 1].numSolutions < bagSizeForget) {
+                /*if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 4 < bagSizeForget)) {
+                    std::cout << "IF - combine!\n";
                     this->combineMap(node.solution[a], node.solution[a - 1]);
                     node.solution.erase(node.solution.begin() + a);
+                    std::cout << "IF - combine finished!\n";
                     a--;
-                }
-                if (node.solution[a].elements.size() > node.solution[a].numSolutions * 2) {
+                }*/
+
+                if (node.solution[a].elements.size() > node.solution[a].numSolutions * 4) {
                     this->resizeMap(node.solution[a]);
                 }
             }
         }
+        cl_long tableSize = 0;
+        for (int i = 0; i < node.solution.size(); i++) {
+            tableSize += node.solution[i].elements.size();
+        }
+        this->maxTableSize = std::max(this->maxTableSize, tableSize);
         //std::cout << "IF\n";
         //GPUSATUtils::printSol(node);
         for (cl_long a = 0; a < cnode.solution.size(); a++) {

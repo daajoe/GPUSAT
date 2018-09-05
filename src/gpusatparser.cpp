@@ -4,7 +4,7 @@
 #include <iostream>
 #include <algorithm>
 #include <gpusatparser.h>
-#include <gpusatpreprocessor.h>
+#include <unordered_set>
 
 namespace gpusat {
 
@@ -125,6 +125,40 @@ namespace gpusat {
         factR = b;
     }
 
+    void TDParser::iterateDecompPre(bagType &bag){
+        this->preWidth = (bag.variables.size() > this->preWidth) ? bag.variables.size() : this->preWidth;
+        std::unordered_set<cl_long> joinSet;
+
+        for (auto &node:bag.edges) {
+            iterateDecompPre(*node);
+            std::set_intersection(bag.variables.begin(), bag.variables.end(), node->variables.begin(), node->variables.end(), std::inserter(joinSet, joinSet.begin()));
+            std::unordered_set<cl_long> cutSet;
+            std::set_intersection(bag.variables.begin(), bag.variables.end(), node->variables.begin(), node->variables.end(), std::inserter(cutSet, cutSet.begin()));
+            this->preCut = (cutSet.size() > this->preCut) ? cutSet.size() : this->preCut;
+        }
+
+        if (bag.edges.size() > 1) {
+            this->preJoinSize = (joinSet.size() > this->preJoinSize) ? joinSet.size() : this->preJoinSize;
+        }
+    }
+
+    void TDParser::iterateDecompPost(bagType &bag){
+        this->postWidth = (bag.variables.size() > this->postWidth) ? bag.variables.size() : this->postWidth;
+        std::unordered_set<cl_long> joinSet;
+
+        for (auto &node:bag.edges) {
+            iterateDecompPost(*node);
+            std::set_intersection(bag.variables.begin(), bag.variables.end(), node->variables.begin(), node->variables.end(), std::inserter(joinSet, joinSet.begin()));
+            std::unordered_set<cl_long> cutSet;
+            std::set_intersection(bag.variables.begin(), bag.variables.end(), node->variables.begin(), node->variables.end(), std::inserter(cutSet, cutSet.begin()));
+            this->postCut = (cutSet.size() > this->postCut) ? cutSet.size() : this->postCut;
+        }
+
+        if (bag.edges.size() > 1) {
+            this->postJoinSize = (joinSet.size() > this->postJoinSize) ? joinSet.size() : this->postJoinSize;
+        }
+    }
+
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType) {
         treedecType ret;
         std::stringstream ss(graph);
@@ -168,48 +202,9 @@ namespace gpusat {
             }
         }
 
-        // remove facts form decomp and formula
-        if (factR) {
-            Preprocessor::preprocessFacts(ret, formula, gType, defaultWeight);
-            if (formula.unsat) {
-                return treedecType();
-            }
-        }
-        // combine small bags
-        Preprocessor::preprocessDecomp(&ret.bags[0], combineWidth);
-        treedecType ret_;
-        ret_.numb = 0;
-        ret_.numVars = 0;
-        ret_.bags.clear();
-        std::list<bagType *> bags;
-        bags.push_back(&(ret.bags[0]));
-        while (!bags.empty()) {
-            bagType *bag = bags.front();
-            bags.pop_front();
-            for (int a = 0; a < bag->edges.size(); a++) {
-                bags.push_back(bag->edges[a]);
-            }
-            ret_.numb++;
-        }
-        cl_long id = 0, cid = 1;
-        bags.push_back(&ret.bags[0]);
-        ret_.bags.reserve(ret_.numb);
-        while (!bags.empty()) {
-            bagType *bag = bags.front();
-            bagType b;
-            bags.pop_front();
-            b.variables = (*bag).variables;
-            for (int a = 0; a < bag->edges.size(); a++) {
-                b.edges.push_back(&(ret_.bags[cid]));
-                bags.push_back(bag->edges[a]);
-                cid++;
-            }
-            std::sort(b.edges.begin(), b.edges.end(), compTreedType);
-            ret_.bags.push_back(b);
-            id++;
-        }
-        ret_.numVars = ret.numVars;
-        return ret_;
+        iterateDecompPre(ret.bags[0]);
+        this->preNumBags = ret.bags.size();
+        return ret;
     }
 
     void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {

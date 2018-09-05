@@ -13,12 +13,19 @@ endif ()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-if(UNIX)
+if (DEBUG)
+    # compiler flags
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -g")
+    # linker flags
+    SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
+        #
+    add_definitions(-DDEBUG)
+elseif (UNIX)
     # compiler flags
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O3")
     # linker flags
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
-endif(UNIX)
+endif ()
 
 file(GLOB gpusat_SRC "src/*.cpp")
 add_executable(gpusat ${gpusat_SRC})

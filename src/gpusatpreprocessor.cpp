@@ -110,7 +110,7 @@ namespace gpusat {
 
     }
 
-    void Preprocessor::preprocessFacts(treedecType decomp, satformulaType &formula, graphTypes gType, cl_double &defaultWeight) {
+    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, graphTypes gType, cl_double &defaultWeight) {
         for (cl_long i = 0; i < formula.facts.size(); i++) {
             cl_long fact = formula.facts[i];
             for (cl_long a = 0; a < formula.clauses.size(); a++) {

@@ -14,6 +14,7 @@
 #include <solver.h>
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
+#include <gpusatpreprocessor.h>
 
 using namespace gpusat;
 
@@ -82,28 +83,6 @@ int main(int argc, char *argv[]) {
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
     treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula, graph);
-    //found unsat during preprocessing
-    if (satFormula.unsat) {
-        std::cout << "{\n    \"Model Count\": " << 0;
-        time_total = getTime() - time_total;
-        std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Solving\": " << 0;
-        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
-        std::cout << "\n        ,\"Build_Kernel\": " << 0;
-        std::cout << "\n        ,\"Generate_Model\": " << 0;
-        std::cout << "\n        ,\"Init_OpenCL\": " << 0;
-        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        std::cout << "\n    }";
-        std::cout << "\n    ,\"Statistics\":{";
-        std::cout << "\n        \"Num Join\": " << 0;
-        std::cout << "\n        ,\"Num Forget\": " << 0;
-        std::cout << "\n        ,\"Num Introduce\": " << 0;
-        std::cout << "\n        ,\"Num Leaf\": " << 0;
-        std::cout << "\n    }";
-        std::cout << "\n}";
-        exit(20);
-
-    }
 
     if (satFormula.clauses.size() == satFormula.numVars && satFormula.numVars == treeDecomp.numVars) {
         if (isPrimalGraph(&satFormula, &treeDecomp)) {
@@ -124,6 +103,36 @@ int main(int argc, char *argv[]) {
         std::cerr << "Error: Unknown graph type\n";
         exit(EXIT_FAILURE);
     }
+
+    // remove facts form decomp and formula
+    if (!factR) {
+        Preprocessor::preprocessFacts(treeDecomp, satFormula, graph, tdParser.defaultWeight);
+        if (satFormula.unsat) {
+            std::cout << "{\n    \"Model Count\": " << 0;
+            time_total = getTime() - time_total;
+            std::cout << "\n    ,\"Time\":{";
+            std::cout << "\n        \"Solving\": " << 0;
+            std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
+            std::cout << "\n        ,\"Build_Kernel\": " << 0;
+            std::cout << "\n        ,\"Generate_Model\": " << 0;
+            std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+            std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+            std::cout << "\n    }";
+            std::cout << "\n    ,\"Statistics\":{";
+            std::cout << "\n        \"Num Join\": " << 0;
+            std::cout << "\n        ,\"Num Forget\": " << 0;
+            std::cout << "\n        ,\"Num Introduce\": " << 0;
+            std::cout << "\n        ,\"Num Leaf\": " << 0;
+            std::cout << "\n    }";
+            std::cout << "\n}";
+            exit(20);
+        }
+    }
+    // combine small bags
+    Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
+
+    tdParser.iterateDecompPost(treeDecomp.bags[0]);
+    tdParser.postNumBags = treeDecomp.bags.size();
 
     time_parsing = getTime() - time_parsing;
 
@@ -182,42 +191,42 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-            //create kernel binary if it doesn't exist
-            std::string sourcePath;
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
-            switch (graph) {
-                case DUAL:
-                    sourcePath = kernelPath + "SAT_d_dual.cl";
-                    break;
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
-                    break;
-            }
-            // read source file
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        switch (graph) {
+            case DUAL:
+                sourcePath = kernelPath + "SAT_d_dual.cl";
+                break;
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+        }
+        // read source file
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            // write binaries
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        // write binaries
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
@@ -322,7 +331,16 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    }";
         std::cout << "\n    ,\"Statistics\":{";
         std::cout << "\n        \"Num Join\": " << sol->numJoin;
-        std::cout << "\n        ,\"Num Forget\": " << sol->numIntroduceForget;
+        std::cout << "\n        ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
+        std::cout << "\n        ,\"pre Width\": " << tdParser.preWidth;
+        std::cout << "\n        ,\"post Width\": " << tdParser.postWidth;
+        std::cout << "\n        ,\"pre Cut Set Size\": " << tdParser.preCut;
+        std::cout << "\n        ,\"post Cut Set Size\": " << tdParser.postCut;
+        std::cout << "\n        ,\"pre Join Size\": " << tdParser.preJoinSize;
+        std::cout << "\n        ,\"post Join Size\": " << tdParser.postJoinSize;
+        std::cout << "\n        ,\"pre Bags\": " << tdParser.preNumBags;
+        std::cout << "\n        ,\"post Bags\": " << tdParser.postNumBags;
+        std::cout << "\n        ,\"max Table Size\": " << sol->maxTableSize;
         std::cout << "\n    }";
         std::cout << "\n}";
         std::cout.flush();

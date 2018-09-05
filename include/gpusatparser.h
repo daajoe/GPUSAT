@@ -68,6 +68,18 @@ namespace gpusat {
 
         cl_double defaultWeight = 1.0;
         int combineWidth;
+        cl_long preWidth = 0;
+        cl_long postWidth = 0;
+        cl_long preCut = 0;
+        cl_long postCut = 0;
+        cl_long preJoinSize = 0;
+        cl_long postJoinSize = 0;
+        cl_long preNumBags = 0;
+        cl_long postNumBags = 0;
+
+        void iterateDecompPre(bagType &bag);
+
+        void iterateDecompPost(bagType &bag);
 
     private:
         bool factR;

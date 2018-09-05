@@ -20,6 +20,7 @@ namespace gpusat {
         cl_long isSat = 1;
         cl_long numJoin = 0;
         cl_long numIntroduceForget = 0;
+        cl_long maxTableSize = 0;
 
         Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : context(context_), queue(queue_), program(program_), maxWidth(width) {}
 
@@ -43,7 +44,7 @@ namespace gpusat {
          * @param cnode     the child of the current node
          * @param leaf      indicates that the current node is a leaf node
          */
-        virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf)=0;
+        virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf) = 0;
 
         /**
          * function to solve a join node
@@ -53,7 +54,7 @@ namespace gpusat {
          * @param edge2     the second child node
          * @param formula   the sat formula
          */
-        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula)=0;
+        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) = 0;
 
         void resizeMap(myHashTable &table);
 
@@ -68,6 +69,7 @@ namespace gpusat {
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) override;
 
         void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf) override;
+
     };
 /*
     class Solver_Incidence : public Solver {
