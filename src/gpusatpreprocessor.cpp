@@ -65,7 +65,7 @@ namespace gpusat {
                         it_ = std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), v_.begin(),
                                              compTreedType);
                         v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
-                        decomp->edges.clear();
+                        decomp->edges.resize(0);
                         for (int asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
                             bagType *&sdggg = v_[asdf];
                             if (v_[asdf]->id == cid) {
@@ -93,7 +93,7 @@ namespace gpusat {
             if (numForgetVars >= 4) {
                 bagType *newEdge = new bagType;
                 newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
-                fVars.clear();
+                fVars.resize(0);
                 std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(),
                                     std::back_inserter(fVars));
                 newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 3);

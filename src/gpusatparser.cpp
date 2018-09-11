@@ -82,12 +82,12 @@ namespace gpusat {
         if (clause->size() > 1 && num == 0) {
             sort(clause->begin(), clause->end(), compVars);
             ret.clauses.push_back(*clause);
-            clause->clear();
+            clause->resize(0);
         } else if (clause->size() == 1 && num == 0) {
             if (find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
                 ret.facts.push_back((*clause)[0]);
             ret.clauses.push_back(*clause);
-            clause->clear();
+            clause->resize(0);
         }
     }
 
