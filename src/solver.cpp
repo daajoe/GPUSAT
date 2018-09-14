@@ -61,7 +61,7 @@ namespace gpusat {
     void Solver::resizeMap(myHashTable &table) {
         myHashTable t;
         t.numSolutions = 0;
-        t.elements.resize(static_cast<unsigned long>(table.numSolutions * 1.5));
+        t.elements.resize(static_cast<unsigned long>(table.numSolutions * 2));
         t.minId = table.minId;
         t.maxId = table.maxId;
         combineMap(t, table);
@@ -201,9 +201,9 @@ namespace gpusat {
                     a--;
                 }*/
 
-                /*if (node.solution[a].elements.size() >= (node.solution[a].numSolutions * 2)) {
+                if (node.solution[a].elements.size() >= (node.solution[a].numSolutions * 2)) {
                     this->resizeMap(node.solution[a]);
-                }*/
+                }
             }
         }
         cl_long tableSize = 0;
@@ -360,9 +360,9 @@ namespace gpusat {
                     a--;
                 }*/
 
-                /*if (node.solution[a].elements.size() >= node.solution[a].numSolutions * 2) {
+                if (node.solution[a].elements.size() >= node.solution[a].numSolutions * 2) {
                     this->resizeMap(node.solution[a]);
-                }*/
+                }
             }
         }
         cl_long tableSize = 0;

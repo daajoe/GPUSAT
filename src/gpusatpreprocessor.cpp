@@ -84,13 +84,14 @@ namespace gpusat {
         for (int i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i], combineWidth);
         }
+        //std::sort(decomp->variables.begin(), decomp->variables.end());
 
         for (int i = 0; i < decomp->edges.size(); i++) {
             std::vector<cl_long> fVars;
             std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(),
                                   std::back_inserter(fVars));
             unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
-            if (numForgetVars >= 4) {
+            if (numForgetVars > 4) {
                 bagType *newEdge = new bagType;
                 newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
                 fVars.resize(0);

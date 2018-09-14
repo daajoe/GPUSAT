@@ -18,15 +18,21 @@ typedef struct {
 } tableElement;
 
 double getCount(long id, __global tableElement *elements, long size) {
-    for (long i = 0; i < size; i++) {
-        if (elements[(id + i) % size].id == id) {
-            return elements[(id + i) % size].count;
-        } else if (elements[(id + i) % size].id < 0) {
-            return 0;
+    double count = 0.0;
+    for (long i = 0; i < size; i++){
+        long map_id = (id + i) % size;
+        long element_id = elements[map_id].id;
+        if ( element_id == id || element_id < 0.0) {
+            count = elements[map_id].count;
+            break;
         }
     }
-    return 0;
+    return count;
 }
+/*
+double getCount(long id, __global tableElement *elements, long size) {
+    return elements[(id) % size].count;
+}*/
 
 __kernel void resize(__global tableElement *solutions_old, __global tableElement *solutions_new, long tableSize_new, __global long *counts) {
     long id = get_global_id(0);
@@ -92,6 +98,7 @@ stype solveIntroduce_(long numV, __global tableElement *edge, long numVE, __glob
     }
 
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
+        //return edge[otherId % tableSize].count;
         return getCount(otherId, edge, tableSize);
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
@@ -204,6 +211,7 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
+        //double oldVal = solutions[id % tableSize].count;
         double oldVal = getCount(id, solutions, tableSize);
         if (oldVal < 0) {
             if (tmp > 0) {
@@ -223,6 +231,7 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
 
     // we have some solutions in edge2
     if (tmp_ >= 0.0) {
+        //double oldVal = solutions[id % tableSize].count;
         double oldVal = getCount(id, solutions, tableSize);
         if (oldVal < 0) {
             if (tmp_ > 0) {
@@ -362,6 +371,7 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
             // get solution count of the corresponding assignment in the edge
             tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, otherId, tableSizeE);
         }
+        //solsF[id % tableSizeF].count = tmp + solsF[id % tableSizeF].count;
         solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
         solsF[id % tableSizeF].id = id;
         if (tmp > 0) {
@@ -370,6 +380,7 @@ __kernel void solveIntroduceForget(__global tableElement *solsF, __global long *
     } else {
         // no forget variables, only introduce
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, startIDE, weights, id, tableSizeE);
+        //solsF[id % tableSizeF].count = tmp + solsF[id % tableSizeF].count;
         solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
         solsF[id % tableSizeF].id = id;
         if (tmp > 0) {
