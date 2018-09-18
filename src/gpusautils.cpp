@@ -7,16 +7,27 @@
 
 namespace gpusat {
 
+    bool myfunction(myTableElement i, myTableElement j) { return (i.id < j.id); }
+
     void GPUSATUtils::printSol(bagType &bag) {
         std::cout << "variables: \n";
         for (int j = 0; j < bag.variables.size(); ++j) {
             std::cout << bag.variables[j] << " ";
         }
-        std::cout << "\nsolutions: \n";
-        for (int i = 0; i < bag.solution.size(); i++) {
-            for (int a = 0; a < bag.solution[i].elements.size(); a++) {
-                std::cout << bag.solution[i].elements[a].id << ": ";
-                std::cout << bag.solution[i].elements[a].count << "\n";
+        std::cout << "\nbags: " << bag.bags << "\n";
+        for (int i = 0; i < bag.bags; i++) {
+            std::cout << "solutions: " << bag.solution[i].numSolutions << "\n";
+            std::cout << "size: " << bag.solution[i].size << "\n";
+            std::cout << "min: " << bag.solution[i].minId << "\n";
+            std::cout << "max: " << bag.solution[i].maxId << "\n";
+            std::vector<myTableElement> sols;
+            for (int a = 0; a < bag.solution[i].size; a++) {
+                sols.push_back(bag.solution[i].elements[a]);
+            }
+            std::sort(sols.begin(), sols.end(), myfunction);
+            for (auto a:sols) {
+                std::cout << a.id << ": ";
+                std::cout << a.count << "\n";
             }
         }
     }
