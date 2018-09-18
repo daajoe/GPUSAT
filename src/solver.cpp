@@ -226,9 +226,9 @@ namespace gpusat {
                 delete[] edge2.solution[a].elements;
             }
         }
-        std::cout << "Join " << numJoin << "\n";
-        GPUSATUtils::printSol(node);
-        std::cout.flush();
+        //std::cout << "Join " << numJoin << "\n";
+        //GPUSATUtils::printSol(node);
+        //std::cout.flush();
     }
 
     void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf) {
@@ -393,8 +393,8 @@ namespace gpusat {
                 delete[]cnode.solution[a].elements;
             }
         }
-        std::cout << "IF " << numIntroduceForget << "\n";
-        GPUSATUtils::printSol(node);
-        std::cout.flush();
+        //std::cout << "IF " << numIntroduceForget << "\n";
+        //GPUSATUtils::printSol(node);
+        //std::cout.flush();
     }
 }
