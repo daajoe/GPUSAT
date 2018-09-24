@@ -58,6 +58,8 @@ namespace gpusat {
 
         void resizeMap(myHashTable &table);
 
+        void cleanMap(myHashTable &table, cl_long size);
+
         void combineMap(myHashTable &to, myHashTable &from);
     };
 

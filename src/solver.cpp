@@ -67,6 +67,16 @@ namespace gpusat {
         combineMap(t, table);
     }
 
+    void Solver::cleanMap(myHashTable &table, cl_long size) {
+        myHashTable t;
+        t.numSolutions = 0;
+        t.size = static_cast<unsigned long>(size);
+        t.elements = new myTableElement[static_cast<unsigned long>(size)];
+        t.minId = table.minId;
+        t.maxId = table.maxId;
+        combineMap(t, table);
+    }
+
     void Solver::combineMap(myHashTable &to, myHashTable &from) {
         if (from.size > 0) {
             cl::Kernel kernel_resize = cl::Kernel(program, "resize");
@@ -133,15 +143,15 @@ namespace gpusat {
             kernel.setArg(16, NULL);
         }
 
-        for (cl_long a = 0; a < node.bags; a++) {
+        for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].elements = new myTableElement[(bagSizeNode)];
             node.solution[a].size = (bagSizeNode);
             for (cl_long i = 0; i < bagSizeNode; i++) {
                 node.solution[a].elements[i].count = -1.0;
-                node.solution[a].elements[i].id = i + a * bagSizeNode;
+                node.solution[a].elements[i].id = i + run * bagSizeNode;
             }
-            node.solution[a].minId = a * bagSizeNode;
-            node.solution[a].maxId = a * bagSizeNode + bagSizeNode;
+            node.solution[a].minId = run * bagSizeNode;
+            node.solution[a].maxId = run * bagSizeNode + bagSizeNode;
             cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, bufSol);
             cl_long bagsolutions = 0;
@@ -194,19 +204,18 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
-                /*if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 < bagSizeNode)) {
-                    this->combineMap(node.solution[a-1], node.solution[a]);
+            }
+            if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 <= bagSizeNode || node.solution[a].numSolutions == 0)) {
+                this->cleanMap(node.solution[a], (node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2);
+                this->combineMap(node.solution[a], node.solution[a - 1]);
+                node.solution[a - 1] = node.solution[a];
 
-                    a--;
-                    node.bags--;
-                    for(cl_long e = a;e<node.bags;e++){
-                        node.solution[e]=node.solution[e+1];
-                    }
-                }*/
+                node.bags--;
+                a--;
+            }
 
-                if (node.solution[a].size > (node.solution[a].numSolutions * 2)) {
-                    this->resizeMap(node.solution[a]);
-                }
+            if (node.solution[a].size > node.solution[a].numSolutions * 2 && node.solution[a].numSolutions > 0) {
+                this->resizeMap(node.solution[a]);
             }
         }
         cl_long tableSize = 0;
@@ -312,12 +321,12 @@ namespace gpusat {
             kernel.setArg(17, NULL);
         }
 
-        for (cl_long a = 0; a < node.bags; a++) {
+        for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].numSolutions = 0;
             node.solution[a].elements = new myTableElement[(bagSizeForget)];
             node.solution[a].size = bagSizeForget;
-            node.solution[a].minId = a * bagSizeForget;
-            node.solution[a].maxId = a * bagSizeForget + bagSizeForget;
+            node.solution[a].minId = run * bagSizeForget;
+            node.solution[a].maxId = run * bagSizeForget + bagSizeForget;
 
             cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(myTableElement) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, buf_solsF);
@@ -367,19 +376,18 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(myTableElement) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
-                /*if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 < bagSizeForget)) {
-                    this->combineMap(node.solution[a-1], node.solution[a]);
+            }
+            if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 <= bagSizeForget || node.solution[a].numSolutions == 0)) {
+                this->cleanMap(node.solution[a], (node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2);
+                this->combineMap(node.solution[a], node.solution[a - 1]);
+                node.solution[a - 1] = node.solution[a];
 
-                    a--;
-                    node.bags--;
-                    for(cl_long e = a;e<node.bags;e++){
-                        node.solution[e]=node.solution[e+1];
-                    }
-                }*/
+                node.bags--;
+                a--;
+            }
 
-                if (node.solution[a].size > node.solution[a].numSolutions * 2) {
-                    this->resizeMap(node.solution[a]);
-                }
+            if (node.solution[a].size > node.solution[a].numSolutions * 2 && node.solution[a].numSolutions > 0) {
+                this->resizeMap(node.solution[a]);
             }
         }
         cl_long tableSize = 0;

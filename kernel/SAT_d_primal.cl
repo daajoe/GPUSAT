@@ -379,9 +379,6 @@ __kernel void solveIntroduceForget(
         long tableSizeF,
         long tableSizeE) {
     long id = get_global_id(0);
-    if (maxIdE > 1 && id - startIDF < tableSizeE) {
-        printf("old: %f\n", solsE[id - startIDF].count);
-    }
     if (numVI != numVF) {
         double tmp = 0;
         long templateId = 0;
@@ -412,7 +409,6 @@ __kernel void solveIntroduceForget(
         }
         solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
         solsF[id % tableSizeF].id = id;
-        printf("tmp: %d\n", tmp);
     } else {
         // no forget variables, only introduce
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id, tableSizeE);
@@ -422,6 +418,5 @@ __kernel void solveIntroduceForget(
         }
         solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
         solsF[id % tableSizeF].id = id;
-        printf("tmp: %d\n", tmp);
     }
 }
