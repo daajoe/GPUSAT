@@ -52,7 +52,7 @@ namespace gpusat {
 
     struct treeType {
         cl_long *elements = nullptr;
-        cl_long numSolutions = 0;
+        cl_int numSolutions = 0;
         cl_long size = 0;
         cl_long minId = 0;
         cl_long maxId = 0;

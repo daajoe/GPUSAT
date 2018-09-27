@@ -15,7 +15,7 @@
 
 double getCount(long id,
                 __global long *tree,
-                int numVars) {
+                long numVars) {
     int nextId = 0;
     for (int i = 0; i < numVars; i++) {
         nextId = ((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
@@ -60,6 +60,18 @@ __kernel void resize(long numVars,
     long id = get_global_id(0);
     if (solutions_old[id] > 0) {
         setCount(id+startId, tree, numVars, treeSize, solutions_old[id]);
+    }
+}
+
+__kernel void resize_(long numVars,
+                     __global long *tree,
+                     __global double *solutions_old,
+                     __global int *treeSize,
+                     long startId) {
+    long id = get_global_id(0);
+    double val = getCount(id+startId,solutions_old,numVars);
+    if (val>0.0) {
+        setCount(id+startId, tree, numVars, treeSize, val);
     }
 }
 /**

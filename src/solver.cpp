@@ -85,7 +85,40 @@ namespace gpusat {
             error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
             error2 = queue.finish();
             if (error1 != 0 || error2 != 0) {
-                std::cerr << "Resize - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
+                std::cerr << "Resize 1 - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
+                exit(1);
+            }
+            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
+            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
+        }
+        t.minId = std::min(table.minId, t.minId);
+        t.maxId = std::max(table.maxId, t.maxId);
+        free(table.elements);
+        table = t;
+    }
+
+    void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
+        if (table.size > 0) {
+            cl::Kernel kernel_resize = cl::Kernel(program, "resize_");
+
+            kernel_resize.setArg(0, numVars);
+
+            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
+            kernel_resize.setArg(1, buf_sols_new);
+
+            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
+            kernel_resize.setArg(2, buf_sols_old);
+
+            cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
+            kernel_resize.setArg(3, buf_num_sol);
+
+            kernel_resize.setArg(4, table.minId);
+
+            cl_long error1 = 0, error2 = 0;
+            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
+            error2 = queue.finish();
+            if (error1 != 0 || error2 != 0) {
+                std::cerr << "Resize 2 - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
                 exit(1);
             }
             queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
@@ -192,7 +225,16 @@ namespace gpusat {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
                 this->cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size());
-                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long)*(node.solution[a].numSolutions + 1));
+
+                if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+                    combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
+                    node.solution[a - 1] = node.solution[a];
+
+                    node.bags--;
+                    a--;
+                }
+
+                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long) * (node.solution[a].numSolutions + 1));
                 node.solution[a].size = node.solution[a].numSolutions + 1;
             }
         }
@@ -350,8 +392,14 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
-                if(a>0 && (node.solution[a].numSolutions +node.solution[a-1].numSolutions + 2))
-                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long)*(node.solution[a].numSolutions + 1));
+                if (a > 0 && node.solution[a-1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+                    combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
+                    node.solution[a - 1] = node.solution[a];
+
+                    node.bags--;
+                    a--;
+                }
+                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long) * (node.solution[a].numSolutions + 1));
                 node.solution[a].size = node.solution[a].numSolutions + 1;
             }
         }
