@@ -35,11 +35,11 @@ namespace gpusat {
         std::cout << "-----\n";
         for (int i = 0; i < bag.bags; i++) {
             std::cout << "solutions: " << bag.solution[i].numSolutions << "\n";
-            std::cout << "size: " << bag.solution[i].size << "\n";
+            //std::cout << "size: " << bag.solution[i].size << "\n";
             std::cout << "min: " << bag.solution[i].minId << "\n";
             std::cout << "max: " << bag.solution[i].maxId << "\n";
             std::vector<cl_double> sols;
-            for (cl_long a = 0; a < bag.solution[i].size; a++) {
+            for (cl_long a = 0; a < bag.solution[i].numSolutions+1; a++) {
                 if (bag.solution[i].elements != nullptr) {
                     std::cout << a << ": " << ((int *) &(bag.solution[i].elements[a]))[0] << "/" << ((int *) &(bag.solution[i].elements[a]))[1] << "\n";
                 }

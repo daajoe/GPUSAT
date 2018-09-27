@@ -11,12 +11,12 @@ namespace gpusat {
             if (node.edges.empty()) {
                 bagType cNode;
                 cNode.solution = new treeType[1];
-                cNode.solution[0].elements = new cl_long[1];
+                cNode.solution[0].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), 1));
                 double val = 1.0;
                 cNode.solution[0].elements[0] = *reinterpret_cast <cl_long *>(&val);
                 cNode.solution[0].maxId = 1;
                 cNode.solution[0].minId = 0;
-                cNode.solution[0].numSolutions = 1;
+                cNode.solution[0].numSolutions = 0;
                 cNode.solution[0].size = 1;
                 cNode.bags = 1;
                 solveIntroduceForget(formula, pnode, node, cNode, true);
@@ -62,43 +62,39 @@ namespace gpusat {
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
-        t.elements = new cl_long[static_cast<unsigned long>(size + numVars)]();
+        t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars));
         t.minId = table.minId;
         t.maxId = table.maxId;
-        combineTree(t, table, numVars);
-    }
-
-    void Solver::combineTree(treeType &to, treeType &from, cl_long numVars) {
-        if (from.size > 0) {
+        if (table.size > 0) {
             cl::Kernel kernel_resize = cl::Kernel(program, "resize");
 
             kernel_resize.setArg(0, numVars);
 
-            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * to.size, to.elements);
+            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
             kernel_resize.setArg(1, buf_sols_new);
 
-            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * from.size, from.elements);
+            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
             kernel_resize.setArg(2, buf_sols_old);
 
-            cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &to.numSolutions);
+            cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
             kernel_resize.setArg(3, buf_num_sol);
 
-            kernel_resize.setArg(4, from.minId);
+            kernel_resize.setArg(4, table.minId);
 
             cl_long error1 = 0, error2 = 0;
-            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(from.size)));
+            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
             error2 = queue.finish();
             if (error1 != 0 || error2 != 0) {
                 std::cerr << "Resize - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
                 exit(1);
             }
-            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(long) * to.size, to.elements);
-            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &to.numSolutions);
+            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
+            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
         }
-        to.minId = std::min(from.minId, to.minId);
-        to.maxId = std::max(from.maxId, to.maxId);
-        delete[] from.elements;
-        from = to;
+        t.minId = std::min(table.minId, t.minId);
+        t.maxId = std::max(table.maxId, t.maxId);
+        free(table.elements);
+        table = t;
     }
 
     void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
@@ -141,7 +137,7 @@ namespace gpusat {
         }
 
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
-            node.solution[a].elements = new cl_long[(bagSizeNode)];
+            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), bagSizeNode));
             node.solution[a].size = (bagSizeNode);
             for (cl_long i = 0; i < bagSizeNode; i++) {
                 double val = -1.0;
@@ -149,18 +145,16 @@ namespace gpusat {
             }
             node.solution[a].minId = run * bagSizeNode;
             node.solution[a].maxId = run * bagSizeNode + bagSizeNode;
-            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(long) * node.solution[a].size, node.solution[a].elements);
+            cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, bufSol);
-            cl_int bagsolutions = 0;
-            cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &node.solution[a].numSolutions);
+            cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &node.solution[a].numSolutions);
             kernel.setArg(17, bufsolBag);
             kernel.setArg(13, node.solution[a].minId);
-            kernel.setArg(18, node.solution[a].size);
 
             for (cl_long b = 0; b < std::max(edge1.bags, edge2.bags); b++) {
                 cl::Buffer bufSol1;
-                if (b < edge1.bags && edge1.solution[b].numSolutions != 0) {
-                    bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(long) * edge1.solution[b].size, edge1.solution[b].elements);
+                if (b < edge1.bags && edge1.solution[b].elements != NULL) {
+                    bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge1.solution[b].size, edge1.solution[b].elements);
                     kernel.setArg(1, bufSol1);
                 } else {
                     kernel.setArg(1, NULL);
@@ -169,11 +163,10 @@ namespace gpusat {
                 kernel.setArg(9, (b < edge1.bags) ? edge1.solution[b].minId : -1);
                 kernel.setArg(10, (b < edge1.bags) ? edge1.solution[b].maxId : -1);
                 kernel.setArg(14, (b < edge1.bags) ? edge1.solution[b].minId : 0);
-                kernel.setArg(19, (b < edge1.bags) ? edge1.solution[b].size : 0);
 
                 cl::Buffer bufSol2;
-                if (b < edge2.bags && edge2.solution[b].numSolutions != 0) {
-                    bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(long) * edge2.solution[b].size, edge2.solution[b].elements);
+                if (b < edge2.bags && edge2.solution[b].elements != NULL) {
+                    bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge2.solution[b].size, edge2.solution[b].elements);
                     kernel.setArg(2, bufSol2);
                 } else {
                     kernel.setArg(2, NULL);
@@ -182,7 +175,6 @@ namespace gpusat {
                 kernel.setArg(11, (b < edge2.bags) ? edge2.solution[b].minId : -1);
                 kernel.setArg(12, (b < edge2.bags) ? edge2.solution[b].maxId : -1);
                 kernel.setArg(15, (b < edge2.bags) ? edge2.solution[b].minId : 0);
-                kernel.setArg(20, (b < edge2.bags) ? edge2.solution[b].size : 0);
 
                 cl_long error1 = 0, error2 = 0;
                 error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
@@ -192,29 +184,17 @@ namespace gpusat {
                     exit(1);
                 }
             }
-            queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
-            node.solution[a].numSolutions += bagsolutions;
+            queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &node.solution[a].numSolutions);
             if (node.solution[a].numSolutions == 0) {
-                delete[] node.solution[a].elements;
+                free(node.solution[a].elements);
                 node.solution[a].elements = NULL;
-                //node.solution[a].size = 0;
             } else {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
                 this->cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size());
+                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long)*(node.solution[a].numSolutions + 1));
+                node.solution[a].size = node.solution[a].numSolutions + 1;
             }
-            /*if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 <= bagSizeNode || node.solution[a].numSolutions == 0)) {
-                this->cleanTree(node.solution[a], (node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2);
-                this->combineTree(node.solution[a], node.solution[a - 1]);
-                node.solution[a - 1] = node.solution[a];
-
-                node.bags--;
-                a--;
-            }
-
-            if (node.solution[a].size > node.solution[a].numSolutions * 2 && node.solution[a].numSolutions > 0) {
-                this->resizeMap(node.solution[a]);
-            }*/
         }
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {
@@ -223,14 +203,14 @@ namespace gpusat {
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (cl_long a = 0; a < edge1.bags; a++) {
             if (edge1.solution[a].elements != NULL) {
-                edge1.solution[a].size = 0;
-                delete[] edge1.solution[a].elements;
+                free(edge1.solution[a].elements);
+                edge1.solution[a].elements = NULL;
             }
         }
         for (cl_long a = 0; a < edge2.bags; a++) {
             if (edge2.solution[a].elements != NULL) {
-                edge2.solution[a].size = 0;
-                delete[] edge2.solution[a].elements;
+                free(edge2.solution[a].elements);
+                edge2.solution[a].elements = NULL;
             }
         }
 #ifdef DEBUG
@@ -323,12 +303,12 @@ namespace gpusat {
 
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].numSolutions = 0;
-            node.solution[a].elements = new cl_long[bagSizeForget * 2 + node.variables.size()]();
+            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), bagSizeForget * 2 + node.variables.size()));
             node.solution[a].size = bagSizeForget * 2 + node.variables.size();
             node.solution[a].minId = run * bagSizeForget;
             node.solution[a].maxId = run * bagSizeForget + bagSizeForget;
 
-            cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(long) * node.solution[a].size, node.solution[a].elements);
+            cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, buf_solsF);
             cl::Buffer buf_varsF;
             if (fVars.size() > 0) {
@@ -339,14 +319,13 @@ namespace gpusat {
             }
             kernel.setArg(9, node.solution[a].minId);
 
-            cl_int bagsolutions = 0;
-            cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &bagsolutions);
+            cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &node.solution[a].numSolutions);
             kernel.setArg(11, bufsolBag);
             for (cl_long b = 0; b < cnode.bags; b++) {
-                if (cnode.solution[b].size == 0) {
+                if (cnode.solution[b].elements == NULL) {
                     continue;
                 }
-                cl::Buffer buf_solsE(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(long) * cnode.solution[b].size, cnode.solution[b].elements);
+                cl::Buffer buf_solsE(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * cnode.solution[b].size, cnode.solution[b].elements);
                 if (!leaf) {
                     kernel.setArg(2, buf_solsE);
                 } else {
@@ -356,9 +335,6 @@ namespace gpusat {
                 kernel.setArg(8, cnode.solution[b].maxId);
                 kernel.setArg(10, cnode.solution[b].minId);
 
-                kernel.setArg(18, node.solution[a].size);
-                kernel.setArg(19, cnode.solution[b].size);
-
                 cl_long error1 = 0, error2 = 0;
                 error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(bagSizeForget)));
                 error2 = queue.finish();
@@ -367,29 +343,17 @@ namespace gpusat {
                     exit(1);
                 }
             }
-            queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &bagsolutions);
-            node.solution[a].numSolutions += bagsolutions;
+            queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_int), &node.solution[a].numSolutions);
             if (node.solution[a].numSolutions == 0) {
-                delete[] node.solution[a].elements;
+                free(node.solution[a].elements);
                 node.solution[a].elements = NULL;
-                //node.solution[a].size = 0;
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
+                if(a>0 && (node.solution[a].numSolutions +node.solution[a-1].numSolutions + 2))
+                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long)*(node.solution[a].numSolutions + 1));
+                node.solution[a].size = node.solution[a].numSolutions + 1;
             }
-            /*
-            if (a > 0 && ((node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2 <= bagSizeForget || node.solution[a].numSolutions == 0)) {
-                this->cleanTree(node.solution[a], (node.solution[a].numSolutions + node.solution[a - 1].numSolutions) * 2);
-                this->combineTree(node.solution[a], node.solution[a - 1]);
-                node.solution[a - 1] = node.solution[a];
-
-                node.bags--;
-                a--;
-            }
-
-            if (node.solution[a].size > node.solution[a].numSolutions * 2 && node.solution[a].numSolutions > 0) {
-                this->resizeMap(node.solution[a]);
-            }*/
         }
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {
@@ -398,8 +362,8 @@ namespace gpusat {
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (cl_long a = 0; a < cnode.bags; a++) {
             if (cnode.solution[a].elements != NULL) {
-                cnode.solution[a].size = (0);
-                delete[]cnode.solution[a].elements;
+                free(cnode.solution[a].elements);
+                cnode.solution[a].elements = NULL;
             }
         }
 #ifdef DEBUG

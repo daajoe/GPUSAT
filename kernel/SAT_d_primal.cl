@@ -1,49 +1,65 @@
-#if defined(cl_khr_fp64)
-# pragma OPENCL EXTENSION cl_khr_fp64: enable
-# pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
+/*#if defined(cl_khr_fp64)
+//# pragma OPENCL EXTENSION cl_khr_fp64: enable
+//# pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 #elif defined(cl_amd_fp64)
 # pragma OPENCL EXTENSION cl_amd_fp64: enable
 # pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 #else
 # error double precision is not supported
 #endif
+*/
 #define stype double
 
 //#define __kernel
 //#define __global
 
-typedef struct {
-    long id;
-    double count;
-} tableElement;
-
-double getCount(long id, __global tableElement *elements, long size) {
-    for (long i = 0; i < size; i++) {
-        if (elements[(id + i) % size].id == id) {
-            return elements[(id + i) % size].count;
-        } else if (elements[(id + i) % size].id < 0) {
-            return 0;
+double getCount(long id,
+                __global long *tree,
+                int numVars) {
+    int nextId = 0;
+    for (int i = 0; i < numVars; i++) {
+        nextId = ((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        if (nextId == 0) {
+            return 0.0;
         }
     }
-    return 0;
+    return as_double(tree[nextId]);
 }
 
-void setCount(long id, __global tableElement *elements, long size, double count) {
-    for (long i = 0; i < size; i++) {
-        long oldId = atom_cmpxchg(&(elements[(id + i) % size].id), -1, id);
-
-        if (oldId == -1) {
-            elements[(id + i) % size].count = count;
-            return;
-        }
+void setCount(long id,
+              __global long *tree,
+              long numVars,
+              __global int *treeSize,
+              double value) {
+    int nextId = 0;
+    int val = 0;
+    if(numVars==0){
+        atomic_inc(treeSize);
     }
+    for (int i = 0; i < numVars; i++) {
+        __global int *lowVal = &(((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1]);
+        if(val==0&&*lowVal==0){
+            val = atomic_inc(treeSize)+1;
+        }
+        atomic_cmpxchg(lowVal, 0, val);
+        if (*lowVal == val) {
+            if(i < (numVars-1)) {
+                val = atomic_inc(treeSize)+1;
+            }
+        }
+        nextId = *lowVal;
+    }
+    tree[nextId] = as_long(value);
 }
 
-__kernel void resize(__global tableElement *solutions_old, __global tableElement *solutions_new, long tableSize_new, __global long *counts) {
+__kernel void resize(long numVars,
+                     __global long *tree,
+                     __global double *solutions_old,
+                     __global int *treeSize,
+                     long startId) {
     long id = get_global_id(0);
-    if (solutions_old[id].count > 0) {
-        setCount(solutions_old[id].id, solutions_new, tableSize_new, solutions_old[id].count);
-        atom_add(counts, 1);
+    if (solutions_old[id] > 0) {
+        setCount(id+startId, tree, numVars, treeSize, solutions_old[id]);
     }
 }
 /**
@@ -69,16 +85,15 @@ __kernel void resize(__global tableElement *solutions_old, __global tableElement
  *      the ids of the variables in the next bag
  */
 stype solveIntroduce_(
-        long numV,
-        __global tableElement *edge,
-        long numVE,
+        int numV,
+        __global long *edge,
+        int numVE,
         __global long *variables,
         __global long *edgeVariables,
         long minId,
         long maxId,
         __global double *weights,
-        long id,
-        long tableSize) {
+        long id) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
@@ -105,7 +120,7 @@ stype solveIntroduce_(
 
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
         //return edge[otherId % tableSize].count;
-        return getCount(otherId, edge, tableSize) * weight;
+        return getCount(otherId, edge, numVE) * weight;
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
     } else {
@@ -132,7 +147,12 @@ stype solveIntroduce_(
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
+int checkBag(__global long *clauses,
+             __global long *numVarsC,
+             long numclauses,
+             long id,
+             long numV,
+             __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     // iterate through all clauses
@@ -194,19 +214,19 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global tableElement *solutions, __global tableElement *edge1, __global tableElement *edge2, __global long *variables, __global long *edgeVariables1,
+__kernel void solveJoin(__global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1,
                         __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols, long tableSize, long tableSizeE1, long tableSizeE2) {
+                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global int *sols) {
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     double weight = 1;
     if (startIDEdge1 != -1) {
         // get solution count from first edge
-        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, weights, id, tableSizeE1);
+        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, weights, id);
     }
     if (startIDEdge2 != -1) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, weights, id, tableSizeE2);
+        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, weights, id);
     }
     // weighted model count
     if (weights != 0) {
@@ -217,8 +237,7 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
-        //double oldVal = solutions[id % tableSize].count;
-        double oldVal = getCount(id, solutions, tableSize);
+        double oldVal = solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp > 0) {
                 atom_add(sols, 1);
@@ -231,14 +250,12 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id % tableSize].count = tmp * oldVal / weight;
-        solutions[id % tableSize].id = id;
+        solutions[id - startIDNode] = tmp * oldVal / weight;
     }
 
     // we have some solutions in edge2
     if (tmp_ >= 0.0) {
-        //double oldVal = solutions[id % tableSize].count;
-        double oldVal = getCount(id, solutions, tableSize);
+        double oldVal = solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp_ > 0) {
                 atom_add(sols, 1);
@@ -251,8 +268,7 @@ __kernel void solveJoin(__global tableElement *solutions, __global tableElement 
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id % tableSize].count = tmp_ * oldVal;
-        solutions[id % tableSize].id = id;
+        solutions[id - startIDNode] = tmp_ * oldVal;
     }
 }
 
@@ -283,19 +299,18 @@ stype solveIntroduceF(
         __global long *numVarsC,
         long numclauses,
         long numV,
-        __global tableElement *edge,
+        __global long *edge,
         long numVE,
         __global long *variables,
         __global long *edgeVariables,
         long minId,
         long maxId,
         __global double *weights,
-        long id,
-        long tableSize) {
+        long id) {
     stype tmp;
     if (edge != 0) {
         // get solutions count edge
-        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id, tableSize);
+        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
@@ -358,9 +373,9 @@ stype solveIntroduceF(
  *      the ids of the variables in the next bag
  */
 __kernel void solveIntroduceForget(
-        __global tableElement *solsF,
+        __global long *solsF,
         __global long *varsF,
-        __global tableElement *solsE,
+        __global long *solsE,
         long numVE,
         __global long *varsE,
         long combinations,
@@ -369,15 +384,13 @@ __kernel void solveIntroduceForget(
         long maxIdE,
         long startIDF,
         long startIDE,
-        __global long *sols,
+        __global int *sols,
         long numVI,
         __global long *varsI,
         __global long *clauses,
         __global long *numVarsC,
         long numclauses,
-        __global double *weights,
-        long tableSizeF,
-        long tableSizeE) {
+        __global double *weights) {
     long id = get_global_id(0);
     if (numVI != numVF) {
         double tmp = 0;
@@ -401,22 +414,18 @@ __kernel void solveIntroduceForget(
                 }
             }
             // get solution count of the corresponding assignment in the edge
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId, tableSizeE);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId);
         }
-        //solsF[id % tableSizeF].count = tmp + solsF[id % tableSizeF].count;
-        if (solsF[id % tableSizeF].count == 0 && tmp > 0) {
-            atom_add(sols, 1);
+        if(tmp>0){
+            double last = getCount(id, solsF, numVF);
+            setCount(id, solsF, numVF, sols, tmp + last);
         }
-        solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
-        solsF[id % tableSizeF].id = id;
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id, tableSizeE);
-        //solsF[id % tableSizeF].count = tmp + solsF[id % tableSizeF].count;
-        if (solsF[id % tableSizeF].count == 0 && tmp > 0) {
-            atom_add(sols, 1);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id);
+        if(tmp>0){
+            double last = getCount(id, solsF, numVF);
+            setCount(id, solsF, numVF, sols, tmp + last);
         }
-        solsF[id % tableSizeF].count = tmp + getCount(id, solsF, tableSizeF);
-        solsF[id % tableSizeF].id = id;
     }
 }
