@@ -56,11 +56,11 @@ namespace gpusat {
          */
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) = 0;
 
-        void resizeMap(myHashTable &table);
+        void resizeMap(treeType &table);
 
-        void cleanMap(myHashTable &table, cl_long size);
+        void cleanTree(treeType &table, cl_long size, cl_long numVars);
 
-        void combineMap(myHashTable &to, myHashTable &from);
+        void combineTree(treeType &to, treeType &from, cl_long numVars);
     };
 
     class Solver_Primal : public Solver {

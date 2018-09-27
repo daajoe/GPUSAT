@@ -50,17 +50,12 @@ namespace dual {
 }
 namespace gpusat {
 
-    struct myTableElement {
-        cl_long id = -1;
-        cl_double count = 0;
-    };
-
-    struct myHashTable {
-        myTableElement *elements;
+    struct treeType {
+        cl_long *elements = nullptr;
         cl_long numSolutions = 0;
+        cl_long size = 0;
         cl_long minId = 0;
         cl_long maxId = 0;
-        cl_long size = 0;
     };
 
     /// type for a bag in the tree decomposition
@@ -69,7 +64,7 @@ namespace gpusat {
         std::vector<cl_long> variables;
         std::vector<bagType *> edges;
         cl_long bags = 0;
-        myHashTable *solution;
+        treeType *solution;
     };
 
     /// type for saving a tree decomposition

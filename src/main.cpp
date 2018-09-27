@@ -116,6 +116,27 @@ int main(int argc, char *argv[]) {
     // remove facts form decomp and formula
     if (!factR) {
         Preprocessor::preprocessFacts(treeDecomp, satFormula, graph, tdParser.defaultWeight);
+        if (satFormula.unsat) {
+            time_parsing = getTime() - time_parsing;
+            time_total = getTime() - time_total;
+            std::cout << "\n    ,\"Model Count\": " << 0;
+            std::cout << "\n    ,\"Time\":{";
+            std::cout << "\n        \"Solving\": " << 0;
+            std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
+            std::cout << "\n        ,\"Build_Kernel\": " << 0;
+            std::cout << "\n        ,\"Generate_Model\": " << 0;
+            std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+            std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+            std::cout << "\n    }";
+            std::cout << "\n    ,\"Statistics\":{";
+            std::cout << "\n        \"Num Join\": " << 0;
+            std::cout << "\n        ,\"Num Forget\": " << 0;
+            std::cout << "\n        ,\"Num Introduce\": " << 0;
+            std::cout << "\n        ,\"Num Leaf\": " << 0;
+            std::cout << "\n    }";
+            std::cout << "\n}\n";
+            exit(20);
+        }
     }
     // combine small bags
     Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
@@ -194,42 +215,42 @@ int main(int argc, char *argv[]) {
 #ifndef DEBUG
         if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-            //create kernel binary if it doesn't exist
-            std::string sourcePath;
+        //create kernel binary if it doesn't exist
+        std::string sourcePath;
 
-            switch (graph) {
-                case DUAL:
-                    sourcePath = kernelPath + "SAT_d_dual.cl";
-                    break;
-                case PRIMAL:
-                    sourcePath = kernelPath + "SAT_d_primal.cl";
-                    break;
-                case INCIDENCE:
-                    sourcePath = kernelPath + "SAT_d_inci.cl";
-                    break;
-            }
-            // read source file
-            std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-            cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-            program = cl::Program(context, sources);
-            program.build(devices);
+        switch (graph) {
+            case DUAL:
+                sourcePath = kernelPath + "SAT_d_dual.cl";
+                break;
+            case PRIMAL:
+                sourcePath = kernelPath + "SAT_d_primal.cl";
+                break;
+            case INCIDENCE:
+                sourcePath = kernelPath + "SAT_d_inci.cl";
+                break;
+        }
+        // read source file
+        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+        program = cl::Program(context, sources);
+        program.build(devices);
 
-            const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-            std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-            char *binChunk = &binData[0];
+        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+        char *binChunk = &binData[0];
 
-            std::vector<char *> binaries;
-            for (const size_t &binSize : binSizes) {
-                binaries.push_back(binChunk);
-                binChunk += binSize;
-            }
+        std::vector<char *> binaries;
+        for (const size_t &binSize : binSizes) {
+            binaries.push_back(binChunk);
+            binChunk += binSize;
+        }
 
-            // write binaries
-            program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-            std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-            for (unsigned int i = 0; i < binaries.size(); ++i)
-                binaryfile.write(binaries[i], binSizes[i]);
-            binaryfile.close();
+        // write binaries
+        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+        for (unsigned int i = 0; i < binaries.size(); ++i)
+            binaryfile.write(binaries[i], binSizes[i]);
+        binaryfile.close();
 #ifndef DEBUG
         } else {
             //load kernel binary
@@ -268,18 +289,20 @@ int main(int argc, char *argv[]) {
             cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
 
             for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
-                for (cl_long i = 0; i < treeDecomp.bags[0].solution[a].size; i++) {
-                    sols = sols + treeDecomp.bags[0].solution[a].elements[i].count;
+                for (cl_long i = treeDecomp.bags[0].solution[a].minId; i < treeDecomp.bags[0].solution[a].maxId; i++) {
+                    if (treeDecomp.bags[0].solution[a].elements != nullptr) {
+                        sols = sols + GPUSATUtils::getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
+                    }
                 }
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
                     delete[] treeDecomp.bags[0].solution[a].elements;
             }
-            if (!weighted && graph != DUAL) {
+            /*if (!weighted && graph != DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);
             } else if (graph != DUAL) {
                 sols = sols * tdParser.defaultWeight;
-            }
+            }*/
 
             if (graph == DUAL) {
                 std::set<cl_long> varSet;

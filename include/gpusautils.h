@@ -30,6 +30,8 @@ namespace gpusat {
          * @return          the file contents
          */
         static std::string readBinary(std::string path);
+
+        static cl_double getCount(cl_long id, cl_long *tree, cl_int numVars);
     };
 
     inline cl_long popcount(cl_long x) {
