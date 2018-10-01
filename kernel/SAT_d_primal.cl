@@ -70,7 +70,7 @@ __kernel void resize_(long numVars,
                      long startId) {
     long id = get_global_id(0);
     double val = getCount(id+startId,solutions_old,numVars);
-    if (val>0.0) {
+    if (val>0) {
         setCount(id+startId, tree, numVars, treeSize, val);
     }
 }

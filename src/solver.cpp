@@ -106,7 +106,7 @@ namespace gpusat {
             cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
             kernel_resize.setArg(1, buf_sols_new);
 
-            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
+            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * table.size, table.elements);
             kernel_resize.setArg(2, buf_sols_old);
 
             cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
@@ -115,7 +115,7 @@ namespace gpusat {
             kernel_resize.setArg(4, table.minId);
 
             cl_long error1 = 0, error2 = 0;
-            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
+            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.maxId - table.minId)));
             error2 = queue.finish();
             if (error1 != 0 || error2 != 0) {
                 std::cerr << "Resize 2 - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
@@ -127,7 +127,6 @@ namespace gpusat {
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
         free(table.elements);
-        table = t;
     }
 
     void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
@@ -172,6 +171,7 @@ namespace gpusat {
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), bagSizeNode));
             node.solution[a].size = (bagSizeNode);
+            node.solution[a].numSolutions = (0);
             for (cl_long i = 0; i < bagSizeNode; i++) {
                 double val = -1.0;
                 node.solution[a].elements[i] = *reinterpret_cast <cl_long *>(&val);
@@ -392,7 +392,8 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
-                if (a > 0 && node.solution[a-1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+
+                if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                     combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
                     node.solution[a - 1] = node.solution[a];
 

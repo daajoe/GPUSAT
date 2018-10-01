@@ -54,7 +54,7 @@ namespace gpusat {
                     ret.variableWeights[i * 2 + 1] = 0.5;
                 }
             }
-        } /*else {
+        } else {
             ret.variableWeights = new cl_double[(ret.numVars + 1) * 2]();
             ret.numWeights = (ret.numVars + 1) * 2;
 
@@ -62,7 +62,7 @@ namespace gpusat {
                 ret.variableWeights[i * 2] = 0.78;
                 ret.variableWeights[i * 2 + 1] = 0.78;
             }
-        }*/
+        }
         return ret;
     }
 
