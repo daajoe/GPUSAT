@@ -105,7 +105,7 @@ namespace gpusat {
         }
 
         if (decomp->variables.size() > 61) {
-            std::cout << "ERROR: width > 60";
+            std::cout << "\nERROR: width > 60";
             exit(0);
         }
 

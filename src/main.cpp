@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
             }
         }
         if (iter == platforms.end()) {
-            std::cout << "ERROR: no GPU found!";
+            std::cout << "\nERROR: no GPU found!";
             exit(1);
         }
         time_init_opencl = getTime() - time_init_opencl;
@@ -343,7 +343,7 @@ int main(int argc, char *argv[]) {
         }
     }
     catch (cl::Error &err) {
-        std::cerr << "ERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
+        std::cerr << "\nERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
         if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
             std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
             std::cout << "Program Info: " << str << std::endl;
