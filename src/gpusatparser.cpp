@@ -121,12 +121,12 @@ namespace gpusat {
         wmc = weighted;
     }
 
-    TDParser::TDParser(int i, bool b, int i1) {
+    TDParser::TDParser(int i, bool b) {
         combineWidth = i;
         factR = b;
     }
 
-    void TDParser::iterateDecompPre(bagType &bag){
+    void TDParser::iterateDecompPre(bagType &bag) {
         this->preWidth = (bag.variables.size() > this->preWidth) ? bag.variables.size() : this->preWidth;
         std::unordered_set<cl_long> joinSet;
 
@@ -143,7 +143,7 @@ namespace gpusat {
         }
     }
 
-    void TDParser::iterateDecompPost(bagType &bag){
+    void TDParser::iterateDecompPost(bagType &bag) {
         this->postWidth = (bag.variables.size() > this->postWidth) ? bag.variables.size() : this->postWidth;
         std::unordered_set<cl_long> joinSet;
 

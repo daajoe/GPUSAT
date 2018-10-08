@@ -13,8 +13,7 @@ namespace gpusat {
         cl::Context &context;
         cl::CommandQueue &queue;
         cl::Program &program;
-        ///max with before splitting the bags
-        cl_long maxWidth;
+        cl_long memorySize;
 
     public:
         cl_long isSat = 1;
@@ -22,7 +21,7 @@ namespace gpusat {
         cl_long numIntroduceForget = 0;
         cl_long maxTableSize = 0;
 
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : context(context_), queue(queue_), program(program_), maxWidth(width) {}
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_) {}
 
         /**
          * function to solve the sat problem
@@ -63,7 +62,7 @@ namespace gpusat {
 
     class Solver_Primal : public Solver {
     public:
-        Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int width) : Solver(context_, queue_, program_, width) {}
+        Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_ulong memorySize_) : Solver(context_, queue_, program_, memorySize_) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) override;

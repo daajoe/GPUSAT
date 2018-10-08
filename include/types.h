@@ -65,6 +65,7 @@ namespace gpusat {
         std::vector<bagType *> edges;
         cl_long bags = 0;
         treeType *solution;
+        cl_long maxSize = 0;
     };
 
     /// type for saving a tree decomposition
@@ -96,8 +97,13 @@ namespace gpusat {
     };
 
     /// the graph type which was the base for the tree decomposition
-    enum graphTypes {
+    enum class graphTypes {
         PRIMAL, INCIDENCE, DUAL, NONE
+    };
+
+    /// the graph type which was the base for the tree decomposition
+    enum class nodeTypes {
+        JOIN, INTRODUCEFORGET, LEAF, NONE
     };
 
     /**

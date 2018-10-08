@@ -1,13 +1,13 @@
-/*#if defined(cl_khr_fp64)
-//# pragma OPENCL EXTENSION cl_khr_fp64: enable
-//# pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
+#if defined(cl_khr_fp64)
+# pragma OPENCL EXTENSION cl_khr_fp64: enable
+# pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 #elif defined(cl_amd_fp64)
 # pragma OPENCL EXTENSION cl_amd_fp64: enable
 # pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
 #else
 # error double precision is not supported
 #endif
-*/
+
 #define stype double
 
 //#define __kernel
@@ -228,7 +228,7 @@ int checkBag(__global long *clauses,
  */
 __kernel void solveJoin(__global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1,
                         __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global int *sols) {
+                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols) {
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     double weight = 1;
@@ -396,7 +396,7 @@ __kernel void solveIntroduceForget(
         long maxIdE,
         long startIDF,
         long startIDE,
-        __global int *sols,
+        __global long *sols,
         long numVI,
         __global long *varsI,
         __global long *clauses,

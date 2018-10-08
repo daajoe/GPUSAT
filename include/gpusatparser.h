@@ -56,7 +56,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        explicit TDParser(int i, bool b, int i1);
+        explicit TDParser(int i, bool b);
 
         /**
          * generates a treedec from a given string

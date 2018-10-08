@@ -28,17 +28,16 @@ int main(int argc, char *argv[]) {
     std::string inputLine;
     std::string formulaDir;
     std::string decompDir;
-    int combineWidth = 12, maxBag = 22;
+    int combineWidth = 12;
     std::string kernelPath = "./kernel/";
-    graphTypes graph = NONE;
+    graphTypes graph = graphTypes::NONE;
     bool factR, cpu, weighted, nvidia, amd;
     CLI::App app{};
 
     std::string filename = "default";
     app.add_option("-s,--formula", formulaDir, "path to the file containing the sat formula")->required();
     app.add_option("-f,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
-    app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("14");
-    app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("26");
+    app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("10");
     app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
     app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
     app.add_flag("--CPU", cpu, "run the solver on the cpu");
@@ -72,7 +71,7 @@ int main(int argc, char *argv[]) {
 
     long long int time_parsing = getTime();
     CNFParser cnfParser(weighted);
-    TDParser tdParser(combineWidth, factR, maxBag);
+    TDParser tdParser(combineWidth, factR);
     std::string satString = sat.str();
     std::string treeDString = treeD.str();
     if (satString.size() < 10) {
@@ -92,22 +91,23 @@ int main(int argc, char *argv[]) {
     std::cout << "\n    ,\"pre Cut Set Size\": " << tdParser.preCut;
     std::cout << "\n    ,\"pre Join Size\": " << tdParser.preJoinSize;
     std::cout << "\n    ,\"pre Bags\": " << tdParser.preNumBags;
+    std::cout.flush();
 
     if (satFormula.clauses.size() == satFormula.numVars && satFormula.numVars == treeDecomp.numVars) {
         if (isPrimalGraph(&satFormula, &treeDecomp)) {
-            graph = PRIMAL;
+            graph = graphTypes::PRIMAL;
         } else {
-            graph = DUAL;
+            graph = graphTypes::DUAL;
         }
     } else if (satFormula.clauses.size() == treeDecomp.numVars) {
         // decomposition is of the dual
-        graph = DUAL;
+        graph = graphTypes::DUAL;
     } else if (satFormula.numVars == treeDecomp.numVars) {
         // decomposition is of the incidence graph
-        graph = PRIMAL;
+        graph = graphTypes::PRIMAL;
     } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
         // decomposition is of the primal graph
-        graph = INCIDENCE;
+        graph = graphTypes::INCIDENCE;
     } else {
         std::cerr << "Error: Unknown graph type\n";
         exit(EXIT_FAILURE);
@@ -150,12 +150,14 @@ int main(int argc, char *argv[]) {
     std::cout << "\n    ,\"post Cut Set Size\": " << tdParser.postCut;
     std::cout << "\n    ,\"post Join Size\": " << tdParser.postJoinSize;
     std::cout << "\n    ,\"post Bags\": " << tdParser.postNumBags;
+    std::cout.flush();
 
     std::vector<cl::Platform> platforms;
     cl::Context context;
     std::vector<cl::Device> devices;
     cl::CommandQueue queue;
     cl::Program program;
+    cl_long memorySize = 0;
 
     try {
         long long int time_init_opencl = getTime();
@@ -185,6 +187,8 @@ int main(int argc, char *argv[]) {
             devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
             if (err == CL_SUCCESS) {
                 queue = cl::CommandQueue(context, devices[0]);
+                memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>()/262144;
+                memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
                 break;
             }
         }
@@ -199,13 +203,13 @@ int main(int argc, char *argv[]) {
         std::string binPath;
 
         switch (graph) {
-            case DUAL:
+            case graphTypes::DUAL:
                 binPath = kernelPath + "SAT_d_d.clbin";
                 break;
-            case PRIMAL:
+            case graphTypes::PRIMAL:
                 binPath = kernelPath + "SAT_d_p.clbin";
                 break;
-            case INCIDENCE:
+            case graphTypes::INCIDENCE:
                 binPath = kernelPath + "SAT_d_i.clbin";
                 break;
             default:
@@ -219,13 +223,13 @@ int main(int argc, char *argv[]) {
         std::string sourcePath;
 
         switch (graph) {
-            case DUAL:
+            case graphTypes::DUAL:
                 sourcePath = kernelPath + "SAT_d_dual.cl";
                 break;
-            case PRIMAL:
+            case graphTypes::PRIMAL:
                 sourcePath = kernelPath + "SAT_d_primal.cl";
                 break;
-            case INCIDENCE:
+            case graphTypes::INCIDENCE:
                 sourcePath = kernelPath + "SAT_d_inci.cl";
                 break;
         }
@@ -268,10 +272,9 @@ int main(int argc, char *argv[]) {
         Solver *sol;
         bagType next;
         switch (graph) {
-            case PRIMAL:
-                sol = new Solver_Primal(context, queue, program, maxBag);
-                next.variables.assign(treeDecomp.bags[0].variables.begin(),
-                                      treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
+            case graphTypes::PRIMAL:
+                sol = new Solver_Primal(context, queue, program, memorySize);
+                next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
         }
         long long int time_solving = getTime();
@@ -281,13 +284,17 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    ,\"Num Join\": " << sol->numJoin;
         std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
         std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
+        std::cout << "\n    ,\"is SAT\": " << sol->isSat;
+        cl_long solLeafs = 0;
+        for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
+            solLeafs += treeDecomp.bags[0].solution[a].numSolutions;
+        }
+        std::cout << "\n    ,\"solution Leafs\": " << solLeafs;
 
         //sum up last node solutions
         long long int time_model = getTime();
         boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
-            cl_long bagSizeNode = static_cast<cl_long>(pow(2, std::min((cl_long) maxBag, (cl_long) treeDecomp.bags[0].variables.size())));
-
             for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
                 for (cl_long i = treeDecomp.bags[0].solution[a].minId; i < treeDecomp.bags[0].solution[a].maxId; i++) {
                     if (treeDecomp.bags[0].solution[a].elements != nullptr) {
@@ -297,14 +304,14 @@ int main(int argc, char *argv[]) {
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
                     delete[] treeDecomp.bags[0].solution[a].elements;
             }
-            if (!weighted && graph != DUAL) {
+            if (!weighted && graph != graphTypes::DUAL) {
                 boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
                 sols = sols / pow(base, exponent);
-            } else if (graph != DUAL) {
+            } else if (graph != graphTypes::DUAL) {
                 sols = sols * tdParser.defaultWeight;
             }
 
-            if (graph == DUAL) {
+            if (graph == graphTypes::DUAL) {
                 std::set<cl_long> varSet;
                 for (int j = 0; j < satFormula.clauses.size(); ++j) {
                     for (int i = 0; i < satFormula.clauses[j].size(); ++i) {
@@ -360,8 +367,7 @@ bool isPrimalGraph(satformulaType *satFormula, treedecType *treeDecomp) {
             for (int y = x + 1; y < clause.size(); y++) {
                 bool found = false;
                 for (int j = 0; j < treeDecomp->numb; j++) {
-                    if (std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[x])) != treeDecomp->bags[j].variables.end() &&
-                        std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[y])) != treeDecomp->bags[j].variables.end()) {
+                    if (std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[x])) != treeDecomp->bags[j].variables.end() && std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[y])) != treeDecomp->bags[j].variables.end()) {
                         found = true;
                     }
                 }
