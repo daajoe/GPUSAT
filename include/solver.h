@@ -30,7 +30,7 @@ namespace gpusat {
          * @param formula   the sat formula
          * @param node      the node to start from in the tree decompostion
          */
-        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &lastNode);
+        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeTypes lastNode);
 
     protected:
 
@@ -43,7 +43,7 @@ namespace gpusat {
          * @param cnode     the child of the current node
          * @param leaf      indicates that the current node is a leaf node
          */
-        virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf) = 0;
+        virtual void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode) = 0;
 
         /**
          * function to solve a join node
@@ -53,7 +53,7 @@ namespace gpusat {
          * @param edge2     the second child node
          * @param formula   the sat formula
          */
-        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) = 0;
+        virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) = 0;
 
         void cleanTree(treeType &table, cl_long size, cl_long numVars);
 
@@ -65,9 +65,9 @@ namespace gpusat {
         Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_ulong memorySize_) : Solver(context_, queue_, program_, memorySize_) {}
 
     protected:
-        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) override;
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) override;
 
-        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf) override;
+        void solveIntroduceForget(satformulaType &, bagType &, bagType &, bagType &, bool leaf, nodeTypes nextNode) override;
 
     };
 /*

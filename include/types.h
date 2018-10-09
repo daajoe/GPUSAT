@@ -97,13 +97,13 @@ namespace gpusat {
     };
 
     /// the graph type which was the base for the tree decomposition
-    enum class graphTypes {
+    enum graphTypes {
         PRIMAL, INCIDENCE, DUAL, NONE
     };
 
     /// the graph type which was the base for the tree decomposition
-    enum class nodeTypes {
-        JOIN, INTRODUCEFORGET, LEAF, NONE
+    enum nodeTypes {
+        JOIN, INTRODUCEFORGET
     };
 
     /**

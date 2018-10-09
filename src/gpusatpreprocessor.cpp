@@ -112,10 +112,10 @@ namespace gpusat {
                     if (*elem == (fact)) {
                         //remove clause from formula
                         formula.clauses.erase(formula.clauses.begin() + a);
-                        if (gType == graphTypes::INCIDENCE) {
+                        if (gType == INCIDENCE) {
                             relableDecomp(&decomp.bags[0], a + formula.numVars + 1);
                             decomp.numVars--;
-                        } else if (gType == graphTypes::DUAL) {
+                        } else if (gType == DUAL) {
                             relableDecomp(&decomp.bags[0], a);
                             decomp.numVars--;
                         }
@@ -144,7 +144,7 @@ namespace gpusat {
                     }
                 }
             }
-            if (gType != graphTypes::DUAL) {
+            if (gType != DUAL) {
                 relableDecomp(&decomp.bags[0], std::abs(fact));
             }
             decomp.numVars--;

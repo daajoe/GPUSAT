@@ -6,7 +6,7 @@
 
 namespace gpusat {
 
-    void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode) {
+    void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeTypes lastNode) {
         if (isSat > 0) {
             if (node.edges.empty()) {
                 bagType cNode;
@@ -20,16 +20,16 @@ namespace gpusat {
                 cNode.solution[0].size = 1;
                 cNode.bags = 1;
                 cNode.maxSize = 1;
-                solveIntroduceForget(formula, pnode, node, cNode, true);
+                solveIntroduceForget(formula, pnode, node, cNode, true, lastNode);
             } else if (node.edges.size() == 1) {
-                solveProblem(decomp, formula, *node.edges[0], node);
+                solveProblem(decomp, formula, *node.edges[0], node, INTRODUCEFORGET);
                 if (isSat == 1) {
                     bagType &cnode = *node.edges[0];
-                    solveIntroduceForget(formula, pnode, node, cnode, false);
+                    solveIntroduceForget(formula, pnode, node, cnode, false, lastNode);
                 }
             } else if (node.edges.size() > 1) {
                 bagType &edge1 = *node.edges[0];
-                solveProblem(decomp, formula, edge1, node);
+                solveProblem(decomp, formula, edge1, node, JOIN);
                 if (isSat <= 0) {
                     return;
                 }
@@ -38,7 +38,7 @@ namespace gpusat {
 
                     for (cl_long i = 1; i < node.edges.size(); i++) {
                         bagType &edge2 = *node.edges[i];
-                        solveProblem(decomp, formula, edge2, node);
+                        solveProblem(decomp, formula, edge2, node, JOIN);
                         if (isSat <= 0) {
                             return;
                         }
@@ -47,11 +47,14 @@ namespace gpusat {
                         auto itt = std::set_union(edge1.variables.begin(), edge1.variables.end(), edge2.variables.begin(), edge2.variables.end(), vt.begin());
                         vt.resize(static_cast<unsigned long long int>(itt - vt.begin()));
                         tmp.variables = vt;
-                        solveJoin(tmp, edge1, edge2, formula);
-                        edge1 = tmp;
 
                         if (i == node.edges.size() - 1) {
-                            solveIntroduceForget(formula, pnode, node, tmp, false);
+                            solveJoin(tmp, edge1, edge2, formula, INTRODUCEFORGET);
+                            edge1 = tmp;
+                            solveIntroduceForget(formula, pnode, node, tmp, false, lastNode);
+                        } else {
+                            solveJoin(tmp, edge1, edge2, formula, JOIN);
+                            edge1 = tmp;
                         }
                     }
                 }
@@ -130,7 +133,7 @@ namespace gpusat {
         free(table.elements);
     }
 
-    void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula) {
+    void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) {
         this->numJoin++;
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
@@ -168,7 +171,13 @@ namespace gpusat {
         cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
-        cl_long bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        cl_long bagSizeNode = 1;
+
+        if (nextNode == JOIN) {
+            bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        } else if (nextNode == INTRODUCEFORGET) {
+            bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size());
+        }
         bagSizeNode = 1l << (cl_long) std::floor(std::log2(bagSizeNode));
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
@@ -270,7 +279,7 @@ namespace gpusat {
 #endif
     }
 
-    void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf) {
+    void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode) {
         isSat = 0;
         std::vector<cl_long> fVars;
         std::set_intersection(node.variables.begin(), node.variables.end(), pnode.variables.begin(), pnode.variables.end(), std::back_inserter(fVars));
@@ -349,7 +358,11 @@ namespace gpusat {
         cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size();
         cl_long bagSizeForget = 1;
         cl_long s = sizeof(cl_long);
-        bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        if (nextNode == JOIN) {
+            bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        } else if (nextNode == INTRODUCEFORGET) {
+            bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size());
+        }
         bagSizeForget = 1l << (cl_long) std::floor(std::log2(bagSizeForget));
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
