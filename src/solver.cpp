@@ -19,6 +19,7 @@ namespace gpusat {
                 cNode.solution[0].numSolutions = 0;
                 cNode.solution[0].size = 1;
                 cNode.bags = 1;
+                cNode.maxSize = 1;
                 solveIntroduceForget(formula, pnode, node, cNode, true);
             } else if (node.edges.size() == 1) {
                 solveProblem(decomp, formula, *node.edges[0], node);
@@ -164,23 +165,26 @@ namespace gpusat {
             kernel.setArg(16, NULL);
         }
 
-        cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + edge1.maxSize + edge2.maxSize + (1 << 20);
+        cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
         cl_long bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        bagSizeNode = 1l << (cl_long) std::floor(std::log2(bagSizeNode));
 
-        node.solution = new treeType[(static_cast<unsigned long>(ceil((1l << (node.variables.size())) / bagSizeNode)))];
-        node.bags = ((static_cast<unsigned long>(ceil((1l << (node.variables.size())) / bagSizeNode))));
+        cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
+        node.solution = new treeType[maxSize];
+        node.bags = maxSize;
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
-            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), bagSizeNode));
-            node.solution[a].size = (bagSizeNode);
-            node.solution[a].numSolutions = (0);
+            node.solution[a].numSolutions = 0;
+            node.solution[a].minId = run * bagSizeNode;
+            node.solution[a].maxId = std::min(run * bagSizeNode + bagSizeNode, 1l << (node.variables.size()));
+            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
+            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
+
             for (cl_long i = 0; i < bagSizeNode; i++) {
                 double val = -1.0;
                 node.solution[a].elements[i] = *reinterpret_cast <cl_long *>(&val);
             }
-            node.solution[a].minId = run * bagSizeNode;
-            node.solution[a].maxId = run * bagSizeNode + bagSizeNode;
             cl::Buffer bufSol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, bufSol);
             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &node.solution[a].numSolutions);
@@ -213,7 +217,7 @@ namespace gpusat {
                 kernel.setArg(15, (b < edge2.bags) ? edge2.solution[b].minId : 0);
 
                 cl_long error1 = 0, error2 = 0;
-                error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(bagSizeNode)));
+                error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId)));
                 error2 = queue.finish();
                 if (error1 != 0 || error2 != 0) {
                     std::cerr << "\nJoin - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
@@ -259,11 +263,11 @@ namespace gpusat {
                 edge2.solution[a].elements = NULL;
             }
         }
-/*#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "\nJoin " << numJoin << "\n";
         GPUSATUtils::printSol(node);
         std::cout.flush();
-#endif*/
+#endif
     }
 
     void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf) {
@@ -342,19 +346,21 @@ namespace gpusat {
             kernel.setArg(17, NULL);
         }
 
-        cl_ulong usedMemory = cnode.maxSize + sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + (1l << 20);
+        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size();
         cl_long bagSizeForget = 1;
         cl_long s = sizeof(cl_long);
         bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+        bagSizeForget = 1l << (cl_long) std::floor(std::log2(bagSizeForget));
 
-        node.solution = new treeType[(static_cast<unsigned long>(ceil((1l << (node.variables.size())) / bagSizeForget)))];
-        node.bags = ((static_cast<unsigned long>(ceil((1l << (node.variables.size())) / bagSizeForget))));
+        cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
+        node.solution = new treeType[maxSize];
+        node.bags = maxSize;
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].numSolutions = 0;
-            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), bagSizeForget * 2 + node.variables.size()));
-            node.solution[a].size = bagSizeForget * 2 + node.variables.size();
             node.solution[a].minId = run * bagSizeForget;
-            node.solution[a].maxId = run * bagSizeForget + bagSizeForget;
+            node.solution[a].maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
+            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
+            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
 
             cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, buf_solsF);
@@ -384,7 +390,7 @@ namespace gpusat {
                 kernel.setArg(10, cnode.solution[b].minId);
 
                 cl_long error1 = 0, error2 = 0;
-                error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(bagSizeForget)));
+                error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId)));
                 error2 = queue.finish();
                 if (error1 != 0 || error2 != 0) {
                     std::cerr << "\nIntroduce Forget - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
@@ -422,10 +428,10 @@ namespace gpusat {
                 cnode.solution[a].elements = NULL;
             }
         }
-/*#ifdef DEBUG
+#ifdef DEBUG
         std::cout << "\nIF " << numIntroduceForget << "\n";
         GPUSATUtils::printSol(node);
         std::cout.flush();
-#endif*/
+#endif
     }
 }

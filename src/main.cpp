@@ -187,7 +187,6 @@ int main(int argc, char *argv[]) {
             devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
             if (err == CL_SUCCESS) {
                 queue = cl::CommandQueue(context, devices[0]);
-                memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>()/262144;
                 memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
                 break;
             }
@@ -284,12 +283,6 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    ,\"Num Join\": " << sol->numJoin;
         std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
         std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
-        std::cout << "\n    ,\"is SAT\": " << sol->isSat;
-        cl_long solLeafs = 0;
-        for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
-            solLeafs += treeDecomp.bags[0].solution[a].numSolutions;
-        }
-        std::cout << "\n    ,\"solution Leafs\": " << solLeafs;
 
         //sum up last node solutions
         long long int time_model = getTime();

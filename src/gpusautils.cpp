@@ -22,17 +22,6 @@ namespace gpusat {
         for (int j = 0; j < bag.variables.size(); ++j) {
             std::cout << bag.variables[j] << " ";
         }
-        std::cout << "\nsolutions: " << "\n";
-        for (int i = 0; i < bag.bags; i++) {
-            for (cl_long a = bag.solution[i].minId; a < bag.solution[i].maxId; a++) {
-                if (bag.solution[i].elements != nullptr) {
-                    std::cout << a << ": " << getCount(a, bag.solution[i].elements, bag.variables.size()) << "\n";
-                } else {
-                    std::cout << a << ": " << 0 << "\n";
-                }
-            }
-        }
-        std::cout << "-----\n";
         for (int i = 0; i < bag.bags; i++) {
             std::cout << "solutions: " << bag.solution[i].numSolutions << "\n";
             //std::cout << "size: " << bag.solution[i].size << "\n";
@@ -42,6 +31,17 @@ namespace gpusat {
             for (cl_long a = 0; a < bag.solution[i].numSolutions+1; a++) {
                 if (bag.solution[i].elements != nullptr) {
                     std::cout << a << ": " << ((int *) &(bag.solution[i].elements[a]))[0] << "/" << ((int *) &(bag.solution[i].elements[a]))[1] << "\n";
+                }
+            }
+        }
+        std::cout << "-----\n";
+        std::cout << "\nsolutions: " << "\n";
+        for (int i = 0; i < bag.bags; i++) {
+            for (cl_long a = bag.solution[i].minId; a < bag.solution[i].maxId; a++) {
+                if (bag.solution[i].elements != nullptr) {
+                    std::cout << a << ": " << getCount(a, bag.solution[i].elements, bag.variables.size()) << "\n";
+                } else {
+                    std::cout << a << ": " << 0 << "\n";
                 }
             }
         }
