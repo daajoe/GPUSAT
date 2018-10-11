@@ -11,6 +11,7 @@
 #include <gpusautils.h>
 #include <sys/stat.h>
 #include <numeric>
+#include <decomposer.h>
 #include <solver.h>
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
@@ -22,7 +23,7 @@ long long int getTime();
 
 bool isPrimalGraph(satformulaType *formula, treedecType *decomp);
 
-void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, bool nvidia, bool amd, bool cpu, int &combineWidth, graphTypes graph, std::string kernelPath) {
+void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth, graphTypes graph, std::string kernelPath) {
 
     cl::Platform::get(&platforms);
     std::vector<cl::Platform>::iterator iter;
@@ -51,6 +52,7 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
         if (err == CL_SUCCESS) {
             queue = cl::CommandQueue(context, devices[0]);
             memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
+            maxMemoryBuffer = devices[0].getInfo<CL_DEVICE_MAX_MEM_ALLOC_SIZE>();
             combineWidth = (int) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
             break;
         }
@@ -80,42 +82,42 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
 #ifndef DEBUG
     if (stat(binPath.c_str(), &buffer) != 0) {
 #endif
-        //create kernel binary if it doesn't exist
-        std::string sourcePath;
+    //create kernel binary if it doesn't exist
+    std::string sourcePath;
 
-        switch (graph) {
-            case DUAL:
-                sourcePath = kernelPath + "SAT_d_dual.cl";
-                break;
-            case PRIMAL:
-                sourcePath = kernelPath + "SAT_d_primal.cl";
-                break;
-            case INCIDENCE:
-                sourcePath = kernelPath + "SAT_d_inci.cl";
-                break;
-        }
-        // read source file
-        std::string kernelStr = GPUSATUtils::readFile(sourcePath);
-        cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-        program = cl::Program(context, sources);
-        program.build(devices);
+    switch (graph) {
+        case DUAL:
+            sourcePath = kernelPath + "SAT_d_dual.cl";
+            break;
+        case PRIMAL:
+            sourcePath = kernelPath + "SAT_d_primal.cl";
+            break;
+        case INCIDENCE:
+            sourcePath = kernelPath + "SAT_d_inci.cl";
+            break;
+    }
+    // read source file
+    std::string kernelStr = GPUSATUtils::readFile(sourcePath);
+    cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
+    program = cl::Program(context, sources);
+    program.build(devices);
 
-        const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-        std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-        char *binChunk = &binData[0];
+    const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
+    std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
+    char *binChunk = &binData[0];
 
-        std::vector<char *> binaries;
-        for (const size_t &binSize : binSizes) {
-            binaries.push_back(binChunk);
-            binChunk += binSize;
-        }
+    std::vector<char *> binaries;
+    for (const size_t &binSize : binSizes) {
+        binaries.push_back(binChunk);
+        binChunk += binSize;
+    }
 
-        // write binaries
-        program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-        std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-        for (unsigned int i = 0; i < binaries.size(); ++i)
-            binaryfile.write(binaries[i], binSizes[i]);
-        binaryfile.close();
+    // write binaries
+    program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
+    std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
+    for (unsigned int i = 0; i < binaries.size(); ++i)
+        binaryfile.write(binaries[i], binSizes[i]);
+    binaryfile.close();
 #ifndef DEBUG
     } else {
         //load kernel binary
@@ -137,14 +139,16 @@ int main(int argc, char *argv[]) {
     std::string formulaDir;
     std::string decompDir;
     int combineWidth = 10;
+    time_t seed = time(0);
     std::string kernelPath = "./kernel/";
     graphTypes graph = NONE;
     bool factR, cpu, weighted, nvidia, amd;
     CLI::App app{};
 
     std::string filename = "default";
-    app.add_option("-s,--formula", formulaDir, "path to the file containing the sat formula")->required();
-    app.add_option("-f,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
+    app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
+    app.add_option("-f,--formula", formulaDir, "path to the file containing the sat formula")->set_default_str("");
+    app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
     app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
     app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
     app.add_flag("--CPU", cpu, "run the solver on the cpu");
@@ -153,25 +157,33 @@ int main(int argc, char *argv[]) {
     app.add_flag("--weighted", weighted, "use weighted model count");
 
 
-    CLI11_PARSE(app, argc, argv);
+    CLI11_PARSE(app, argc, argv)
 
-    if (decompDir.compare("") != 0) {
+    srand(seed);
+
+    if (formulaDir != "") {
+        std::ifstream fileIn(formulaDir);
+        while (getline(fileIn, inputLine)) {
+            sat.sputn(inputLine.c_str(), inputLine.size());
+            sat.sputn("\n", 1);
+        }
+    } else {
+        while (getline(std::cin, inputLine)) {
+            sat.sputn(inputLine.c_str(), inputLine.size());
+            sat.sputn("\n", 1);
+        }
+    }
+
+    std::string treeDString;
+    if (decompDir != "") {
         std::ifstream fileIn(decompDir);
         while (getline(fileIn, inputLine)) {
             treeD.sputn(inputLine.c_str(), inputLine.size());
             treeD.sputn("\n", 1);
         }
+        treeDString = treeD.str();
     } else {
-        while (getline(std::cin, inputLine)) {
-            treeD.sputn(inputLine.c_str(), inputLine.size());
-            treeD.sputn("\n", 1);
-        }
-    }
-
-    std::ifstream fileIn(formulaDir);
-    while (getline(fileIn, inputLine)) {
-        sat.sputn(inputLine.c_str(), inputLine.size());
-        sat.sputn("\n", 1);
+        treeDString = Decomposer::computeDecomposition(sat.str());
     }
 
     std::cout << "{\n";
@@ -180,7 +192,28 @@ int main(int argc, char *argv[]) {
     CNFParser cnfParser(weighted);
     TDParser tdParser(combineWidth, factR);
     std::string satString = sat.str();
-    std::string treeDString = treeD.str();
+
+    if (treeDString == "") {
+        std::stringstream satStream(satString);
+        std::string line;
+        while (std::getline(satStream, line)) {
+
+            std::stringstream sline(line);
+            std::string i;
+
+            cl_long num = 0;
+            while (!sline.eof()) {
+                getline(sline, i, ' ');
+                if (i.size() > 0 && line[0] != 'p' && line[0] != 'c') {
+                    num = stol(i);
+                    if (num != 0) {
+                        //clause->push_back(num);
+                    }
+                }
+            }
+        }
+    }
+
     if (satString.size() < 10) {
         std::cerr << "Error: SAT formula\n";
         exit(EXIT_FAILURE);
@@ -192,7 +225,7 @@ int main(int argc, char *argv[]) {
     //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeD.str(), satFormula, graph);
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula, graph);
 
     std::cout << "    \"pre Width\": " << tdParser.preWidth;
     std::cout << "\n    ,\"pre Cut Set Size\": " << tdParser.preCut;
@@ -252,7 +285,8 @@ int main(int argc, char *argv[]) {
     cl::CommandQueue queue;
     cl::Program program;
     cl_long memorySize = 0;
-    getKernel(platforms, context, devices, queue, program, memorySize, nvidia, amd, cpu, combineWidth, graph, kernelPath);
+    cl_long maxMemoryBuffer = 0;
+    getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, graph, kernelPath);
 
     // combine small bags
     Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
@@ -274,7 +308,7 @@ int main(int argc, char *argv[]) {
         bagType next;
         switch (graph) {
             case PRIMAL:
-                sol = new Solver_Primal(context, queue, program, memorySize);
+                sol = new Solver_Primal(context, queue, program, memorySize,maxMemoryBuffer);
                 next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
         }

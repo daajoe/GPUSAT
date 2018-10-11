@@ -20,8 +20,9 @@ namespace gpusat {
         cl_long numJoin = 0;
         cl_long numIntroduceForget = 0;
         cl_long maxTableSize = 0;
+        cl_long maxMemoryBuffer = 0;
 
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_) {}
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_, cl_long maxMemoryBuffer_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_) {}
 
         /**
          * function to solve the sat problem
@@ -62,7 +63,7 @@ namespace gpusat {
 
     class Solver_Primal : public Solver {
     public:
-        Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_ulong memorySize_) : Solver(context_, queue_, program_, memorySize_) {}
+        Solver_Primal(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_ulong memorySize_, cl_ulong maxMemoryBuffer_) : Solver(context_, queue_, program_, memorySize_, maxMemoryBuffer_) {}
 
     protected:
         void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) override;

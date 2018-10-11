@@ -77,13 +77,14 @@ namespace gpusat {
             cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
             kernel_resize.setArg(1, buf_sols_new);
 
-            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
+            cl::Buffer buf_sols_old(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
             kernel_resize.setArg(2, buf_sols_old);
 
             cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
             kernel_resize.setArg(3, buf_num_sol);
 
             kernel_resize.setArg(4, table.minId);
+            cl_long maxSize = sizeof(cl_long) * t.size + sizeof(cl_double) * table.size + sizeof(cl_long);
 
             cl_long error1 = 0, error2 = 0;
             error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
@@ -110,7 +111,7 @@ namespace gpusat {
             cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
             kernel_resize.setArg(1, buf_sols_new);
 
-            cl::Buffer buf_sols_old(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * table.size, table.elements);
+            cl::Buffer buf_sols_old(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * table.size, table.elements);
             kernel_resize.setArg(2, buf_sols_old);
 
             cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
@@ -138,21 +139,21 @@ namespace gpusat {
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
         if (node.variables.size() > 0) {
-            bufSolVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.variables.size(), &node.variables[0]);
+            bufSolVars = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.variables.size(), &node.variables[0]);
             kernel.setArg(3, bufSolVars);
         } else {
             kernel.setArg(3, NULL);
         }
         cl::Buffer bufSolVars1;
         if (edge1.variables.size() > 0) {
-            bufSolVars1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge1.variables.size(), &edge1.variables[0]);
+            bufSolVars1 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge1.variables.size(), &edge1.variables[0]);
             kernel.setArg(4, bufSolVars1);
         } else {
             kernel.setArg(4, NULL);
         }
         cl::Buffer bufSolVars2;
         if (edge2.variables.size() > 0) {
-            bufSolVars2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge2.variables.size(), &edge2.variables[0]);
+            bufSolVars2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge2.variables.size(), &edge2.variables[0]);
             kernel.setArg(5, bufSolVars2);
         } else {
             kernel.setArg(5, NULL);
@@ -162,21 +163,21 @@ namespace gpusat {
         kernel.setArg(8, edge2.variables.size());
         cl::Buffer bufWeights;
         if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
+            bufWeights = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
             kernel.setArg(16, bufWeights);
         } else {
             kernel.setArg(16, NULL);
         }
 
-        cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights;
+        cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
         cl_long bagSizeNode = 1;
 
         if (nextNode == JOIN) {
-            bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
         } else if (nextNode == INTRODUCEFORGET) {
-            bagSizeNode = std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size());
+            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
         }
         bagSizeNode = 1l << (cl_long) std::floor(std::log2(bagSizeNode));
 
@@ -187,7 +188,7 @@ namespace gpusat {
             node.solution[a].numSolutions = 0;
             node.solution[a].minId = run * bagSizeNode;
             node.solution[a].maxId = std::min(run * bagSizeNode + bagSizeNode, 1l << (node.variables.size()));
-            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
+            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) + node.variables.size();
             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
 
             for (cl_long i = 0; i < bagSizeNode; i++) {
@@ -203,7 +204,7 @@ namespace gpusat {
             for (cl_long b = 0; b < std::max(edge1.bags, edge2.bags); b++) {
                 cl::Buffer bufSol1;
                 if (b < edge1.bags && edge1.solution[b].elements != NULL) {
-                    bufSol1 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge1.solution[b].size, edge1.solution[b].elements);
+                    bufSol1 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge1.solution[b].size, edge1.solution[b].elements);
                     kernel.setArg(1, bufSol1);
                 } else {
                     kernel.setArg(1, NULL);
@@ -215,7 +216,7 @@ namespace gpusat {
 
                 cl::Buffer bufSol2;
                 if (b < edge2.bags && edge2.solution[b].elements != NULL) {
-                    bufSol2 = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge2.solution[b].size, edge2.solution[b].elements);
+                    bufSol2 = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * edge2.solution[b].size, edge2.solution[b].elements);
                     kernel.setArg(2, bufSol2);
                 } else {
                     kernel.setArg(2, NULL);
@@ -272,11 +273,11 @@ namespace gpusat {
                 edge2.solution[a].elements = NULL;
             }
         }
-#ifdef DEBUG
+/*#ifdef DEBUG
         std::cout << "\nJoin " << numJoin << "\n";
         GPUSATUtils::printSol(node);
         std::cout.flush();
-#endif
+#endif*/
     }
 
     void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode) {
@@ -312,7 +313,7 @@ namespace gpusat {
 
         cl::Buffer buf_varsE;
         if (eVars.size() > 0) {
-            buf_varsE = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * eVars.size(), &eVars[0]);
+            buf_varsE = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * eVars.size(), &eVars[0]);
             kernel.setArg(4, buf_varsE);
         } else {
             kernel.setArg(4, NULL);
@@ -327,21 +328,21 @@ namespace gpusat {
         //variables introduce
         cl::Buffer bufIVars;
         if (iVars.size() > 0) {
-            bufIVars = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * iVars.size(), &iVars[0]);
+            bufIVars = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * iVars.size(), &iVars[0]);
             kernel.setArg(13, bufIVars);
         } else {
             kernel.setArg(13, NULL);
         }
         cl::Buffer bufClauses;
         if (clauses.size() > 0) {
-            bufClauses = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
+            bufClauses = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
             kernel.setArg(14, bufClauses);
         } else {
             kernel.setArg(14, NULL);
         }
         cl::Buffer bufNumVarsC;
         if (numClauses > 0) {
-            bufNumVarsC = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
+            bufNumVarsC = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
             kernel.setArg(15, bufNumVarsC);
         } else {
             kernel.setArg(15, NULL);
@@ -349,19 +350,19 @@ namespace gpusat {
         kernel.setArg(16, numClauses);
         cl::Buffer bufWeights;
         if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
+            bufWeights = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
             kernel.setArg(17, bufWeights);
         } else {
             kernel.setArg(17, NULL);
         }
 
-        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size();
+        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
         cl_long bagSizeForget = 1;
         cl_long s = sizeof(cl_long);
         if (nextNode == JOIN) {
-            bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size());
+            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
         } else if (nextNode == INTRODUCEFORGET) {
-            bagSizeForget = std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size());
+            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
         }
         bagSizeForget = 1l << (cl_long) std::floor(std::log2(bagSizeForget));
 
@@ -379,7 +380,7 @@ namespace gpusat {
             kernel.setArg(0, buf_solsF);
             cl::Buffer buf_varsF;
             if (fVars.size() > 0) {
-                buf_varsF = cl::Buffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
+                buf_varsF = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
                 kernel.setArg(1, buf_varsF);
             } else {
                 kernel.setArg(1, NULL);
@@ -392,7 +393,7 @@ namespace gpusat {
                 if (cnode.solution[b].elements == NULL) {
                     continue;
                 }
-                cl::Buffer buf_solsE(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * cnode.solution[b].size, cnode.solution[b].elements);
+                cl::Buffer buf_solsE(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * cnode.solution[b].size, cnode.solution[b].elements);
                 if (!leaf) {
                     kernel.setArg(2, buf_solsE);
                 } else {
@@ -441,10 +442,10 @@ namespace gpusat {
                 cnode.solution[a].elements = NULL;
             }
         }
-#ifdef DEBUG
+/*#ifdef DEBUG
         std::cout << "\nIF " << numIntroduceForget << "\n";
         GPUSATUtils::printSol(node);
         std::cout.flush();
-#endif
+#endif*/
     }
 }

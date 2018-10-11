@@ -27,6 +27,14 @@ elseif (UNIX)
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 endif ()
 
-file(GLOB gpusat_SRC "src/*.cpp")
+find_library(HTD_LIB htd)
+add_library(htd STATIC IMPORTED)
+set_target_properties(htd PROPERTIES IMPORTED_LOCATION ${HTD_LIB})
+
+find_library(HTD_IO_LIB htd_io)
+add_library(htd_io STATIC IMPORTED)
+set_target_properties(htd_io PROPERTIES IMPORTED_LOCATION ${HTD_IO_LIB})
+
+file(GLOB gpusat_SRC "src/*.cpp" "src/*/*.cpp")
 add_executable(gpusat ${gpusat_SRC})
-target_link_libraries(gpusat OpenCL)
+target_link_libraries(gpusat OpenCL htd htd_io)
