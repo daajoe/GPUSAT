@@ -169,17 +169,17 @@ namespace gpusat {
             kernel.setArg(16, NULL);
         }
 
-        cl_long usedMemory = sizeof(cl_long) * node.variables.size() + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
+        cl_long usedMemory = sizeof(cl_long) * node.variables.size() * 3 + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
         cl_long bagSizeNode = 1;
 
         if (nextNode == JOIN) {
-            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
+            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long) * 3), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
         } else if (nextNode == INTRODUCEFORGET) {
-            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
+            bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long) * 3), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
         }
-        bagSizeNode = 1l << (cl_long) std::floor(std::log2(bagSizeNode));
+        //bagSizeNode = 1l << (cl_long) std::floor(std::log2(bagSizeNode));
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
         node.solution = new treeType[maxSize];
@@ -191,7 +191,7 @@ namespace gpusat {
             node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) + node.variables.size();
             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
 
-            for (cl_long i = 0; i < bagSizeNode; i++) {
+            for (cl_long i = 0; i < node.solution[a].size; i++) {
                 double val = -1.0;
                 node.solution[a].elements[i] = *reinterpret_cast <cl_long *>(&val);
             }
@@ -238,6 +238,13 @@ namespace gpusat {
             if (node.solution[a].numSolutions == 0) {
                 free(node.solution[a].elements);
                 node.solution[a].elements = NULL;
+
+                if (a > 0) {
+                    node.solution[a - 1].maxId = node.solution[a].maxId;
+
+                    node.bags--;
+                    a--;
+                }
             } else {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
@@ -245,6 +252,12 @@ namespace gpusat {
 
                 if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                     combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
+                    node.solution[a - 1] = node.solution[a];
+
+                    node.bags--;
+                    a--;
+                } else if (a > 0 && node.solution[a - 1].elements == NULL) {
+                    node.solution[a].minId = node.solution[a - 1].minId;
                     node.solution[a - 1] = node.solution[a];
 
                     node.bags--;
@@ -356,15 +369,15 @@ namespace gpusat {
             kernel.setArg(17, NULL);
         }
 
-        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
+        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
         cl_long bagSizeForget = 1;
         cl_long s = sizeof(cl_long);
         if (nextNode == JOIN) {
-            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
+            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
         } else if (nextNode == INTRODUCEFORGET) {
-            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
+            bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
         }
-        bagSizeForget = 1l << (cl_long) std::floor(std::log2(bagSizeForget));
+        //bagSizeForget = 1l << (cl_long) std::floor(std::log2(bagSizeForget));
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
         node.solution = new treeType[maxSize];
@@ -415,12 +428,25 @@ namespace gpusat {
             if (node.solution[a].numSolutions == 0) {
                 free(node.solution[a].elements);
                 node.solution[a].elements = NULL;
+
+                if (a > 0) {
+                    node.solution[a - 1].maxId = node.solution[a].maxId;
+
+                    node.bags--;
+                    a--;
+                }
             } else {
                 queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
 
                 if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                     combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
+                    node.solution[a - 1] = node.solution[a];
+
+                    node.bags--;
+                    a--;
+                } else if (a > 0 && node.solution[a - 1].elements == NULL) {
+                    node.solution[a].minId = node.solution[a - 1].minId;
                     node.solution[a - 1] = node.solution[a];
 
                     node.bags--;
