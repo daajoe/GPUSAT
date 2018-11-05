@@ -1,5 +1,4 @@
 #include <cmath>
-#include <fstream>
 #include <sstream>
 #include <iostream>
 #include <algorithm>
@@ -27,10 +26,36 @@ namespace gpusat {
                 } else if (type == 'w') {
                     //weight line
                     this->parseWeightLine(item, weights);
+                } else if (type == 's') {
+                    //weight line
+                    this->parseSolutionLine(item);
                 } else {
                     //clause line
                     parseClauseLine(ret, item, clause);
                 }
+            }
+            if (item.find("c UNSATISFIABLE") != std::string::npos) {
+                std::cout << "    \"pre Width\": " << 0;
+                std::cout << "\n    ,\"pre Cut Set Size\": " << 0;
+                std::cout << "\n    ,\"pre Join Size\": " << 0;
+                std::cout << "\n    ,\"pre Bags\": " << 0;
+                std::cout << "\n    ,\"Model Count\": " << 0;
+                std::cout << "\n    ,\"Time\":{";
+                std::cout << "\n        \"Solving\": " << 0;
+                std::cout << "\n        ,\"Parsing\": " << 0;
+                std::cout << "\n        ,\"Build_Kernel\": " << 0;
+                std::cout << "\n        ,\"Generate_Model\": " << 0;
+                std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+                std::cout << "\n        ,\"Total\": " << 0;
+                std::cout << "\n    }";
+                std::cout << "\n    ,\"Statistics\":{";
+                std::cout << "\n        \"Num Join\": " << 0;
+                std::cout << "\n        ,\"Num Forget\": " << 0;
+                std::cout << "\n        ,\"Num Introduce\": " << 0;
+                std::cout << "\n        ,\"Num Leaf\": " << 0;
+                std::cout << "\n    }";
+                std::cout << "\n}\n";
+                exit(20);
             }
         }
 
@@ -119,6 +144,59 @@ namespace gpusat {
 
     CNFParser::CNFParser(bool weighted) {
         wmc = weighted;
+    }
+
+    void CNFParser::parseSolutionLine(std::string item) {
+        if (item.find("UNSATISFIABLE") != std::string::npos) {
+            std::cout << "    \"pre Width\": " << 0;
+            std::cout << "\n    ,\"pre Cut Set Size\": " << 0;
+            std::cout << "\n    ,\"pre Join Size\": " << 0;
+            std::cout << "\n    ,\"pre Bags\": " << 0;
+            std::cout << "\n    ,\"Model Count\": " << 0;
+            std::cout << "\n    ,\"Time\":{";
+            std::cout << "\n        \"Solving\": " << 0;
+            std::cout << "\n        ,\"Parsing\": " << 0;
+            std::cout << "\n        ,\"Build_Kernel\": " << 0;
+            std::cout << "\n        ,\"Generate_Model\": " << 0;
+            std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+            std::cout << "\n        ,\"Total\": " << 0;
+            std::cout << "\n    }";
+            std::cout << "\n    ,\"Statistics\":{";
+            std::cout << "\n        \"Num Join\": " << 0;
+            std::cout << "\n        ,\"Num Forget\": " << 0;
+            std::cout << "\n        ,\"Num Introduce\": " << 0;
+            std::cout << "\n        ,\"Num Leaf\": " << 0;
+            std::cout << "\n    }";
+            std::cout << "\n}\n";
+            exit(20);
+        }
+        std::stringstream sline(item);
+        std::string i;
+        getline(sline, i, ' '); //s
+        getline(sline, i, ' '); //solutions
+
+        std::cout << "    \"pre Width\": " << 0;
+        std::cout << "\n    ,\"pre Cut Set Size\": " << 0;
+        std::cout << "\n    ,\"pre Join Size\": " << 0;
+        std::cout << "\n    ,\"pre Bags\": " << 0;
+        std::cout << "\n    ,\"Model Count\": " << i;
+        std::cout << "\n    ,\"Time\":{";
+        std::cout << "\n        \"Solving\": " << 0;
+        std::cout << "\n        ,\"Parsing\": " << 0;
+        std::cout << "\n        ,\"Build_Kernel\": " << 0;
+        std::cout << "\n        ,\"Generate_Model\": " << 0;
+        std::cout << "\n        ,\"Init_OpenCL\": " << 0;
+        std::cout << "\n        ,\"Total\": " << 0;
+        std::cout << "\n    }";
+        std::cout << "\n    ,\"Statistics\":{";
+        std::cout << "\n        \"Num Join\": " << 0;
+        std::cout << "\n        ,\"Num Forget\": " << 0;
+        std::cout << "\n        ,\"Num Introduce\": " << 0;
+        std::cout << "\n        ,\"Num Leaf\": " << 0;
+        std::cout << "\n    }";
+        std::cout << "\n}\n";
+        exit(10);
+
     }
 
     TDParser::TDParser(int i, bool b) {

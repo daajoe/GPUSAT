@@ -26,7 +26,7 @@ namespace gpusat {
                 } else if (type == 'p') {
                     //start line
                     parseProblemLine(item, hypergraph);
-                } else if (type == 'w') {
+                } else if (type == 'w' || type == 's') {
                     //weight line (ignore)
                 } else if (item.size() > 0) {
                     //clause line
@@ -37,7 +37,7 @@ namespace gpusat {
         htd::BucketEliminationTreeDecompositionAlgorithm *treeDecompositionAlgorithm = new htd::BucketEliminationTreeDecompositionAlgorithm(htdManager);
         //htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, new WidthFitnessFunction());
         htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, new CutSetFitnessFunction());
-        algorithm->setIterationCount(30);
+        algorithm->setIterationCount(50);
         htd::ITreeDecomposition *decomp = algorithm->computeDecomposition(hypergraph);
         htd_io::TdFormatExporter exp;
         std::ostringstream oss;

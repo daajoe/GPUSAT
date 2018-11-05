@@ -66,7 +66,7 @@ namespace gpusat {
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
-        t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars));
+        t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars * 3));
         t.minId = table.minId;
         t.maxId = table.maxId;
         if (table.size > 0) {
@@ -87,11 +87,17 @@ namespace gpusat {
             cl_long maxSize = sizeof(cl_long) * t.size + sizeof(cl_double) * table.size + sizeof(cl_long);
 
             cl_long error1 = 0, error2 = 0;
-            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.size)));
-            error2 = queue.finish();
-            if (error1 != 0 || error2 != 0) {
-                std::cerr << "\nResize 1 - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
-                exit(1);
+            cl_double range = table.maxId - table.minId;
+            cl_long s = std::ceil(range / (1l << 31));
+            for (int i = 0; i < s; i++) {
+                cl_long id1 = (1 << 31) * i;
+                cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(id1)), cl::NDRange(static_cast<size_t>(range)));
+                error2 = queue.finish();
+                if (error1 != 0 || error2 != 0) {
+                    std::cerr << "\nResize 1 - OpenCL error: " << (error1 != 0 ? error1 : error2);
+                    exit(1);
+                }
             }
             queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
             queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
@@ -120,11 +126,17 @@ namespace gpusat {
             kernel_resize.setArg(4, table.minId);
 
             cl_long error1 = 0, error2 = 0;
-            error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(0)), cl::NDRange(static_cast<size_t>(table.maxId - table.minId)));
-            error2 = queue.finish();
-            if (error1 != 0 || error2 != 0) {
-                std::cerr << "\nResize 2 - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
-                exit(1);
+            cl_double range = table.maxId - table.minId;
+            cl_long s = std::ceil(range / (1l << 31));
+            for (int i = 0; i < s; i++) {
+                cl_long id1 = (1 << 31) * i;
+                cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(id1)), cl::NDRange(static_cast<size_t>(range)));
+                error2 = queue.finish();
+                if (error1 != 0 || error2 != 0) {
+                    std::cerr << "\nResize 2 - OpenCL error: " << (error1 != 0 ? error1 : error2);
+                    exit(1);
+                }
             }
             queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
             queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);

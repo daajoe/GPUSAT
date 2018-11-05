@@ -52,6 +52,8 @@ namespace gpusat {
          * @param clause
          */
         void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
+
+        void parseSolutionLine(std::string item);
     };
 
     class TDParser {
