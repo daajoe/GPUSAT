@@ -3,6 +3,7 @@
 #include <iostream>
 #include <gpusautils.h>
 #include <solver.h>
+#include <errno.h>
 
 namespace gpusat {
 
@@ -12,6 +13,13 @@ namespace gpusat {
                 bagType cNode;
                 cNode.solution = new treeType[1];
                 cNode.solution[0].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), 1));
+                if (cNode.solution[0].elements == NULL || cNode.solution[0].elements == (cl_long *) -1) {
+                    std::cerr << "\nMemory ERROR\n";
+                    exit(0);
+                } else if (errno == ENOMEM) {
+                    std::cerr << "\nOut of Memory!\n";
+                    exit(0);
+                }
                 double val = 1.0;
                 cNode.solution[0].elements[0] = *reinterpret_cast <cl_long *>(&val);
                 cNode.solution[0].maxId = 1;
@@ -67,6 +75,13 @@ namespace gpusat {
         t.numSolutions = 0;
         t.size = size + numVars;
         t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars * 3));
+        if (t.elements == NULL || t.elements == (cl_long *) -1) {
+            std::cerr << "\nMemory ERROR\n";
+            exit(0);
+        } else if (errno == ENOMEM) {
+            std::cerr << "\nOut of Memory!\n";
+            exit(0);
+        }
         t.minId = table.minId;
         t.maxId = table.maxId;
         if (table.size > 0) {
@@ -202,6 +217,13 @@ namespace gpusat {
             node.solution[a].maxId = std::min(run * bagSizeNode + bagSizeNode, 1l << (node.variables.size()));
             node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) + node.variables.size();
             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
+            if (node.solution[a].elements == NULL || node.solution[a].elements == (cl_long *) -1) {
+                std::cerr << "\nMemory ERROR\n";
+                exit(0);
+            } else if (errno == ENOMEM) {
+                std::cerr << "\nOut of Memory!\n";
+                exit(0);
+            }
 
             for (cl_long i = 0; i < node.solution[a].size; i++) {
                 double val = -1.0;
@@ -277,6 +299,13 @@ namespace gpusat {
                 }
 
                 node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long) * (node.solution[a].numSolutions + 1));
+                if (node.solution[a].elements == NULL || node.solution[a].elements == (cl_long *) -1) {
+                    std::cerr << "\nMemory ERROR\n";
+                    exit(0);
+                } else if (errno == ENOMEM) {
+                    std::cerr << "\nOut of Memory!\n";
+                    exit(0);
+                }
                 node.solution[a].size = node.solution[a].numSolutions + 1;
                 node.maxSize = std::max(node.maxSize, node.solution[a].size);
             }
@@ -400,6 +429,13 @@ namespace gpusat {
             node.solution[a].maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
             node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
+            if (node.solution[a].elements == NULL || errno == ENOMEM) {
+                std::cerr << "\nMemory ERROR\n";
+                exit(0);
+            } else if (errno == ENOMEM) {
+                std::cerr << "\nOut of Memory!\n";
+                exit(0);
+            }
 
             cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
             kernel.setArg(0, buf_solsF);
@@ -465,6 +501,13 @@ namespace gpusat {
                     a--;
                 }
                 node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long) * (node.solution[a].numSolutions + 1));
+                if (node.solution[a].elements == NULL || errno == ENOMEM) {
+                    std::cerr << "\nMemory ERROR\n";
+                    exit(0);
+                } else if (errno == ENOMEM) {
+                    std::cerr << "\nOut of Memory!\n";
+                    exit(0);
+                }
                 node.solution[a].size = node.solution[a].numSolutions + 1;
                 node.maxSize = std::max(node.maxSize, node.solution[a].size);
             }

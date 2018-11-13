@@ -308,7 +308,7 @@ int main(int argc, char *argv[]) {
         bagType next;
         switch (graph) {
             case PRIMAL:
-                sol = new Solver_Primal(context, queue, program, memorySize,maxMemoryBuffer);
+                sol = new Solver_Primal(context, queue, program, memorySize, maxMemoryBuffer);
                 next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
                 break;
         }
