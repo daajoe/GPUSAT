@@ -52,14 +52,11 @@ void setCount(long id,
     tree[nextId] = as_long(value);
 }
 
-__kernel void resize(long numVars,
-                     __global long *tree,
-                     __global double *solutions_old,
-                     __global int *treeSize,
-                     long startId) {
+__kernel void resize(long numVars, __global long *tree, __global double *solutions_old, __global int *treeSize, long startId, __global int *exponent) {
     long id = get_global_id(0);
     if (solutions_old[id] > 0) {
-        setCount(id+startId, tree, numVars, treeSize, solutions_old[id]);
+        setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
+        atomic_max(exponent, ilogb(solutions_old[id]));
     }
 }
 
@@ -226,9 +223,10 @@ int checkBag(__global long *clauses,
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1,
-                        __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2,
-                        long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols) {
+__kernel void solveJoin(
+        __global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
+        long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights,
+        __global long *sols, double value) {
     long id = get_global_id(0);
     stype tmp = -1, tmp_ = -1;
     double weight = 1;
@@ -280,7 +278,7 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id - startIDNode] = tmp_ * oldVal;
+        solutions[id - startIDNode] = tmp_ * oldVal / value;
     }
 }
 
@@ -385,24 +383,9 @@ stype solveIntroduceF(
  *      the ids of the variables in the next bag
  */
 __kernel void solveIntroduceForget(
-        __global long *solsF,
-        __global long *varsF,
-        __global long *solsE,
-        long numVE,
-        __global long *varsE,
-        long combinations,
-        long numVF,
-        long minIdE,
-        long maxIdE,
-        long startIDF,
-        long startIDE,
-        __global long *sols,
-        long numVI,
-        __global long *varsI,
-        __global long *clauses,
-        __global long *numVarsC,
-        long numclauses,
-        __global double *weights) {
+        __global long *solsF, __global long *varsF, __global long *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE, long maxIdE,
+        long startIDF, long startIDE, __global long *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC, long numclauses,
+        __global double *weights, __global int *exponent, double value) {
     long id = get_global_id(0);
     if (numVI != numVF) {
         double tmp = 0;
@@ -428,16 +411,18 @@ __kernel void solveIntroduceForget(
             // get solution count of the corresponding assignment in the edge
             tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId);
         }
-        if(tmp>0){
+        if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
-            setCount(id, solsF, numVF, sols, tmp + last);
+            setCount(id, solsF, numVF, sols, (tmp/ value + last));
+            atomic_max(exponent, ilogb((tmp / value + last)));
         }
     } else {
         // no forget variables, only introduce
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id);
-        if(tmp>0){
+        if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
-            setCount(id, solsF, numVF, sols, tmp + last);
+            setCount(id, solsF, numVF, sols, (tmp/ value + last));
+            atomic_max(exponent, ilogb((tmp / value + last)));
         }
     }
 }

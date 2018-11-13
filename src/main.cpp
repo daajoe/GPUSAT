@@ -286,23 +286,23 @@ int main(int argc, char *argv[]) {
     cl::Program program;
     cl_long memorySize = 0;
     cl_long maxMemoryBuffer = 0;
-    getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, graph, kernelPath);
-
-    // combine small bags
-    Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
-
-    tdParser.iterateDecompPost(treeDecomp.bags[0]);
-    tdParser.postNumBags = treeDecomp.bags.size();
-
-    time_parsing = getTime() - time_parsing;
-
-    std::cout << "\n    ,\"post Width\": " << tdParser.postWidth;
-    std::cout << "\n    ,\"post Cut Set Size\": " << tdParser.postCut;
-    std::cout << "\n    ,\"post Join Size\": " << tdParser.postJoinSize;
-    std::cout << "\n    ,\"post Bags\": " << tdParser.postNumBags;
-    std::cout.flush();
 
     try {
+        getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, graph, kernelPath);
+
+        // combine small bags
+        Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
+
+        tdParser.iterateDecompPost(treeDecomp.bags[0]);
+        tdParser.postNumBags = treeDecomp.bags.size();
+
+        time_parsing = getTime() - time_parsing;
+
+        std::cout << "\n    ,\"post Width\": " << tdParser.postWidth;
+        std::cout << "\n    ,\"post Cut Set Size\": " << tdParser.postCut;
+        std::cout << "\n    ,\"post Join Size\": " << tdParser.postJoinSize;
+        std::cout << "\n    ,\"post Bags\": " << tdParser.postNumBags;
+        std::cout.flush();
 
         Solver *sol;
         bagType next;
@@ -333,25 +333,13 @@ int main(int argc, char *argv[]) {
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
                     delete[] treeDecomp.bags[0].solution[a].elements;
             }
-            if (!weighted && graph != DUAL) {
-                boost::multiprecision::cpp_bin_float_100 base = 0.78, exponent = satFormula.numVars;
-                sols = sols / pow(base, exponent);
-            } else if (graph != DUAL) {
+            if (!weighted) {
+                boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
+                sols = sols * pow(base, exponent);
+            } else {
                 sols = sols * tdParser.defaultWeight;
             }
 
-            if (graph == DUAL) {
-                std::set<cl_long> varSet;
-                for (int j = 0; j < satFormula.clauses.size(); ++j) {
-                    for (int i = 0; i < satFormula.clauses[j].size(); ++i) {
-                        varSet.insert(satFormula.clauses[j][i]);
-                    }
-                }
-                for (int i = 1; i <= satFormula.numVars; ++i) {
-                    if (varSet.find(i) == varSet.end() && varSet.find(-i) == varSet.end())
-                        sols *= 2;
-                }
-            }
             char buf[128];
 
             std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << sols;

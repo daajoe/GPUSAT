@@ -56,7 +56,7 @@ namespace gpusat {
          */
         virtual void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) = 0;
 
-        void cleanTree(treeType &table, cl_long size, cl_long numVars);
+        void cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node);
 
         void combineTree(treeType &to, treeType &from, cl_long numVars);
     };

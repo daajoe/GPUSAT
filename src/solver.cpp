@@ -70,7 +70,7 @@ namespace gpusat {
         }
     }
 
-    void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars) {
+    void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node) {
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
@@ -99,6 +99,10 @@ namespace gpusat {
             kernel_resize.setArg(3, buf_num_sol);
 
             kernel_resize.setArg(4, table.minId);
+
+            cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &(node.exponent));
+            kernel_resize.setArg(5, buf_exp);
+
             cl_long maxSize = sizeof(cl_long) * t.size + sizeof(cl_double) * table.size + sizeof(cl_long);
 
             cl_long error1 = 0, error2 = 0;
@@ -116,6 +120,7 @@ namespace gpusat {
             }
             queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
             queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
+            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
         }
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
@@ -196,6 +201,9 @@ namespace gpusat {
             kernel.setArg(16, NULL);
         }
 
+        kernel.setArg(18, pow(2, edge1.exponent + edge2.exponent));
+
+        node.exponent = CL_INT_MIN;
         cl_long usedMemory = sizeof(cl_long) * node.variables.size() * 3 + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
@@ -282,7 +290,7 @@ namespace gpusat {
             } else {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
-                this->cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size());
+                this->cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node);
 
                 if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                     combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
@@ -310,6 +318,7 @@ namespace gpusat {
                 node.maxSize = std::max(node.maxSize, node.solution[a].size);
             }
         }
+        node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {
             tableSize += node.solution[i].size;
@@ -409,6 +418,12 @@ namespace gpusat {
         } else {
             kernel.setArg(17, NULL);
         }
+
+        kernel.setArg(19, pow(2, cnode.exponent));
+
+        node.exponent = CL_INT_MIN;
+        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &(node.exponent));
+        kernel.setArg(18, buf_exp);
 
         cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
         cl_long bagSizeForget = 1;
@@ -512,6 +527,8 @@ namespace gpusat {
                 node.maxSize = std::max(node.maxSize, node.solution[a].size);
             }
         }
+        queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
+        node.correction = cnode.correction + cnode.exponent;
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {
             tableSize += node.solution[i].size;
