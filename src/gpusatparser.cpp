@@ -42,10 +42,6 @@ namespace gpusat {
                 std::cout << "\n    ,\"Model Count\": " << 0;
                 std::cout << "\n    ,\"Time\":{";
                 std::cout << "\n        \"Solving\": " << 0;
-                std::cout << "\n        ,\"Parsing\": " << 0;
-                std::cout << "\n        ,\"Build_Kernel\": " << 0;
-                std::cout << "\n        ,\"Generate_Model\": " << 0;
-                std::cout << "\n        ,\"Init_OpenCL\": " << 0;
                 std::cout << "\n        ,\"Total\": " << 0;
                 std::cout << "\n    }";
                 std::cout << "\n    ,\"Statistics\":{";
@@ -147,10 +143,6 @@ namespace gpusat {
             std::cout << "\n    ,\"Model Count\": " << 0;
             std::cout << "\n    ,\"Time\":{";
             std::cout << "\n        \"Solving\": " << 0;
-            std::cout << "\n        ,\"Parsing\": " << 0;
-            std::cout << "\n        ,\"Build_Kernel\": " << 0;
-            std::cout << "\n        ,\"Generate_Model\": " << 0;
-            std::cout << "\n        ,\"Init_OpenCL\": " << 0;
             std::cout << "\n        ,\"Total\": " << 0;
             std::cout << "\n    }";
             std::cout << "\n    ,\"Statistics\":{";
@@ -174,10 +166,6 @@ namespace gpusat {
         std::cout << "\n    ,\"Model Count\": " << i;
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << 0;
-        std::cout << "\n        ,\"Parsing\": " << 0;
-        std::cout << "\n        ,\"Build_Kernel\": " << 0;
-        std::cout << "\n        ,\"Generate_Model\": " << 0;
-        std::cout << "\n        ,\"Init_OpenCL\": " << 0;
         std::cout << "\n        ,\"Total\": " << 0;
         std::cout << "\n    }";
         std::cout << "\n    ,\"Statistics\":{";
@@ -191,9 +179,8 @@ namespace gpusat {
 
     }
 
-    TDParser::TDParser(int i, bool b) {
+    TDParser::TDParser(int i) {
         combineWidth = i;
-        factR = b;
     }
 
     void TDParser::iterateDecompPre(bagType &bag) {
@@ -230,7 +217,7 @@ namespace gpusat {
         }
     }
 
-    treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType) {
+    treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
         treedecType ret;
         std::stringstream ss(graph);
         std::string item;

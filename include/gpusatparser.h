@@ -58,7 +58,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        explicit TDParser(int i, bool b);
+        explicit TDParser(int i);
 
         /**
          * generates a treedec from a given string
@@ -66,7 +66,7 @@ namespace gpusat {
          * @param graph     the string representation of the tree decomposition
          * @return          the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph, satformulaType &formula, graphTypes gType);
+        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
         cl_double defaultWeight = 1.0;
         int combineWidth;
@@ -84,7 +84,6 @@ namespace gpusat {
         void iterateDecompPost(bagType &bag);
 
     private:
-        bool factR;
 
         /**
          * parse an edge from the tree decomposition

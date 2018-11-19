@@ -1,7 +1,3 @@
-//
-// Created by Markus on 10.10.2018.
-//
-
 #ifndef GPUSAT_CUTSETFITNESSFUNCTION_H
 #define GPUSAT_CUTSETFITNESSFUNCTION_H
 

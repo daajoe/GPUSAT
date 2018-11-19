@@ -16,14 +16,16 @@
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <gpusatpreprocessor.h>
+#include <FitnessFunctions/WidthFitnessFunction.h>
+#include <FitnessFunctions/WidthCutSetFitnessFunction.h>
+#include <FitnessFunctions/CutSetFitnessFunction.h>
+#include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 
 using namespace gpusat;
 
 long long int getTime();
 
-bool isPrimalGraph(satformulaType *formula, treedecType *decomp);
-
-void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth, graphTypes graph, std::string kernelPath) {
+void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth, std::string kernelPath) {
 
     cl::Platform::get(&platforms);
     std::vector<cl::Platform>::iterator iter;
@@ -63,21 +65,7 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
     }
 
     struct stat buffer;
-    std::string binPath;
-
-    switch (graph) {
-        case DUAL:
-            binPath = kernelPath + "SAT_d_d.clbin";
-            break;
-        case PRIMAL:
-            binPath = kernelPath + "SAT_d_p.clbin";
-            break;
-        case INCIDENCE:
-            binPath = kernelPath + "SAT_d_i.clbin";
-            break;
-        default:
-            break;
-    }
+    std::string binPath = kernelPath + "SAT_d_p.clbin";
 
 #ifndef DEBUG
     if (stat(binPath.c_str(), &buffer) != 0) {
@@ -85,17 +73,7 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
     //create kernel binary if it doesn't exist
     std::string sourcePath;
 
-    switch (graph) {
-        case DUAL:
-            sourcePath = kernelPath + "SAT_d_dual.cl";
-            break;
-        case PRIMAL:
-            sourcePath = kernelPath + "SAT_d_primal.cl";
-            break;
-        case INCIDENCE:
-            sourcePath = kernelPath + "SAT_d_inci.cl";
-            break;
-    }
+    sourcePath = kernelPath + "SAT_d_primal.cl";
     // read source file
     std::string kernelStr = GPUSATUtils::readFile(sourcePath);
     cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
@@ -137,24 +115,26 @@ int main(int argc, char *argv[]) {
     std::stringbuf treeD, sat;
     std::string inputLine;
     std::string formulaDir;
+    std::string fitness;
     std::string decompDir;
     int combineWidth = 10;
     time_t seed = time(0);
     std::string kernelPath = "./kernel/";
-    graphTypes graph = NONE;
-    bool factR, cpu, weighted, nvidia, amd;
+    bool cpu, weighted, nvidia, amd;
     CLI::App app{};
+    std::size_t numDecomps = 30;
 
     std::string filename = "default";
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-f,--formula", formulaDir, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
     app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
-    app.add_flag("--noFactRemoval", factR, "deactivate fact removal optimization");
+    app.add_option("-n,--numDecomps", numDecomps, "");
     app.add_flag("--CPU", cpu, "run the solver on the cpu");
     app.add_flag("--NVIDIA", nvidia, "run the solver on an NVIDIA device");
     app.add_flag("--AMD", amd, "run the solver on an AMD device");
     app.add_flag("--weighted", weighted, "use weighted model count");
+    app.add_set("--fitnessFunction", fitness, {"width", "cutSet", "width_cutSet", "cutSet_width"}, "fitness function")->set_default_str("width_cutSet");
 
 
     CLI11_PARSE(app, argc, argv)
@@ -183,14 +163,24 @@ int main(int argc, char *argv[]) {
         }
         treeDString = treeD.str();
     } else {
-        treeDString = Decomposer::computeDecomposition(sat.str());
+        htd::ITreeDecompositionFitnessFunction *fit;
+        if (fitness == "width") {
+            fit = new WidthFitnessFunction();
+        } else if (fitness == "cutSet") {
+            fit = new CutSetFitnessFunction();
+        } else if (fitness == "cutSet_width") {
+            fit = new CutSetWidthFitnessFunction();
+        } else {
+            fit = new WidthCutSetFitnessFunction();
+        }
+        treeDString = Decomposer::computeDecomposition(sat.str(), fit, numDecomps);
     }
 
     std::cout << "{\n";
 
     long long int time_parsing = getTime();
     CNFParser cnfParser(weighted);
-    TDParser tdParser(combineWidth, factR);
+    TDParser tdParser(combineWidth);
     std::string satString = sat.str();
 
     if (treeDString == "") {
@@ -225,7 +215,7 @@ int main(int argc, char *argv[]) {
     //parse the sat formula
     satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
     //parse the tree decomposition
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula, graph);
+    treedecType treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
 
     std::cout << "    \"pre Width\": " << tdParser.preWidth;
     std::cout << "\n    ,\"pre Cut Set Size\": " << tdParser.preCut;
@@ -233,50 +223,23 @@ int main(int argc, char *argv[]) {
     std::cout << "\n    ,\"pre Bags\": " << tdParser.preNumBags;
     std::cout.flush();
 
-    if (satFormula.clauses.size() == satFormula.numVars && satFormula.numVars == treeDecomp.numVars) {
-        if (isPrimalGraph(&satFormula, &treeDecomp)) {
-            graph = PRIMAL;
-        } else {
-            graph = DUAL;
-        }
-    } else if (satFormula.clauses.size() == treeDecomp.numVars) {
-        // decomposition is of the dual
-        graph = DUAL;
-    } else if (satFormula.numVars == treeDecomp.numVars) {
-        // decomposition is of the incidence graph
-        graph = PRIMAL;
-    } else if (satFormula.numVars + satFormula.clauses.size() == treeDecomp.numVars) {
-        // decomposition is of the primal graph
-        graph = INCIDENCE;
-    } else {
-        std::cerr << "Error: Unknown graph type\n";
-        exit(EXIT_FAILURE);
-    }
-
-    // remove facts form decomp and formula
-    if (!factR) {
-        Preprocessor::preprocessFacts(treeDecomp, satFormula, graph, tdParser.defaultWeight);
-        if (satFormula.unsat) {
-            time_parsing = getTime() - time_parsing;
-            time_total = getTime() - time_total;
-            std::cout << "\n    ,\"Model Count\": " << 0;
-            std::cout << "\n    ,\"Time\":{";
-            std::cout << "\n        \"Solving\": " << 0;
-            std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
-            std::cout << "\n        ,\"Build_Kernel\": " << 0;
-            std::cout << "\n        ,\"Generate_Model\": " << 0;
-            std::cout << "\n        ,\"Init_OpenCL\": " << 0;
-            std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-            std::cout << "\n    }";
-            std::cout << "\n    ,\"Statistics\":{";
-            std::cout << "\n        \"Num Join\": " << 0;
-            std::cout << "\n        ,\"Num Forget\": " << 0;
-            std::cout << "\n        ,\"Num Introduce\": " << 0;
-            std::cout << "\n        ,\"Num Leaf\": " << 0;
-            std::cout << "\n    }";
-            std::cout << "\n}\n";
-            exit(20);
-        }
+    Preprocessor::preprocessFacts(treeDecomp, satFormula, tdParser.defaultWeight);
+    if (satFormula.unsat) {
+        time_parsing = getTime() - time_parsing;
+        time_total = getTime() - time_total;
+        std::cout << "\n    ,\"Model Count\": " << 0;
+        std::cout << "\n    ,\"Time\":{";
+        std::cout << "\n        \"Solving\": " << 0;
+        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        std::cout << "\n    }";
+        std::cout << "\n    ,\"Statistics\":{";
+        std::cout << "\n        \"Num Join\": " << 0;
+        std::cout << "\n        ,\"Num Forget\": " << 0;
+        std::cout << "\n        ,\"Num Introduce\": " << 0;
+        std::cout << "\n        ,\"Num Leaf\": " << 0;
+        std::cout << "\n    }";
+        std::cout << "\n}\n";
+        exit(20);
     }
 
     std::vector<cl::Platform> platforms;
@@ -288,7 +251,7 @@ int main(int argc, char *argv[]) {
     cl_long maxMemoryBuffer = 0;
 
     try {
-        getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, graph, kernelPath);
+        getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, kernelPath);
 
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
@@ -306,12 +269,8 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         bagType next;
-        switch (graph) {
-            case PRIMAL:
-                sol = new Solver_Primal(context, queue, program, memorySize, maxMemoryBuffer);
-                next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
-                break;
-        }
+        sol = new Solver_Primal(context, queue, program, memorySize, maxMemoryBuffer);
+        next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
         time_solving = getTime() - time_solving;
@@ -333,10 +292,11 @@ int main(int argc, char *argv[]) {
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
                     delete[] treeDecomp.bags[0].solution[a].elements;
             }
-            if (!weighted) {
-                boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
-                sols = sols * pow(base, exponent);
-            } else {
+
+            boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
+            sols = sols * pow(base, exponent);
+
+            if (weighted) {
                 sols = sols * tdParser.defaultWeight;
             }
 
@@ -352,8 +312,6 @@ int main(int argc, char *argv[]) {
         std::cout.precision(6);
         std::cout << "\n    ,\"Time\":{";
         std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
-        std::cout << "\n        ,\"Parsing\": " << ((float) time_parsing) / 1000;
-        std::cout << "\n        ,\"Generate_Model\": " << ((float) time_model) / 1000;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}\n";

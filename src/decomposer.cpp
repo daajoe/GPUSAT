@@ -1,4 +1,3 @@
-
 #include <decomposer.h>
 #include <sstream>
 #include <htd/TreeDecompositionOptimizationOperation.hpp>
@@ -6,11 +5,11 @@
 #include <htd/BucketEliminationTreeDecompositionAlgorithm.hpp>
 #include <htd/IterativeImprovementTreeDecompositionAlgorithm.hpp>
 #include <htd/GraphPreprocessor.hpp>
-#include "CutSetFitnessFunction.h"
 #include <htd_io/TdFormatExporter.hpp>
+#include <FitnessFunctions/WidthFitnessFunction.h>
 
 namespace gpusat {
-    std::string Decomposer::computeDecomposition(std::string formula) {
+    std::string Decomposer::computeDecomposition(std::string formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n) {
 
         htd::LibraryInstance *htdManager = htd::createManagementInstance(htd::Id::FIRST);
         htd::Hypergraph hypergraph(htdManager);
@@ -35,9 +34,8 @@ namespace gpusat {
             }
         }
         htd::BucketEliminationTreeDecompositionAlgorithm *treeDecompositionAlgorithm = new htd::BucketEliminationTreeDecompositionAlgorithm(htdManager);
-        //htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, new WidthFitnessFunction());
-        htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, new CutSetFitnessFunction());
-        algorithm->setIterationCount(50);
+        htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, fitness);
+        algorithm->setIterationCount(n);
         htd::ITreeDecomposition *decomp = algorithm->computeDecomposition(hypergraph);
         htd_io::TdFormatExporter exp;
         std::ostringstream oss;

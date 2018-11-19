@@ -103,7 +103,7 @@ namespace gpusat {
 
     }
 
-    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, graphTypes gType, cl_double &defaultWeight) {
+    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, cl_double &defaultWeight) {
         for (cl_long i = 0; i < formula.facts.size(); i++) {
             cl_long fact = formula.facts[i];
             for (cl_long a = 0; a < formula.clauses.size(); a++) {
@@ -112,13 +112,6 @@ namespace gpusat {
                     if (*elem == (fact)) {
                         //remove clause from formula
                         formula.clauses.erase(formula.clauses.begin() + a);
-                        if (gType == INCIDENCE) {
-                            relableDecomp(&decomp.bags[0], a + formula.numVars + 1);
-                            decomp.numVars--;
-                        } else if (gType == DUAL) {
-                            relableDecomp(&decomp.bags[0], a);
-                            decomp.numVars--;
-                        }
                         a--;
                     } else if (*elem == (-fact)) {
                         if (formula.clauses[a].size() == 1) {
@@ -144,9 +137,7 @@ namespace gpusat {
                     }
                 }
             }
-            if (gType != DUAL) {
-                relableDecomp(&decomp.bags[0], std::abs(fact));
-            }
+            relableDecomp(&decomp.bags[0], std::abs(fact));
             decomp.numVars--;
             if (formula.variableWeights != nullptr) {
                 //make product of removed variable weights

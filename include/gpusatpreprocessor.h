@@ -21,10 +21,9 @@ namespace gpusat {
          *
          * @param decomp            the tree decomposition
          * @param formula           the sat formula
-         * @param gType             the type of graph
          * @param defaultWeight     for WMC the product of the weights of the removed literals
          */
-        static void preprocessFacts(treedecType &decomp, satformulaType &formula, graphTypes gType, cl_double &defaultWeight);
+        static void preprocessFacts(treedecType &decomp, satformulaType &formula, cl_double &defaultWeight);
 
     private:
 
