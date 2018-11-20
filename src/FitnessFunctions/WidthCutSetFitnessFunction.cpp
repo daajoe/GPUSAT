@@ -8,22 +8,22 @@ namespace gpusat {
         return new htd::FitnessEvaluation(2, -(double) (decomposition.maximumBagSize()), -getMaxCutSetSize(decomposition, decomposition.root()));
     }
 
-    double gpusat::WidthCutSetFitnessFunction::getMaxCutSetSize(const htd::ITreeDecomposition &decomposition, htd::vertex_t node) const {
+    double gpusat::WidthCutSetFitnessFunction::getMaxCutSetSize(const htd::ITreeDecomposition &decomposition, htd::vertex_t vertex) const {
         double childSize = 0;
-        std::vector<htd::vertex_t> currentNodes = decomposition.bagContent(node);
-        std::vector<htd::vertex_t> childNodes;
-        for (htd::vertex_t childNode : decomposition.children(node)) {
-            std::vector<htd::vertex_t> childNodes_ = decomposition.bagContent(childNode);
-            for (auto n:childNodes_) {
-                childNodes.push_back(n);
+        const std::vector<htd::vertex_t> &currentNodes = decomposition.bagContent(vertex);
+        std::unordered_set<htd::vertex_t> nodes;
+        nodes.insert(currentNodes.begin(), currentNodes.end());
+        std::unordered_set<htd::vertex_t> cNodes;
+        for (htd::vertex_t childVertex : decomposition.children(vertex)) {
+            const std::vector<htd::vertex_t> &childNodes = decomposition.bagContent(childVertex);
+            for (auto n:childNodes) {
+                cNodes.insert(n);
             }
-            childSize = std::max(childSize, getMaxCutSetSize(decomposition, childNode));
+            childSize = std::max(childSize, getMaxCutSetSize(decomposition, childVertex));
         }
 
-        std::sort(currentNodes.begin(), currentNodes.end());
-        std::sort(childNodes.begin(), childNodes.end());
-        std::vector<htd::vertex_t> v(childNodes.size() + currentNodes.size());
-        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), childNodes.begin(), childNodes.end(), v.begin());
+        std::vector<htd::vertex_t> v(nodes.size() + currentNodes.size());
+        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), nodes.begin(), nodes.end(), v.begin());
         double d = it - v.begin();
         return std::max(d, childSize);
     }

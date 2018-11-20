@@ -112,7 +112,6 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
 
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
-    std::stringbuf treeD, sat;
     std::string inputLine;
     std::string formulaDir;
     std::string fitness;
@@ -141,82 +140,61 @@ int main(int argc, char *argv[]) {
 
     srand(seed);
 
-    if (formulaDir != "") {
-        std::ifstream fileIn(formulaDir);
-        while (getline(fileIn, inputLine)) {
-            sat.sputn(inputLine.c_str(), inputLine.size());
-            sat.sputn("\n", 1);
-        }
-    } else {
-        while (getline(std::cin, inputLine)) {
-            sat.sputn(inputLine.c_str(), inputLine.size());
-            sat.sputn("\n", 1);
-        }
-    }
-
-    std::string treeDString;
-    if (decompDir != "") {
-        std::ifstream fileIn(decompDir);
-        while (getline(fileIn, inputLine)) {
-            treeD.sputn(inputLine.c_str(), inputLine.size());
-            treeD.sputn("\n", 1);
-        }
-        treeDString = treeD.str();
-    } else {
-        htd::ITreeDecompositionFitnessFunction *fit;
-        if (fitness == "width") {
-            fit = new WidthFitnessFunction();
-        } else if (fitness == "cutSet") {
-            fit = new CutSetFitnessFunction();
-        } else if (fitness == "cutSet_width") {
-            fit = new CutSetWidthFitnessFunction();
-        } else {
-            fit = new WidthCutSetFitnessFunction();
-        }
-        treeDString = Decomposer::computeDecomposition(sat.str(), fit, numDecomps);
-    }
-
-    std::cout << "{\n";
-
-    long long int time_parsing = getTime();
+    satformulaType satFormula;
+    treedecType treeDecomp;
     CNFParser cnfParser(weighted);
     TDParser tdParser(combineWidth);
-    std::string satString = sat.str();
-
-    if (treeDString == "") {
-        std::stringstream satStream(satString);
-        std::string line;
-        while (std::getline(satStream, line)) {
-
-            std::stringstream sline(line);
-            std::string i;
-
-            cl_long num = 0;
-            while (!sline.eof()) {
-                getline(sline, i, ' ');
-                if (i.size() > 0 && line[0] != 'p' && line[0] != 'c') {
-                    num = stol(i);
-                    if (num != 0) {
-                        //clause->push_back(num);
-                    }
-                }
+    {
+        std::stringbuf treeD, sat;
+        if (formulaDir != "") {
+            std::ifstream fileIn(formulaDir);
+            while (getline(fileIn, inputLine)) {
+                sat.sputn(inputLine.c_str(), inputLine.size());
+                sat.sputn("\n", 1);
+            }
+        } else {
+            while (getline(std::cin, inputLine)) {
+                sat.sputn(inputLine.c_str(), inputLine.size());
+                sat.sputn("\n", 1);
             }
         }
-    }
 
-    if (satString.size() < 10) {
-        std::cerr << "Error: SAT formula\n";
-        exit(EXIT_FAILURE);
-    }
-    if (treeDString.size() < 9) {
-        std::cerr << "Error: tree decomposition\n";
-        exit(EXIT_FAILURE);
-    }
-    //parse the sat formula
-    satformulaType satFormula = cnfParser.parseSatFormula(sat.str());
-    //parse the tree decomposition
-    treedecType treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
+        std::string treeDString;
+        if (decompDir != "") {
+            std::ifstream fileIn(decompDir);
+            while (getline(fileIn, inputLine)) {
+                treeD.sputn(inputLine.c_str(), inputLine.size());
+                treeD.sputn("\n", 1);
+            }
+            treeDString = treeD.str();
+        } else {
+            htd::ITreeDecompositionFitnessFunction *fit;
+            if (fitness == "width") {
+                fit = new WidthFitnessFunction();
+            } else if (fitness == "cutSet") {
+                fit = new CutSetFitnessFunction();
+            } else if (fitness == "cutSet_width") {
+                fit = new CutSetWidthFitnessFunction();
+            } else {
+                fit = new WidthCutSetFitnessFunction();
+            }
+            treeDString = Decomposer::computeDecomposition(sat.str(), fit, numDecomps);
+        }
 
+        std::string satString = sat.str();
+
+        if (satString.size() < 8) {
+            std::cerr << "Error: SAT formula\n";
+            exit(EXIT_FAILURE);
+        }
+        if (treeDString.size() < 8) {
+            std::cerr << "Error: tree decomposition\n";
+            exit(EXIT_FAILURE);
+        }
+        satFormula = cnfParser.parseSatFormula(sat.str());
+        treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
+    }
+    std::cout << "\n{\n";
     std::cout << "    \"pre Width\": " << tdParser.preWidth;
     std::cout << "\n    ,\"pre Cut Set Size\": " << tdParser.preCut;
     std::cout << "\n    ,\"pre Join Size\": " << tdParser.preJoinSize;
@@ -225,7 +203,6 @@ int main(int argc, char *argv[]) {
 
     Preprocessor::preprocessFacts(treeDecomp, satFormula, tdParser.defaultWeight);
     if (satFormula.unsat) {
-        time_parsing = getTime() - time_parsing;
         time_total = getTime() - time_total;
         std::cout << "\n    ,\"Model Count\": " << 0;
         std::cout << "\n    ,\"Time\":{";
@@ -258,8 +235,6 @@ int main(int argc, char *argv[]) {
 
         tdParser.iterateDecompPost(treeDecomp.bags[0]);
         tdParser.postNumBags = treeDecomp.bags.size();
-
-        time_parsing = getTime() - time_parsing;
 
         std::cout << "\n    ,\"post Width\": " << tdParser.postWidth;
         std::cout << "\n    ,\"post Cut Set Size\": " << tdParser.postCut;

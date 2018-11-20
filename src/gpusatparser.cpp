@@ -284,12 +284,10 @@ namespace gpusat {
         getline(sline, i, ' '); //num bags
         ret.bags.resize(stoi(i));
         ret.numb = stoi(i);
-        for (int a = 0; a < ret.numb; a++) {
-            std::vector<cl_long> edge;
-            edges.push_back(edge);
-        }
+        edges.resize(stoi(i));
         getline(sline, i, ' '); //width
         getline(sline, i, ' '); //num vars
+
         ret.numVars = stoi(i);
     }
 
@@ -322,9 +320,10 @@ namespace gpusat {
     }
 
     void TDParser::removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID) {
-        for (int b = 0; b < node[id].size(); b++) {
-            if (preID != (node[id][b] - 1)) {
-                removeEdges(node, node[id][b] - 1, id);
+        const std::vector<cl_long> &test = node.at(id);
+        for (cl_long b : test) {
+            if (preID != (b - 1)) {
+                removeEdges(node, b - 1, id);
             }
         }
         std::vector<cl_long>::iterator it = std::find(node[id].begin(), node[id].end(), preID + 1);

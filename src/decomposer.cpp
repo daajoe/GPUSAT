@@ -40,6 +40,9 @@ namespace gpusat {
         htd_io::TdFormatExporter exp;
         std::ostringstream oss;
         exp.write(*decomp, hypergraph, oss);
+        delete algorithm;
+        delete decomp;
+        delete htdManager;
         return oss.str();
     }
 
