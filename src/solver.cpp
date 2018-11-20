@@ -443,17 +443,11 @@ namespace gpusat {
             node.solution[a].minId = run * bagSizeForget;
             node.solution[a].maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
             node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
-            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
-            if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                std::cerr << "\nMemory ERROR\n";
-                exit(0);
-            } else if (errno == ENOMEM) {
-                std::cerr << "\nOut of Memory!\n";
-                exit(0);
-            }
 
-            cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
+            cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_ALLOC_HOST_PTR, sizeof(cl_long) * node.solution[a].size, NULL);
             kernel.setArg(0, buf_solsF);
+            cl_long zero = 0;
+            queue.enqueueFillBuffer(buf_solsF, zero, 0, static_cast<size_t>(node.solution[a].size));
             cl::Buffer buf_varsF;
             if (fVars.size() > 0) {
                 buf_varsF = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
@@ -499,29 +493,46 @@ namespace gpusat {
                     a--;
                 }
             } else {
-                queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
 
                 if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+
+                    node.solution[a].elements = static_cast<cl_long *>(malloc(sizeof(cl_long) * static_cast<size_t>(node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2)));
+                    if (node.solution[a].elements == NULL || errno == ENOMEM) {
+                        std::cerr << "\nMemory ERROR\n";
+                        exit(0);
+                    } else if (errno == ENOMEM) {
+                        std::cerr << "\nOut of Memory!\n";
+                        exit(0);
+                    }
+
+                    queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * (node.solution[a - 1].numSolutions + 2), node.solution[a].elements);
+
                     combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
                     node.solution[a - 1] = node.solution[a];
 
                     node.bags--;
                     a--;
-                } else if (a > 0 && node.solution[a - 1].elements == NULL) {
-                    node.solution[a].minId = node.solution[a - 1].minId;
-                    node.solution[a - 1] = node.solution[a];
+                } else {
 
-                    node.bags--;
-                    a--;
-                }
-                node.solution[a].elements = (cl_long *) realloc(node.solution[a].elements, sizeof(cl_long) * (node.solution[a].numSolutions + 1));
-                if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                    std::cerr << "\nMemory ERROR\n";
-                    exit(0);
-                } else if (errno == ENOMEM) {
-                    std::cerr << "\nOut of Memory!\n";
-                    exit(0);
+                    node.solution[a].elements = static_cast<cl_long *>(malloc(sizeof(cl_long) * static_cast<size_t>(node.solution[a].numSolutions + 1)));
+                    if (node.solution[a].elements == NULL || errno == ENOMEM) {
+                        std::cerr << "\nMemory ERROR\n";
+                        exit(0);
+                    } else if (errno == ENOMEM) {
+                        std::cerr << "\nOut of Memory!\n";
+                        exit(0);
+                    }
+
+                    queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(long) * (node.solution[a].numSolutions + 1), node.solution[a].elements);
+
+                    if (a > 0 && node.solution[a - 1].elements == NULL) {
+                        node.solution[a].minId = node.solution[a - 1].minId;
+                        node.solution[a - 1] = node.solution[a];
+
+                        node.bags--;
+                        a--;
+                    }
                 }
                 node.solution[a].size = node.solution[a].numSolutions + 1;
                 node.maxSize = std::max(node.maxSize, node.solution[a].size);
