@@ -10,20 +10,20 @@ namespace gpusat {
 
     double gpusat::WidthCutSetFitnessFunction::getMaxCutSetSize(const htd::ITreeDecomposition &decomposition, htd::vertex_t vertex) const {
         double childSize = 0;
-        const std::vector<htd::vertex_t> &currentNodes = decomposition.bagContent(vertex);
-        std::unordered_set<htd::vertex_t> nodes;
-        nodes.insert(currentNodes.begin(), currentNodes.end());
-        std::unordered_set<htd::vertex_t> cNodes;
+        std::vector<htd::vertex_t> currentNodes = decomposition.bagContent(vertex);
+        std::vector<htd::vertex_t> cNodes;
         for (htd::vertex_t childVertex : decomposition.children(vertex)) {
             const std::vector<htd::vertex_t> &childNodes = decomposition.bagContent(childVertex);
             for (auto n:childNodes) {
-                cNodes.insert(n);
+                cNodes.push_back(n);
             }
             childSize = std::max(childSize, getMaxCutSetSize(decomposition, childVertex));
         }
 
-        std::vector<htd::vertex_t> v(nodes.size() + currentNodes.size());
-        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), nodes.begin(), nodes.end(), v.begin());
+        std::sort(currentNodes.begin(),currentNodes.end());
+        std::sort(cNodes.begin(),cNodes.end());
+        std::vector<htd::vertex_t> v(cNodes.size() + currentNodes.size());
+        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), cNodes.begin(), cNodes.end(), v.begin());
         double d = it - v.begin();
         return std::max(d, childSize);
     }
