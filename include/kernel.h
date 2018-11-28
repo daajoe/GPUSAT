@@ -1,3 +1,4 @@
+R"=====(
 #if defined(cl_khr_fp64)
 # pragma OPENCL EXTENSION cl_khr_fp64: enable
 # pragma OPENCL EXTENSION cl_khr_int64_base_atomics : enable
@@ -61,10 +62,10 @@ __kernel void resize(long numVars, __global long *tree, __global double *solutio
 }
 
 __kernel void resize_(long numVars,
-                     __global long *tree,
-                     __global double *solutions_old,
-                     __global int *treeSize,
-                     long startId) {
+                      __global long *tree,
+                      __global double *solutions_old,
+                      __global int *treeSize,
+                      long startId) {
     long id = get_global_id(0);
     double val = getCount(id+startId,solutions_old,numVars);
     if (val>0) {
@@ -426,3 +427,4 @@ __kernel void solveIntroduceForget(
         }
     }
 }
+)=====";

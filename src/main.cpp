@@ -21,6 +21,9 @@
 #include <FitnessFunctions/CutSetFitnessFunction.h>
 #include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 
+std::string kernelStr =
+#include <kernel.h>
+
 using namespace gpusat;
 
 long long int getTime();
@@ -64,50 +67,9 @@ void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::
         exit(1);
     }
 
-    struct stat buffer;
-    std::string binPath = kernelPath + "SAT_d_p.clbin";
-
-#ifndef DEBUG
-    if (stat(binPath.c_str(), &buffer) != 0) {
-#endif
-    //create kernel binary if it doesn't exist
-    std::string sourcePath;
-
-    sourcePath = kernelPath + "SAT_d_primal.cl";
-    // read source file
-    std::string kernelStr = GPUSATUtils::readFile(sourcePath);
     cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
     program = cl::Program(context, sources);
     program.build(devices);
-
-    const std::vector<size_t> binSizes = program.getInfo<CL_PROGRAM_BINARY_SIZES>();
-    std::vector<char> binData((unsigned long long int) std::accumulate(binSizes.begin(), binSizes.end(), 0));
-    char *binChunk = &binData[0];
-
-    std::vector<char *> binaries;
-    for (const size_t &binSize : binSizes) {
-        binaries.push_back(binChunk);
-        binChunk += binSize;
-    }
-
-    // write binaries
-    program.getInfo(CL_PROGRAM_BINARIES, &binaries[0]);
-    std::ofstream binaryfile(binPath.c_str(), std::ios::binary);
-    for (unsigned int i = 0; i < binaries.size(); ++i)
-        binaryfile.write(binaries[i], binSizes[i]);
-    binaryfile.close();
-#ifndef DEBUG
-    } else {
-        //load kernel binary
-
-        long size = 0;
-        cl_int err;
-        std::string kernelStr = GPUSATUtils::readBinary(binPath);
-        cl::Program::Binaries bins(1, std::make_pair((const void *) kernelStr.data(), kernelStr.size()));
-        program = cl::Program(context, devices, bins, nullptr, &err);
-        program.build(devices);
-    }
-#endif
 }
 
 int main(int argc, char *argv[]) {
