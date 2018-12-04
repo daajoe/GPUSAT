@@ -51,9 +51,8 @@ namespace gpusat {
                             return;
                         }
 
-                        std::vector<cl_long> vt(static_cast<unsigned long long int>(edge1.variables.size() + edge2.variables.size()));
-                        auto itt = std::set_union(edge1.variables.begin(), edge1.variables.end(), edge2.variables.begin(), edge2.variables.end(), vt.begin());
-                        vt.resize(static_cast<unsigned long long int>(itt - vt.begin()));
+                        std::vector<cl_long> vt;
+                        std::set_union(edge1.variables.begin(), edge1.variables.end(), edge2.variables.begin(), edge2.variables.end(), back_inserter(vt));
                         tmp.variables = vt;
 
                         if (i == node.edges.size() - 1) {
@@ -358,10 +357,9 @@ namespace gpusat {
         std::vector<cl_long> clauses;
         cl_long numClauses = 0;
         for (cl_long i = 0; i < formula.clauses.size(); i++) {
-            std::vector<cl_long> v(formula.clauses[i].size());
-            std::vector<cl_long>::iterator it;
-            it = std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), v.begin(), compVars);
-            if (it - v.begin() == formula.clauses[i].size()) {
+            std::vector<cl_long> v;
+            std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), back_inserter(v), compVars);
+            if (v.size() == formula.clauses[i].size()) {
                 numClauses++;
                 numVarsClause.push_back(formula.clauses[i].size());
                 for (cl_long a = 0; a < formula.clauses[i].size(); a++) {

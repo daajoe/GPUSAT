@@ -16,20 +16,16 @@ namespace gpusat {
             for (int a = 0; a < decomp->edges.size() && !changed; a++) {
                 for (int b = 0; b < decomp->edges.size() && !changed; b++) {
                     if (a != b && ((decomp->edges[a]->variables.size() < combineWidth && decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 || decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
-                        std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->edges[a]->variables.size() + decomp->edges[b]->variables.size()));
-                        std::vector<cl_long>::iterator it;
-                        it = std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(), v.begin());
-                        v.resize(static_cast<unsigned long long int>(it - v.begin()));
+                        std::vector<cl_long> v;
+                        std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(), back_inserter(v));
                         if (v.size() < combineWidth || decomp->edges[a]->variables.size() == 0 ||
                             decomp->edges[b]->variables.size() == 0) {
                             changed = true;
                             cl_long cid = decomp->edges[b]->id;
                             decomp->edges[a]->variables.assign(v.begin(), v.end());
 
-                            std::vector<bagType *> v_(static_cast<unsigned long long int>(decomp->edges[a]->edges.size() + decomp->edges[b]->edges.size()));
-                            std::vector<bagType *>::iterator it_;
-                            it_ = std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(), decomp->edges[b]->edges.end(), v_.begin(), compTreedType);
-                            v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
+                            std::vector<bagType *> v_;
+                            std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(), decomp->edges[b]->edges.end(), back_inserter(v_), compTreedType);
                             decomp->edges[a]->edges.assign(v_.begin(), v_.end());
                             if (b < decomp->edges.size()) {
                                 decomp->edges.erase(decomp->edges.begin() + b);
@@ -46,19 +42,15 @@ namespace gpusat {
             while (changed) {
                 changed = false;
                 for (int i = 0; i < decomp->edges.size(); i++) {
-                    std::vector<cl_long> v(static_cast<unsigned long long int>(decomp->variables.size() + decomp->edges[i]->variables.size()));
-                    std::vector<cl_long>::iterator it;
-                    it = std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), v.begin());
-                    v.resize(static_cast<unsigned long long int>(it - v.begin()));
+                    std::vector<cl_long> v;
+                    std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), back_inserter(v));
                     if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
                         changed = true;
                         cl_long cid = decomp->edges[i]->id;
                         decomp->variables.assign(v.begin(), v.end());
 
-                        std::vector<bagType *> v_(static_cast<unsigned long long int>(decomp->edges.size() + decomp->edges[i]->edges.size()));
-                        std::vector<bagType *>::iterator it_;
-                        it_ = std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), v_.begin(), compTreedType);
-                        v_.resize(static_cast<unsigned long long int>(it_ - v_.begin()));
+                        std::vector<bagType *> v_;
+                        std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), back_inserter(v_), compTreedType);
                         decomp->edges.resize(0);
                         for (int asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
                             bagType *&sdggg = v_[asdf];
