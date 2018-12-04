@@ -9,17 +9,10 @@ R"=====(
 # error double precision is not supported
 #endif
 
-#define stype double
-
-//#define __kernel
-//#define __global
-
-double getCount(long id,
-                __global long *tree,
-                long numVars) {
+double getCount(long id, __global long *tree, long numVars) {
     int nextId = 0;
     for (int i = 0; i < numVars; i++) {
-        nextId = ((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        nextId = ((__global int *) &tree[nextId])[(id >> (numVars - i - 1)) & 1];
         if (nextId == 0) {
             return 0.0;
         }
@@ -27,25 +20,21 @@ double getCount(long id,
     return as_double(tree[nextId]);
 }
 
-void setCount(long id,
-              __global long *tree,
-              long numVars,
-              __global int *treeSize,
-              double value) {
+void setCount(long id, __global long *tree, long numVars, __global int *treeSize, double value) {
     int nextId = 0;
     int val = 0;
-    if(numVars==0){
+    if (numVars == 0) {
         atomic_inc(treeSize);
     }
     for (int i = 0; i < numVars; i++) {
-        __global int *lowVal = &(((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1]);
-        if(val==0&&*lowVal==0){
-            val = atomic_inc(treeSize)+1;
+        __global int *lowVal = &((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        if (val == 0 && *lowVal == 0) {
+            val = atomic_inc(treeSize) + 1;
         }
         atomic_cmpxchg(lowVal, 0, val);
         if (*lowVal == val) {
-            if(i < (numVars-1)) {
-                val = atomic_inc(treeSize)+1;
+            if (i < (numVars - 1)) {
+                val = atomic_inc(treeSize) + 1;
             }
         }
         nextId = *lowVal;
@@ -61,15 +50,11 @@ __kernel void resize(long numVars, __global long *tree, __global double *solutio
     }
 }
 
-__kernel void resize_(long numVars,
-                      __global long *tree,
-                      __global double *solutions_old,
-                      __global int *treeSize,
-                      long startId) {
+__kernel void resize_(long numVars, __global long *tree, __global double *solutions_old, __global int *treeSize, long startId) {
     long id = get_global_id(0);
-    double val = getCount(id+startId,solutions_old,numVars);
-    if (val>0) {
-        setCount(id+startId, tree, numVars, treeSize, val);
+    double val = getCount(id + startId, solutions_old, numVars);
+    if (val > 0) {
+        setCount(id + startId, tree, numVars, treeSize, val);
     }
 }
 /**
@@ -94,16 +79,7 @@ __kernel void resize_(long numVars,
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-stype solveIntroduce_(
-        int numV,
-        __global long *edge,
-        int numVE,
-        __global long *variables,
-        __global long *edgeVariables,
-        long minId,
-        long maxId,
-        __global double *weights,
-        long id) {
+double solveIntroduce_(int numV, __global long *edge, int numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
@@ -157,12 +133,7 @@ stype solveIntroduce_(
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-int checkBag(__global long *clauses,
-             __global long *numVarsC,
-             long numclauses,
-             long id,
-             long numV,
-             __global long *variables) {
+int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, long id, long numV, __global long *variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     // iterate through all clauses
@@ -224,12 +195,9 @@ int checkBag(__global long *clauses,
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(
-        __global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2,
-        long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights,
-        __global long *sols, double value) {
+__kernel void solveJoin(__global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols, double value) {
     long id = get_global_id(0);
-    stype tmp = -1, tmp_ = -1;
+    double tmp = -1, tmp_ = -1;
     double weight = 1;
     if (startIDEdge1 != -1) {
         // get solution count from first edge
@@ -305,20 +273,8 @@ __kernel void solveJoin(
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-stype solveIntroduceF(
-        __global long *clauses,
-        __global long *numVarsC,
-        long numclauses,
-        long numV,
-        __global long *edge,
-        long numVE,
-        __global long *variables,
-        __global long *edgeVariables,
-        long minId,
-        long maxId,
-        __global double *weights,
-        long id) {
-    stype tmp;
+double solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global long *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id) {
+    double tmp;
     if (edge != 0) {
         // get solutions count edge
         tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id);
@@ -383,10 +339,7 @@ stype solveIntroduceF(
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-__kernel void solveIntroduceForget(
-        __global long *solsF, __global long *varsF, __global long *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE, long maxIdE,
-        long startIDF, long startIDE, __global long *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC, long numclauses,
-        __global double *weights, __global int *exponent, double value) {
+__kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, __global long *solsE, long numVE, __global long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE, __global long *sols, long numVI, __global long *varsI, __global long *clauses, __global long *numVarsC, long numclauses, __global double *weights, __global int *exponent, double value) {
     long id = get_global_id(0);
     if (numVI != numVF) {
         double tmp = 0;
@@ -414,7 +367,7 @@ __kernel void solveIntroduceForget(
         }
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
-            setCount(id, solsF, numVF, sols, (tmp/ value + last));
+            setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
         }
     } else {
@@ -422,7 +375,7 @@ __kernel void solveIntroduceForget(
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id);
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
-            setCount(id, solsF, numVF, sols, (tmp/ value + last));
+            setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
         }
     }

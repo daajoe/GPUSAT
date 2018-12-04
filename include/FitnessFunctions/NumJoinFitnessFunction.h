@@ -4,6 +4,9 @@
 #include <htd/ITreeDecompositionFitnessFunction.hpp>
 
 namespace gpusat {
+    /**
+     * Fitness function that minimizes the number of join nodes and then the width.
+     */
     class NumJoinFitnessFunction : public htd::ITreeDecompositionFitnessFunction {
 
     public:

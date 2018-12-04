@@ -6,6 +6,9 @@
 #include <unordered_map>
 
 namespace gpusat {
+    /**
+     *
+     */
     class CNFParser {
     public:
 
@@ -110,6 +113,12 @@ namespace gpusat {
          */
         void parseBagLine(treedecType &ret, std::string item);
 
+        /**
+         *
+         * @param node
+         * @param id
+         * @param preID
+         */
         static void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
     };
 }

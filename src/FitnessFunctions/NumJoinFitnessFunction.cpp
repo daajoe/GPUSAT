@@ -5,7 +5,7 @@
 
 namespace gpusat {
     htd::FitnessEvaluation *NumJoinFitnessFunction::fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const {
-        return new htd::FitnessEvaluation(2, -decomposition.joinNodeCount());
+        return new htd::FitnessEvaluation(2, -decomposition.joinNodeCount(), -(double) (decomposition.maximumBagSize()));
     }
 
     NumJoinFitnessFunction *NumJoinFitnessFunction::clone(void) const {

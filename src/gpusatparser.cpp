@@ -320,15 +320,11 @@ namespace gpusat {
     }
 
     void TDParser::removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID) {
-        const std::vector<cl_long> &test = node.at(id);
-        for (cl_long b : test) {
-            if (preID != (b - 1)) {
-                removeEdges(node, b - 1, id);
-            }
-        }
-        std::vector<cl_long>::iterator it = std::find(node[id].begin(), node[id].end(), preID + 1);
-        if (it != node[id].end()) {
-            node[id].erase(it);
+        for (cl_long b : node[id]) {
+            auto &n = node[b - 1];
+            auto idx = std::find(n.begin(), n.end(), id + 1);
+            n.erase(idx);
+            removeEdges(node, b - 1, id);
         }
     }
 }

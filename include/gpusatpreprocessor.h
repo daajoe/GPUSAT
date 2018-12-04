@@ -6,6 +6,9 @@
 #include <unordered_map>
 
 namespace gpusat {
+    /**
+     *
+     */
     class Preprocessor {
     public:
         /**
@@ -27,8 +30,18 @@ namespace gpusat {
 
     private:
 
+        /**
+         *
+         * @param decomp
+         * @param id
+         */
         static void relableDecomp(bagType *decomp, cl_long id);
 
+        /**
+         *
+         * @param formula
+         * @param id
+         */
         static void relableFormula(satformulaType &formula, cl_long id);
     };
 }

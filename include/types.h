@@ -1,6 +1,5 @@
 #ifndef GPUSAT_TYPES_H_H
 #define GPUSAT_TYPES_H_H
-
 #if defined __CYGWIN__ || defined __MINGW32__
 #define alloca __builtin_alloca
 #endif
@@ -11,45 +10,11 @@
 #include <vector>
 #include <set>
 
-namespace dual {
-    /**
-     * parameters for the dual join kernel
-     */
-    typedef struct {
-        cl_long numC;
-        cl_long numCE1;
-        cl_long numCE2;
-        cl_long minId1;
-        cl_long maxId1;
-        cl_long minId2;
-        cl_long maxId2;
-        cl_long startIDNode;
-        cl_long startIDEdge1;
-        cl_long startIDEdge2;
-        cl_long numV;
-        cl_long numVE1;
-        cl_long numVE2;
-    } sJVars;
-
-    /**
-     * parameters for the dual introduce forget kernel
-     */
-    typedef struct {
-        cl_long numCI;
-        cl_long numCE;
-        cl_long numVF;
-        cl_long numVI;
-        cl_long numVE;
-        cl_long combinations;
-        cl_long minIdE;
-        cl_long maxIdE;
-        cl_long startIDF;
-        cl_long startIDE;
-        cl_long numCF;
-    } sIFVars;
-}
 namespace gpusat {
 
+    /**
+     *
+     */
     struct treeType {
         cl_long *elements = nullptr;
         cl_int numSolutions = 0;
@@ -59,6 +24,9 @@ namespace gpusat {
     };
 
     /// type for a bag in the tree decomposition
+    /**
+     *
+     */
     struct bagType {
         cl_int correction = 0;
         cl_int exponent = 0;
@@ -71,6 +39,9 @@ namespace gpusat {
     };
 
     /// type for saving a tree decomposition
+    /**
+     *
+     */
     struct treedecType {
         cl_long numb = 0;
         cl_long numVars = 0;
@@ -89,6 +60,9 @@ namespace gpusat {
     }
 
     /// type for saving the sat formula
+    /**
+     *
+     */
     struct satformulaType {
         cl_long numVars = 0;
         cl_long numWeights = 0;
@@ -99,8 +73,18 @@ namespace gpusat {
     };
 
     /// the graph type which was the base for the tree decomposition
+    /**
+     *
+     */
     enum nodeTypes {
         JOIN, INTRODUCEFORGET
+    };
+
+    /**
+     *
+     */
+    enum dataStructures {
+        ARRAY, TREE
     };
 
     /**

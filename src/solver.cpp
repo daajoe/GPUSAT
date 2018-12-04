@@ -1,7 +1,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <gpusautils.h>
+#include <gpusatutils.h>
 #include <solver.h>
 #include <errno.h>
 
@@ -165,7 +165,7 @@ namespace gpusat {
         free(table.elements);
     }
 
-    void Solver_Primal::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) {
+    void Solver::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode) {
         this->numJoin++;
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
@@ -335,14 +335,9 @@ namespace gpusat {
                 edge2.solution[a].elements = NULL;
             }
         }
-/*#ifdef DEBUG
-        std::cout << "\nJoin " << numJoin << "\n";
-        GPUSATUtils::printSol(node);
-        std::cout.flush();
-#endif*/
     }
 
-    void Solver_Primal::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode) {
+    void Solver::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode) {
         isSat = 0;
         std::vector<cl_long> fVars;
         std::set_intersection(node.variables.begin(), node.variables.end(), pnode.variables.begin(), pnode.variables.end(), std::back_inserter(fVars));
@@ -549,10 +544,5 @@ namespace gpusat {
                 cnode.solution[a].elements = NULL;
             }
         }
-/*#ifdef DEBUG
-        std::cout << "\nIF " << numIntroduceForget << "\n";
-        GPUSATUtils::printSol(node);
-        std::cout.flush();
-#endif*/
     }
 }

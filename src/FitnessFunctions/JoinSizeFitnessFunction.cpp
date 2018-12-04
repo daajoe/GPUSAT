@@ -9,7 +9,7 @@ namespace gpusat {
         for (auto node:decomposition.joinNodes()) {
             maxSize = (decomposition.bagContent(node).size() > maxSize) ? decomposition.bagContent(node).size() : maxSize;
         }
-        return new htd::FitnessEvaluation(2, -maxSize);
+        return new htd::FitnessEvaluation(2, -maxSize, -(double) (decomposition.maximumBagSize()));
     }
 
 

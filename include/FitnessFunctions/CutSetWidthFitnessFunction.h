@@ -4,6 +4,9 @@
 #include <htd/ITreeDecompositionFitnessFunction.hpp>
 
 namespace gpusat {
+    /**
+     * Fitness function that first minimizes the cut set size and then the width.
+     */
     class CutSetWidthFitnessFunction : public htd::ITreeDecompositionFitnessFunction {
 
     public:

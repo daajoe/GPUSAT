@@ -8,7 +8,7 @@
 #include <chrono>
 #include <types.h>
 #include <gpusatparser.h>
-#include <gpusautils.h>
+#include <gpusatutils.h>
 #include <sys/stat.h>
 #include <numeric>
 #include <decomposer.h>
@@ -26,10 +26,7 @@ std::string kernelStr =
 
 using namespace gpusat;
 
-long long int getTime();
-
-void getKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth, std::string kernelPath) {
-
+void buildKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth) {
     cl::Platform::get(&platforms);
     std::vector<cl::Platform>::iterator iter;
     for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
@@ -195,7 +192,7 @@ int main(int argc, char *argv[]) {
     cl_long maxMemoryBuffer = 0;
 
     try {
-        getKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth, kernelPath);
+        buildKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
 
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
@@ -211,7 +208,7 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         bagType next;
-        sol = new Solver_Primal(context, queue, program, memorySize, maxMemoryBuffer);
+        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer);
         next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
@@ -228,15 +225,17 @@ int main(int argc, char *argv[]) {
             for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
                 for (cl_long i = treeDecomp.bags[0].solution[a].minId; i < treeDecomp.bags[0].solution[a].maxId; i++) {
                     if (treeDecomp.bags[0].solution[a].elements != nullptr) {
-                        sols = sols + GPUSATUtils::getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
+                        sols = sols + getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
                     }
                 }
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
                     delete[] treeDecomp.bags[0].solution[a].elements;
             }
 
-            boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
-            sols = sols * pow(base, exponent);
+            if (!noExp) {
+                boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
+                sols = sols * pow(base, exponent);
+            }
 
             if (weighted) {
                 sols = sols * tdParser.defaultWeight;
@@ -276,25 +275,3 @@ int main(int argc, char *argv[]) {
     }
 }
 
-bool isPrimalGraph(satformulaType *satFormula, treedecType *treeDecomp) {
-    for (auto &clause : satFormula->clauses) {
-        for (int x = 0; x < clause.size(); x++) {
-            for (int y = x + 1; y < clause.size(); y++) {
-                bool found = false;
-                for (int j = 0; j < treeDecomp->numb; j++) {
-                    if (std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[x])) != treeDecomp->bags[j].variables.end() && std::find(treeDecomp->bags[j].variables.begin(), treeDecomp->bags[j].variables.end(), std::abs(clause[y])) != treeDecomp->bags[j].variables.end()) {
-                        found = true;
-                    }
-                }
-                if (!found) {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
-long long int getTime() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-}
