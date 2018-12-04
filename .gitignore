@@ -27,6 +27,10 @@
 # Kernel Binaries
 *.clbin
 
-/.idea/
-/script
-/build*/
+#ide
+.idea/
+cmake*/
+.vs/
+
+#build folder
+build*/
