@@ -16,9 +16,9 @@
 #include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 #include <gpusatpreprocessor.h>
-#include <FitnessFunctions/WidthFitnessFunction.h>
+#include <FitnessFunctions/NumJoinFitnessFunction.h>
+#include <FitnessFunctions/JoinSizeFitnessFunction.h>
 #include <FitnessFunctions/WidthCutSetFitnessFunction.h>
-#include <FitnessFunctions/CutSetFitnessFunction.h>
 #include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 
 std::string kernelStr =
@@ -89,8 +89,13 @@ int main(int argc, char *argv[]) {
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-f,--formula", formulaDir, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
-    app.add_option("-c,--kernelDir", kernelPath, "directory containing the kernel files")->set_default_str("./kernel/");
-    app.add_option("-n,--numDecomps", numDecomps, "");
+    app.add_option("-n,--numDecomps", numDecomps, "")->set_default_str("30");
+    app.add_set("--fitnessFunction", fitness, {"numJoin", "joinSize", "width_cutSet", "cutSet_width"},
+                "choose a fitness function:\n"
+                "\t\t\tnumJoin: minimize the number of joins\n"
+                "\t\t\tjoinSize: minimize the numer of variables in a join node\n"
+                "\t\t\twidth_cutSet: minimize the width and then the cut set size\n"
+                "\t\t\tcutSet_width: minimize the cut set size and then the width")->set_default_str("width_cutSet");
     app.add_flag("--CPU", cpu, "run the solver on the cpu");
     app.add_flag("--NVIDIA", nvidia, "run the solver on an NVIDIA device");
     app.add_flag("--AMD", amd, "run the solver on an AMD device");
@@ -132,9 +137,9 @@ int main(int argc, char *argv[]) {
         } else {
             htd::ITreeDecompositionFitnessFunction *fit;
             if (fitness == "width") {
-                fit = new WidthFitnessFunction();
+                fit = new NumJoinFitnessFunction();
             } else if (fitness == "cutSet") {
-                fit = new CutSetFitnessFunction();
+                fit = new JoinSizeFitnessFunction();
             } else if (fitness == "cutSet_width") {
                 fit = new CutSetWidthFitnessFunction();
             } else {

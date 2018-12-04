@@ -7,9 +7,9 @@ namespace gpusat {
     class WidthCutSetFitnessFunction : public htd::ITreeDecompositionFitnessFunction {
 
     public:
-        WidthCutSetFitnessFunction(void);
+        WidthCutSetFitnessFunction() = default;
 
-        ~WidthCutSetFitnessFunction();
+        ~WidthCutSetFitnessFunction() = default;
 
         htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override;
 

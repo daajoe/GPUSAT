@@ -22,18 +22,9 @@ namespace gpusat {
 
         std::sort(currentNodes.begin(), currentNodes.end());
         std::sort(childNodes.begin(), childNodes.end());
-        std::vector<htd::vertex_t> v(childNodes.size() + currentNodes.size());
-        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), childNodes.begin(), childNodes.end(), v.begin());
-        double d = it - v.begin();
-        return std::max(d, childSize);
-    }
-
-    CutSetWidthFitnessFunction::CutSetWidthFitnessFunction(void) {
-
-    }
-
-    CutSetWidthFitnessFunction::~CutSetWidthFitnessFunction() {
-
+        std::vector<htd::vertex_t> v;
+        std::set_intersection(currentNodes.begin(), currentNodes.end(), childNodes.begin(), childNodes.end(), back_inserter(v));
+        return std::max((double) v.size(), childSize);
     }
 
     CutSetWidthFitnessFunction *CutSetWidthFitnessFunction::clone(void) const {

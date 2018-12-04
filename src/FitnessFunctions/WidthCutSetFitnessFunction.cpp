@@ -14,26 +14,18 @@ namespace gpusat {
         std::vector<htd::vertex_t> cNodes;
         for (htd::vertex_t childVertex : decomposition.children(vertex)) {
             const std::vector<htd::vertex_t> &childNodes = decomposition.bagContent(childVertex);
-            for (auto n:childNodes) {
+            for (htd::vertex_t n:childNodes) {
+                std::size_t s = cNodes.size();
                 cNodes.push_back(n);
             }
             childSize = std::max(childSize, getMaxCutSetSize(decomposition, childVertex));
         }
 
-        std::sort(currentNodes.begin(),currentNodes.end());
-        std::sort(cNodes.begin(),cNodes.end());
-        std::vector<htd::vertex_t> v(cNodes.size() + currentNodes.size());
-        std::vector<htd::vertex_t>::iterator it = std::set_intersection(currentNodes.begin(), currentNodes.end(), cNodes.begin(), cNodes.end(), v.begin());
-        double d = it - v.begin();
-        return std::max(d, childSize);
-    }
-
-    WidthCutSetFitnessFunction::WidthCutSetFitnessFunction(void) {
-
-    }
-
-    WidthCutSetFitnessFunction::~WidthCutSetFitnessFunction() {
-
+        std::sort(currentNodes.begin(), currentNodes.end());
+        std::sort(cNodes.begin(), cNodes.end());
+        std::vector<htd::vertex_t> v;
+        std::set_intersection(currentNodes.begin(), currentNodes.end(), cNodes.begin(), cNodes.end(), back_inserter(v));
+        return std::max((double) v.size(), childSize);
     }
 
     WidthCutSetFitnessFunction *WidthCutSetFitnessFunction::clone(void) const {

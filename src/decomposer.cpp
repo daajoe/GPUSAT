@@ -6,7 +6,6 @@
 #include <htd/IterativeImprovementTreeDecompositionAlgorithm.hpp>
 #include <htd/GraphPreprocessor.hpp>
 #include <htd_io/TdFormatExporter.hpp>
-#include <FitnessFunctions/WidthFitnessFunction.h>
 
 namespace gpusat {
     std::string Decomposer::computeDecomposition(std::string formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n) {
