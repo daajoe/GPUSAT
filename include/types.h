@@ -76,14 +76,14 @@ namespace gpusat {
     /**
      *
      */
-    enum nodeTypes {
+    enum nodeType {
         JOIN, INTRODUCEFORGET
     };
 
     /**
      *
      */
-    enum dataStructures {
+    enum dataStructure {
         ARRAY, TREE
     };
 

@@ -24,6 +24,7 @@ namespace gpusat {
         cl_long numIntroduceForget = 0;
         cl_long maxTableSize = 0;
         cl_long maxMemoryBuffer = 0;
+        dataStructure solutionType = TREE;
 
         /**
          *
@@ -33,7 +34,7 @@ namespace gpusat {
          * @param memorySize_
          * @param maxMemoryBuffer_
          */
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_, cl_long maxMemoryBuffer_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_) {}
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_, cl_long maxMemoryBuffer_, dataStructure solutionType_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_) {}
 
         /**
          * function to solve the sat problem
@@ -42,7 +43,7 @@ namespace gpusat {
          * @param formula   the sat formula
          * @param node      the node to start from in the tree decompostion
          */
-        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeTypes lastNode);
+        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeType lastNode);
 
     protected:
 
@@ -55,7 +56,7 @@ namespace gpusat {
          * @param cnode     the child of the current node
          * @param leaf      indicates that the current node is a leaf node
          */
-        void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeTypes nextNode);
+        void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeType nextNode);
 
         /**
          * function to solve a join node
@@ -65,7 +66,7 @@ namespace gpusat {
          * @param edge2     the second child node
          * @param formula   the sat formula
          */
-        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeTypes nextNode);
+        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode);
 
         /**
          *

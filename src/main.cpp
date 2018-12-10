@@ -74,15 +74,16 @@ int main(int argc, char *argv[]) {
     std::string inputLine;
     std::string formulaDir;
     std::string fitness;
+    std::string type;
     std::string decompDir;
-    int combineWidth = 10;
+    int combineWidth = 0;
     time_t seed = time(0);
-    std::string kernelPath = "./kernel/";
-    bool cpu, weighted, nvidia, amd;
+    bool cpu, weighted, noExp, nvidia, amd;
+    dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
 
-    std::string filename = "default";
+    //cmd options
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-f,--formula", formulaDir, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
@@ -97,16 +98,23 @@ int main(int argc, char *argv[]) {
     app.add_flag("--NVIDIA", nvidia, "run the solver on an NVIDIA device");
     app.add_flag("--AMD", amd, "run the solver on an AMD device");
     app.add_flag("--weighted", weighted, "use weighted model count");
-    app.add_set("--fitnessFunction", fitness, {"width", "cutSet", "width_cutSet", "cutSet_width"}, "fitness function")->set_default_str("width_cutSet");
-
-
+    //TODO
+    app.add_flag("--noExp", noExp, "don't use extended exponents");
+    app.add_set("--dataStructure", type, {"array", "tree"},
+                "choose a data structure for storing the solutions:")->set_default_str("tree");
     CLI11_PARSE(app, argc, argv)
 
     srand(seed);
 
+    if (type == "array") {
+        kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
+        solutionType = dataStructure::ARRAY;
+    } else if (type == "tree") {
+        solutionType = dataStructure::TREE;
+    }
+
     satformulaType satFormula;
     treedecType treeDecomp;
-    CNFParser cnfParser(weighted);
     TDParser tdParser(combineWidth);
     {
         std::stringbuf treeD, sat;
@@ -155,7 +163,7 @@ int main(int argc, char *argv[]) {
             std::cerr << "Error: tree decomposition\n";
             exit(EXIT_FAILURE);
         }
-        satFormula = cnfParser.parseSatFormula(sat.str());
+        satFormula = CNFParser(weighted).parseSatFormula(sat.str());
         treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
     }
     std::cout << "\n{\n";
@@ -193,7 +201,6 @@ int main(int argc, char *argv[]) {
 
     try {
         buildKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
-
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
 
@@ -208,7 +215,7 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         bagType next;
-        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer);
+        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType);
         next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
@@ -225,11 +232,15 @@ int main(int argc, char *argv[]) {
             for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
                 for (cl_long i = treeDecomp.bags[0].solution[a].minId; i < treeDecomp.bags[0].solution[a].maxId; i++) {
                     if (treeDecomp.bags[0].solution[a].elements != nullptr) {
-                        sols = sols + getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
+                        if (solutionType == TREE) {
+                            sols = sols + getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
+                        } else if (solutionType == ARRAY) {
+                            sols = sols + *reinterpret_cast <cl_double *>(&treeDecomp.bags[0].solution[a].elements[i - treeDecomp.bags[0].solution[a].minId]);
+                        }
                     }
                 }
                 if (treeDecomp.bags[0].solution[a].elements != NULL)
-                    delete[] treeDecomp.bags[0].solution[a].elements;
+                    free(treeDecomp.bags[0].solution[a].elements);
             }
 
             if (!noExp) {

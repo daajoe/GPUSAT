@@ -9,10 +9,13 @@ R"=====(
 # error double precision is not supported
 #endif
 
+#if !defined(ARRAY_TYPE)
+
 double getCount(long id, __global long *tree, long numVars) {
     int nextId = 0;
     for (int i = 0; i < numVars; i++) {
-        nextId = ((__global int *) &tree[nextId])[(id >> (numVars - i - 1)) & 1];
+        nextId = ((__global
+        int *) &tree[nextId])[(id >> (numVars - i - 1)) & 1];
         if (nextId == 0) {
             return 0.0;
         }
@@ -57,6 +60,9 @@ __kernel void resize_(long numVars, __global long *tree, __global double *soluti
         setCount(id + startId, tree, numVars, treeSize, val);
     }
 }
+
+#endif
+
 /**
  * Operation to solve a Introduce node in the decomposition.
  *
@@ -79,7 +85,7 @@ __kernel void resize_(long numVars, __global long *tree, __global double *soluti
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-double solveIntroduce_(int numV, __global long *edge, int numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id) {
+double solveIntroduce_(int numV, __global long *edge, int numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id, long startIDEdge) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
@@ -105,8 +111,13 @@ double solveIntroduce_(int numV, __global long *edge, int numVE, __global long *
     }
 
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
-        //return edge[otherId % tableSize].count;
+
+#if !defined(ARRAY_TYPE)
         return getCount(otherId, edge, numVE) * weight;
+#else
+        return as_double(edge[otherId - (startIDEdge)]) * weight;
+#endif
+
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
         return 0.0;
     } else {
@@ -195,17 +206,17 @@ int checkBag(__global long *clauses, __global long *numVarsC, long numclauses, l
  * @param numVE2
  *      the number of variables in the second edge
  */
-__kernel void solveJoin(__global double *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols, double value) {
+__kernel void solveJoin(__global long *solutions, __global long *edge1, __global long *edge2, __global long *variables, __global long *edgeVariables1, __global long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2, __global double *weights, __global long *sols, double value, __global int *exponent) {
     long id = get_global_id(0);
     double tmp = -1, tmp_ = -1;
     double weight = 1;
     if (startIDEdge1 != -1) {
         // get solution count from first edge
-        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, weights, id);
+        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, weights, id, startIDEdge1);
     }
     if (startIDEdge2 != -1) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, weights, id);
+        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, weights, id, startIDEdge2);
     }
     // weighted model count
     if (weights != 0) {
@@ -216,7 +227,7 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
 
     // we have some solutions in edge1
     if (tmp >= 0.0) {
-        double oldVal = solutions[id - startIDNode];
+        double oldVal = as_double(solutions[id - startIDNode]);
         if (oldVal < 0) {
             if (tmp > 0) {
                 atom_add(sols, 1);
@@ -229,12 +240,16 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id - startIDNode] = tmp * oldVal / weight;
+#if !defined(ARRAY_TYPE)
+        solutions[id - startIDNode] = as_long(tmp * oldVal / weight);
+#else
+        solutions[id - startIDNode] = as_long(tmp * oldVal / weight);
+#endif
     }
 
     // we have some solutions in edge2
     if (tmp_ >= 0.0) {
-        double oldVal = solutions[id - startIDNode];
+        double oldVal = as_double(solutions[id - startIDNode]);
         if (oldVal < 0) {
             if (tmp_ > 0) {
                 atom_add(sols, 1);
@@ -247,8 +262,16 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id - startIDNode] = tmp_ * oldVal / value;
+#if !defined(ARRAY_TYPE)
+        solutions[id - startIDNode] = as_long(tmp_ * oldVal / value);
+#else
+        solutions[id - startIDNode] = as_long(tmp_ * oldVal / value);
+#endif
     }
+#if defined(ARRAY_TYPE)
+        atomic_max(exponent, ilogb(as_double(solutions[id - startIDNode])));
+#endif
+
 }
 
 /**
@@ -265,7 +288,7 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
  * @param numV
  *      the number of variables in the current bag
  * @param edge
- *      the number of models for each assignment of the next bag
+ *      the number of models for each assignment of the next bagsolveIntroduce_
  * @param numVE
  *      the number of variables in the next bag
  * @param variables
@@ -273,11 +296,11 @@ __kernel void solveJoin(__global double *solutions, __global long *edge1, __glob
  * @param edgeVariables
  *      the ids of the variables in the next bag
  */
-double solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global long *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id) {
+double solveIntroduceF(__global long *clauses, __global long *numVarsC, long numclauses, long numV, __global long *edge, long numVE, __global long *variables, __global long *edgeVariables, long minId, long maxId, __global double *weights, long id, long startIDEdge) {
     double tmp;
     if (edge != 0) {
         // get solutions count edge
-        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id);
+        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id, startIDEdge);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
@@ -363,21 +386,40 @@ __kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, _
                 }
             }
             // get solution count of the corresponding assignment in the edge
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId, startIDE);
         }
+#if !defined(ARRAY_TYPE)
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
             setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
         }
+#else
+        if (tmp > 0) {
+            double last=as_double(solsF[id - (startIDF)]);
+            solsF[id - (startIDF)] = as_long(tmp / value + last);
+            *sols += 1;
+            atomic_max(exponent, ilogb(tmp / value + last));
+        }
+#endif
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id, startIDE);
+#if !defined(ARRAY_TYPE)
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
             setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
         }
+#else
+        if (tmp > 0) {
+            double last=as_double(solsF[id - (startIDF)]);
+            solsF[id - (startIDF)] = as_long(tmp / value + last);
+            *sols += 1;
+            atomic_max(exponent, ilogb(tmp / value + last));
+        }
+#endif
     }
 }
+
 )=====";
