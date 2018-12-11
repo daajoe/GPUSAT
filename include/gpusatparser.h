@@ -56,6 +56,10 @@ namespace gpusat {
          */
         void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
 
+        /**
+         *
+         * @param item
+         */
         void parseSolutionLine(std::string item);
     };
 
@@ -82,8 +86,16 @@ namespace gpusat {
         cl_long preNumBags = 0;
         cl_long postNumBags = 0;
 
+        /**
+         *
+         * @param bag
+         */
         void iterateDecompPre(bagType &bag);
 
+        /**
+         *
+         * @param bag
+         */
         void iterateDecompPost(bagType &bag);
 
     private:

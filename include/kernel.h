@@ -30,7 +30,9 @@ void setCount(long id, __global long *tree, long numVars, __global int *treeSize
         atomic_inc(treeSize);
     }
     for (int i = 0; i < numVars; i++) {
-        __global int *lowVal = &((__global int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        __global
+        int *lowVal = &((__global
+        int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
         if (val == 0 && *lowVal == 0) {
             val = atomic_inc(treeSize) + 1;
         }
@@ -49,7 +51,9 @@ __kernel void resize(long numVars, __global long *tree, __global double *solutio
     long id = get_global_id(0);
     if (solutions_old[id] > 0) {
         setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
+#if !defined(NO_EXP)
         atomic_max(exponent, ilogb(solutions_old[id]));
+#endif
     }
 }
 
@@ -240,11 +244,7 @@ __kernel void solveJoin(__global long *solutions, __global long *edge1, __global
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-#if !defined(ARRAY_TYPE)
         solutions[id - startIDNode] = as_long(tmp * oldVal / weight);
-#else
-        solutions[id - startIDNode] = as_long(tmp * oldVal / weight);
-#endif
     }
 
     // we have some solutions in edge2
@@ -262,14 +262,14 @@ __kernel void solveJoin(__global long *solutions, __global long *edge1, __global
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-#if !defined(ARRAY_TYPE)
+#if !defined(NO_EXP)
         solutions[id - startIDNode] = as_long(tmp_ * oldVal / value);
 #else
-        solutions[id - startIDNode] = as_long(tmp_ * oldVal / value);
+        solutions[id - startIDNode] = as_long(tmp_ * oldVal);
 #endif
     }
-#if defined(ARRAY_TYPE)
-        atomic_max(exponent, ilogb(as_double(solutions[id - startIDNode])));
+#if defined(ARRAY_TYPE) && !defined(NO_EXP)
+    atomic_max(exponent, ilogb(as_double(solutions[id - startIDNode])));
 #endif
 
 }
@@ -391,15 +391,23 @@ __kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, _
 #if !defined(ARRAY_TYPE)
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
+#if !defined(NO_EXP)
             setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
+#else
+            setCount(id, solsF, numVF, sols, (tmp + last));
+#endif
         }
 #else
         if (tmp > 0) {
             double last=as_double(solsF[id - (startIDF)]);
-            solsF[id - (startIDF)] = as_long(tmp / value + last);
             *sols += 1;
+#if !defined(NO_EXP)
+            solsF[id - (startIDF)] = as_long(tmp / value + last);
             atomic_max(exponent, ilogb(tmp / value + last));
+#else
+            solsF[id - (startIDF)] = as_long(tmp + last);
+#endif
         }
 #endif
     } else {
@@ -408,15 +416,23 @@ __kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, _
 #if !defined(ARRAY_TYPE)
         if (tmp > 0) {
             double last = getCount(id, solsF, numVF);
+#if !defined(NO_EXP)
             setCount(id, solsF, numVF, sols, (tmp / value + last));
             atomic_max(exponent, ilogb((tmp / value + last)));
+#else
+            setCount(id, solsF, numVF, sols, (tmp + last));
+#endif
         }
 #else
         if (tmp > 0) {
             double last=as_double(solsF[id - (startIDF)]);
-            solsF[id - (startIDF)] = as_long(tmp / value + last);
             *sols += 1;
+#if !defined(NO_EXP)
+            solsF[id - (startIDF)] = as_long(tmp / value + last);
             atomic_max(exponent, ilogb(tmp / value + last));
+#else
+            solsF[id - (startIDF)] = as_long(tmp + last);
+#endif
         }
 #endif
     }

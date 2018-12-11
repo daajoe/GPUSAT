@@ -26,7 +26,8 @@ std::string kernelStr =
 
 using namespace gpusat;
 
-void buildKernel(std::vector<cl::Platform> &platforms, cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth) {
+void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth) {
+    std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     std::vector<cl::Platform>::iterator iter;
     for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
@@ -89,19 +90,17 @@ int main(int argc, char *argv[]) {
     app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
     app.add_option("-n,--numDecomps", numDecomps, "")->set_default_str("30");
     app.add_set("--fitnessFunction", fitness, {"numJoin", "joinSize", "width_cutSet", "cutSet_width"},
-                "choose a fitness function:\n"
+                "fitness functions:\n"
                 "\t\t\tnumJoin: minimize the number of joins\n"
                 "\t\t\tjoinSize: minimize the numer of variables in a join node\n"
                 "\t\t\twidth_cutSet: minimize the width and then the cut set size\n"
                 "\t\t\tcutSet_width: minimize the cut set size and then the width")->set_default_str("width_cutSet");
-    app.add_flag("--CPU", cpu, "run the solver on the cpu");
+    app.add_flag("--CPU", cpu, "run the solver on a cpu");
     app.add_flag("--NVIDIA", nvidia, "run the solver on an NVIDIA device");
     app.add_flag("--AMD", amd, "run the solver on an AMD device");
     app.add_flag("--weighted", weighted, "use weighted model count");
-    //TODO
     app.add_flag("--noExp", noExp, "don't use extended exponents");
-    app.add_set("--dataStructure", type, {"array", "tree"},
-                "choose a data structure for storing the solutions:")->set_default_str("tree");
+    app.add_set("--dataStructure", type, {"array", "tree"}, "data structure for storing the solution")->set_default_str("tree");
     CLI11_PARSE(app, argc, argv)
 
     srand(seed);
@@ -111,6 +110,10 @@ int main(int argc, char *argv[]) {
         solutionType = dataStructure::ARRAY;
     } else if (type == "tree") {
         solutionType = dataStructure::TREE;
+    }
+
+    if (noExp) {
+        kernelStr = "#define NO_EXP\n" + kernelStr;
     }
 
     satformulaType satFormula;
@@ -191,7 +194,6 @@ int main(int argc, char *argv[]) {
         exit(20);
     }
 
-    std::vector<cl::Platform> platforms;
     cl::Context context;
     std::vector<cl::Device> devices;
     cl::CommandQueue queue;
@@ -200,7 +202,7 @@ int main(int argc, char *argv[]) {
     cl_long maxMemoryBuffer = 0;
 
     try {
-        buildKernel(platforms, context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
+        buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
 
@@ -280,9 +282,6 @@ int main(int argc, char *argv[]) {
             std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
             std::cout << "Program Info: " << str << std::endl;
         }
-    }
-    catch (std::string &msg) {
-        std::cerr << "Exception caught in main(): " << msg << std::endl;
     }
 }
 
