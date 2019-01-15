@@ -5,26 +5,28 @@
 
 namespace gpusat {
     htd::FitnessEvaluation *CutSetWidthFitnessFunction::fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const {
-        return new htd::FitnessEvaluation(2, -getMaxCutSetSize(decomposition, decomposition.root()), -(double) (decomposition.maximumBagSize()));
+        return new htd::FitnessEvaluation(2, -getMaxCutSetSize(decomposition), -(double) (decomposition.maximumBagSize()));
     }
 
-    double gpusat::CutSetWidthFitnessFunction::getMaxCutSetSize(const htd::ITreeDecomposition &decomposition, htd::vertex_t node) const {
-        double childSize = 0;
-        std::vector<htd::vertex_t> currentNodes = decomposition.bagContent(node);
-        std::vector<htd::vertex_t> childNodes;
-        for (htd::vertex_t childNode : decomposition.children(node)) {
-            std::vector<htd::vertex_t> childNodes_ = decomposition.bagContent(childNode);
-            for (auto n:childNodes_) {
-                childNodes.push_back(n);
+    double gpusat::CutSetWidthFitnessFunction::getMaxCutSetSize(const htd::ITreeDecomposition &decomposition) const {
+        double sizes = 0;
+        for (auto a:decomposition.vertices()) {
+            std::vector<htd::vertex_t> currentNodes = decomposition.bagContent(a);
+            std::vector<htd::vertex_t> cNodes;
+            for (htd::vertex_t childVertex : decomposition.children(a)) {
+                const std::vector<htd::vertex_t> &childNodes = decomposition.bagContent(childVertex);
+                for (htd::vertex_t n:childNodes) {
+                    cNodes.push_back(n);
+                }
             }
-            childSize = std::max(childSize, getMaxCutSetSize(decomposition, childNode));
-        }
 
-        std::sort(currentNodes.begin(), currentNodes.end());
-        std::sort(childNodes.begin(), childNodes.end());
-        std::vector<htd::vertex_t> v;
-        std::set_intersection(currentNodes.begin(), currentNodes.end(), childNodes.begin(), childNodes.end(), back_inserter(v));
-        return std::max((double) v.size(), childSize);
+            std::sort(currentNodes.begin(), currentNodes.end());
+            std::sort(cNodes.begin(), cNodes.end());
+            std::vector<htd::vertex_t> v;
+            std::set_intersection(currentNodes.begin(), currentNodes.end(), cNodes.begin(), cNodes.end(), back_inserter(v));
+            sizes = std::max((double) v.size(), sizes);
+        }
+        return sizes;
     }
 
     CutSetWidthFitnessFunction *CutSetWidthFitnessFunction::clone(void) const {

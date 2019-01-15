@@ -118,7 +118,8 @@ int main(int argc, char *argv[]) {
 
     satformulaType satFormula;
     treedecType treeDecomp;
-    TDParser tdParser(combineWidth);
+    TDParser tdParser;
+    long long int time_decomposing;
     {
         std::stringbuf treeD, sat;
         if (formulaDir != "") {
@@ -134,6 +135,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        time_decomposing = getTime();
         std::string treeDString;
         if (decompDir != "") {
             std::ifstream fileIn(decompDir);
@@ -155,6 +157,7 @@ int main(int argc, char *argv[]) {
             }
             treeDString = Decomposer::computeDecomposition(sat.str(), fit, numDecomps);
         }
+        time_decomposing = getTime() - time_decomposing;
 
         std::string satString = sat.str();
 
@@ -169,26 +172,20 @@ int main(int argc, char *argv[]) {
         satFormula = CNFParser(weighted).parseSatFormula(sat.str());
         treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
     }
-    std::cout << "\n{\n";
-    std::cout << "    \"pre Width\": " << tdParser.preWidth;
-    std::cout << "\n    ,\"pre Cut Set Size\": " << tdParser.preCut;
-    std::cout << "\n    ,\"pre Join Size\": " << tdParser.preJoinSize;
-    std::cout << "\n    ,\"pre Bags\": " << tdParser.preNumBags;
     std::cout.flush();
 
     Preprocessor::preprocessFacts(treeDecomp, satFormula, tdParser.defaultWeight);
     if (satFormula.unsat) {
         time_total = getTime() - time_total;
+        std::cout << "\n{\n";
+        std::cout << "    \"Num Join\": " << 0;
+        std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
+        std::cout << "\n    ,\"max Table Size\": " << 0;
         std::cout << "\n    ,\"Model Count\": " << 0;
         std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Solving\": " << 0;
+        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+        std::cout << "\n        ,\"Solving\": " << 0;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        std::cout << "\n    }";
-        std::cout << "\n    ,\"Statistics\":{";
-        std::cout << "\n        \"Num Join\": " << 0;
-        std::cout << "\n        ,\"Num Forget\": " << 0;
-        std::cout << "\n        ,\"Num Introduce\": " << 0;
-        std::cout << "\n        ,\"Num Leaf\": " << 0;
         std::cout << "\n    }";
         std::cout << "\n}\n";
         exit(20);
@@ -206,13 +203,6 @@ int main(int argc, char *argv[]) {
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
 
-        tdParser.iterateDecompPost(treeDecomp.bags[0]);
-        tdParser.postNumBags = treeDecomp.bags.size();
-
-        std::cout << "\n    ,\"post Width\": " << tdParser.postWidth;
-        std::cout << "\n    ,\"post Cut Set Size\": " << tdParser.postCut;
-        std::cout << "\n    ,\"post Join Size\": " << tdParser.postJoinSize;
-        std::cout << "\n    ,\"post Bags\": " << tdParser.postNumBags;
         std::cout.flush();
 
         Solver *sol;
@@ -223,7 +213,8 @@ int main(int argc, char *argv[]) {
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
         time_solving = getTime() - time_solving;
 
-        std::cout << "\n    ,\"Num Join\": " << sol->numJoin;
+        std::cout << "\n{\n";
+        std::cout << "    \"Num Join\": " << sol->numJoin;
         std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
         std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
 
@@ -265,7 +256,8 @@ int main(int argc, char *argv[]) {
         time_total = getTime() - time_total;
         std::cout.precision(6);
         std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Solving\": " << ((float) time_solving) / 1000;
+        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+        std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}\n";

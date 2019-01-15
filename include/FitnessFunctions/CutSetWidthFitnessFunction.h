@@ -16,7 +16,7 @@ namespace gpusat {
 
         htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override;
 
-        double getMaxCutSetSize(const htd::ITreeDecomposition &decomposition, htd::vertex_t node) const;
+        double getMaxCutSetSize(const htd::ITreeDecomposition &decomposition) const;
 
         CutSetWidthFitnessFunction *clone(void) const override;
     };

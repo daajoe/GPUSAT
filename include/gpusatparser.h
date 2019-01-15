@@ -65,7 +65,7 @@ namespace gpusat {
 
     class TDParser {
     public:
-        explicit TDParser(int i);
+        TDParser(){};
 
         /**
          * generates a treedec from a given string
@@ -76,27 +76,6 @@ namespace gpusat {
         treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
         cl_double defaultWeight = 1.0;
-        int combineWidth;
-        cl_long preWidth = 0;
-        cl_long postWidth = 0;
-        cl_long preCut = 0;
-        cl_long postCut = 0;
-        cl_long preJoinSize = 0;
-        cl_long postJoinSize = 0;
-        cl_long preNumBags = 0;
-        cl_long postNumBags = 0;
-
-        /**
-         *
-         * @param bag
-         */
-        void iterateDecompPre(bagType &bag);
-
-        /**
-         *
-         * @param bag
-         */
-        void iterateDecompPost(bagType &bag);
 
     private:
 
@@ -124,14 +103,6 @@ namespace gpusat {
          * @param item      a line from the decomposition
          */
         void parseBagLine(treedecType &ret, std::string item);
-
-        /**
-         *
-         * @param node
-         * @param id
-         * @param preID
-         */
-        static void removeEdges(std::vector<std::vector<cl_long>> &node, cl_long id, cl_long preID);
     };
 }
 #endif //GPUSAT_PARSER_H
