@@ -136,20 +136,15 @@ namespace gpusat {
 
     void CNFParser::parseSolutionLine(std::string item) {
         if (item.find("UNSATISFIABLE") != std::string::npos) {
-            std::cout << "    \"pre Width\": " << 0;
-            std::cout << "\n    ,\"pre Cut Set Size\": " << 0;
-            std::cout << "\n    ,\"pre Join Size\": " << 0;
-            std::cout << "\n    ,\"pre Bags\": " << 0;
+            std::cout << "\n{\n";
+            std::cout << "    \"Num Join\": " << 0;
+            std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
+            std::cout << "\n    ,\"max Table Size\": " << 0;
             std::cout << "\n    ,\"Model Count\": " << 0;
             std::cout << "\n    ,\"Time\":{";
-            std::cout << "\n        \"Solving\": " << 0;
+            std::cout << "\n        \"Decomposing\": " << 0;
+            std::cout << "\n        ,\"Solving\": " << 0;
             std::cout << "\n        ,\"Total\": " << 0;
-            std::cout << "\n    }";
-            std::cout << "\n    ,\"Statistics\":{";
-            std::cout << "\n        \"Num Join\": " << 0;
-            std::cout << "\n        ,\"Num Forget\": " << 0;
-            std::cout << "\n        ,\"Num Introduce\": " << 0;
-            std::cout << "\n        ,\"Num Leaf\": " << 0;
             std::cout << "\n    }";
             std::cout << "\n}\n";
             exit(20);
@@ -159,23 +154,18 @@ namespace gpusat {
         getline(sline, i, ' '); //s
         getline(sline, i, ' '); //solutions
 
-        std::cout << "    \"pre Width\": " << 0;
-        std::cout << "\n    ,\"pre Cut Set Size\": " << 0;
-        std::cout << "\n    ,\"pre Join Size\": " << 0;
-        std::cout << "\n    ,\"pre Bags\": " << 0;
+        std::cout << "\n{\n";
+        std::cout << "    \"Num Join\": " << 0;
+        std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
+        std::cout << "\n    ,\"max Table Size\": " << 0;
         std::cout << "\n    ,\"Model Count\": " << i;
         std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Solving\": " << 0;
+        std::cout << "\n        \"Decomposing\": " << 0;
+        std::cout << "\n        ,\"Solving\": " << 0;
         std::cout << "\n        ,\"Total\": " << 0;
         std::cout << "\n    }";
-        std::cout << "\n    ,\"Statistics\":{";
-        std::cout << "\n        \"Num Join\": " << 0;
-        std::cout << "\n        ,\"Num Forget\": " << 0;
-        std::cout << "\n        ,\"Num Introduce\": " << 0;
-        std::cout << "\n        ,\"Num Leaf\": " << 0;
-        std::cout << "\n    }";
         std::cout << "\n}\n";
-        exit(10);
+        exit(20);
 
     }
 
