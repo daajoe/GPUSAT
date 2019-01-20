@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
+    cl_long maxBag = -1;
 
     //cmd options
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
@@ -101,6 +102,7 @@ int main(int argc, char *argv[]) {
     app.add_flag("--weighted", weighted, "use weighted model count");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
     app.add_set("--dataStructure", type, {"array", "tree"}, "data structure for storing the solution")->set_default_str("tree");
+    app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("-1");
     CLI11_PARSE(app, argc, argv)
 
     srand(seed);
@@ -207,7 +209,7 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         bagType next;
-        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType);
+        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag);
         next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
