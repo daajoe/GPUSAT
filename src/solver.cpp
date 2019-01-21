@@ -66,7 +66,7 @@ namespace gpusat {
         }
     }
 
-    void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node) {
+    void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize) {
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
@@ -117,15 +117,15 @@ namespace gpusat {
             queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
             queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
 
-            t.elements = (cl_long *) malloc(sizeof(cl_long) * (t.numSolutions + 1));
+            t.elements = (cl_long *) malloc(sizeof(cl_long) * (t.numSolutions + 1 + nextSize));
             if (t.elements == NULL || errno == ENOMEM) {
                 std::cerr << "\nOut of Memory\n";
                 exit(0);
             }
 
-            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * (t.numSolutions + 1), t.elements);
+            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * (t.numSolutions + 1 + nextSize), t.elements);
         }
-        t.size = (t.numSolutions + 1);
+        t.size = (t.numSolutions + 1 + nextSize);
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
         table = t;
@@ -302,20 +302,23 @@ namespace gpusat {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
                 if (solutionType == TREE) {
-                    cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node);
 
                     if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, node.solution[a - 1].numSolutions + 1);
                         combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
                         node.solution[a - 1] = node.solution[a];
 
                         node.bags--;
                         a--;
                     } else if (a > 0 && node.solution[a - 1].elements == NULL) {
+                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, 0);
                         node.solution[a].minId = node.solution[a - 1].minId;
                         node.solution[a - 1] = node.solution[a];
 
                         node.bags--;
                         a--;
+                    }else{
+                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, 0);
                     }
                     node.solution[a].size = node.solution[a].numSolutions + 1;
                     node.maxSize = std::max(node.maxSize, node.solution[a].size);

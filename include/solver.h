@@ -76,7 +76,7 @@ namespace gpusat {
          * @param numVars
          * @param node
          */
-        void cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node);
+        void cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize);
 
         /**
          *
