@@ -137,11 +137,12 @@ namespace gpusat {
 
             kernel_resize.setArg(0, numVars);
 
-            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
+            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (t.numSolutions + table.numSolutions + 2), t.elements);
             kernel_resize.setArg(1, buf_sols_new);
 
             cl::Buffer buf_sols_old(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * table.size, table.elements);
             kernel_resize.setArg(2, buf_sols_old);
+            free(table.elements);
 
             cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
             kernel_resize.setArg(3, buf_num_sol);
@@ -161,12 +162,11 @@ namespace gpusat {
                     exit(1);
                 }
             }
-            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * t.size, t.elements);
             queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
+            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * (t.numSolutions + 1), t.elements);
         }
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
-        free(table.elements);
     }
 
     void Solver::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode) {
@@ -302,7 +302,7 @@ namespace gpusat {
                 queue.enqueueReadBuffer(bufSol, CL_TRUE, 0, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
                 this->isSat = 1;
                 if (solutionType == TREE) {
-                    this->cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node);
+                    cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node);
 
                     if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                         combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
@@ -513,6 +513,9 @@ namespace gpusat {
                 this->isSat = 1;
 
                 if (solutionType == TREE) {
+                    if (node.variables.size() == 0) {
+                        node.solution[a].numSolutions--;
+                    }
                     free(node.solution[a].elements);
                     if (a > 0 && node.solution[a - 1].elements != nullptr && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
                         node.solution[a].elements = (cl_long *) malloc(sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2));
@@ -520,7 +523,7 @@ namespace gpusat {
                             std::cerr << "\nOut of Memory\n";
                             exit(0);
                         }
-                        queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a - 1].numSolutions + 2), node.solution[a].elements);
+                        queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2), node.solution[a].elements);
 
                         combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
                         node.solution[a - 1] = node.solution[a];

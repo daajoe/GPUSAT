@@ -56,7 +56,9 @@ void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::Com
             queue = cl::CommandQueue(context, devices[0]);
             memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
             maxMemoryBuffer = devices[0].getInfo<CL_DEVICE_MAX_MEM_ALLOC_SIZE>();
-            combineWidth = (int) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
+            if (combineWidth < 0) {
+                combineWidth = (int) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
+            }
             break;
         }
     }
@@ -77,7 +79,7 @@ int main(int argc, char *argv[]) {
     std::string fitness;
     std::string type;
     std::string decompDir;
-    int combineWidth = 0;
+    int combineWidth = -1;
     time_t seed = time(0);
     bool cpu, weighted, noExp, nvidia, amd;
     dataStructure solutionType = dataStructure::TREE;
@@ -103,6 +105,7 @@ int main(int argc, char *argv[]) {
     app.add_flag("--noExp", noExp, "don't use extended exponents");
     app.add_set("--dataStructure", type, {"array", "tree"}, "data structure for storing the solution")->set_default_str("tree");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("-1");
+    app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("-1");
     CLI11_PARSE(app, argc, argv)
 
     srand(seed);
