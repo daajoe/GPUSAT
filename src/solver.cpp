@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <gpusatutils.h>
 #include <solver.h>
 #include <errno.h>
 
@@ -12,6 +11,10 @@ namespace gpusat {
             if (node.edges.empty()) {
                 bagType cNode;
                 cNode.solution = new treeType[1];
+                if (cNode.solution == NULL || errno == ENOMEM) {
+                    std::cerr << "\nOut of Memory\n";
+                    exit(0);
+                }
                 cNode.solution[0].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), 1));
                 if (cNode.solution[0].elements == NULL || errno == ENOMEM) {
                     std::cerr << "\nOut of Memory\n";
@@ -54,6 +57,9 @@ namespace gpusat {
 
                         if (i == node.edges.size() - 1) {
                             solveJoin(tmp, edge1, edge2, formula, INTRODUCEFORGET);
+                            if (isSat <= 0) {
+                                return;
+                            }
                             edge1 = tmp;
                             solveIntroduceForget(formula, pnode, node, tmp, false, lastNode);
                         } else {
@@ -170,6 +176,7 @@ namespace gpusat {
     }
 
     void Solver::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode) {
+        isSat = 0;
         this->numJoin++;
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
         cl::Buffer bufSolVars;
@@ -232,6 +239,10 @@ namespace gpusat {
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
         node.solution = new treeType[maxSize];
+        if (node.solution == NULL || errno == ENOMEM) {
+            std::cerr << "\nOut of Memory\n";
+            exit(0);
+        }
         node.bags = maxSize;
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].numSolutions = 0;
@@ -317,7 +328,7 @@ namespace gpusat {
 
                         node.bags--;
                         a--;
-                    }else{
+                    } else {
                         cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, 0);
                     }
                     node.solution[a].size = node.solution[a].numSolutions + 1;
@@ -362,6 +373,7 @@ namespace gpusat {
 
         this->numIntroduceForget++;
 
+        // get clauses which only contain iVars
         std::vector<cl_long> numVarsClause;
         std::vector<cl_long> clauses;
         cl_long numClauses = 0;
@@ -453,6 +465,10 @@ namespace gpusat {
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
         node.solution = new treeType[maxSize];
+        if (node.solution == NULL || errno == ENOMEM) {
+            std::cerr << "\nOut of Memory\n";
+            exit(0);
+        }
         node.bags = maxSize;
         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
             node.solution[a].numSolutions = 0;

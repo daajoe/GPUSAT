@@ -12,10 +12,10 @@ R"=====(
 #if !defined(ARRAY_TYPE)
 
 double getCount(long id, __global long *tree, long numVars) {
-    int nextId = 0;
-    for (int i = 0; i < numVars; i++) {
+    uint nextId = 0;
+    for (uint i = 0; i < numVars; i++) {
         nextId = ((__global
-        int *) &tree[nextId])[(id >> (numVars - i - 1)) & 1];
+        uint *) &tree[nextId])[(id >> (numVars - i - 1)) & 1];
         if (nextId == 0) {
             return 0.0;
         }
@@ -24,15 +24,15 @@ double getCount(long id, __global long *tree, long numVars) {
 }
 
 void setCount(long id, __global long *tree, long numVars, __global int *treeSize, double value) {
-    int nextId = 0;
-    int val = 0;
+    uint nextId = 0;
+    uint val = 0;
     if (numVars == 0) {
         atomic_inc(treeSize);
     }
-    for (int i = 0; i < numVars; i++) {
+    for (uint i = 0; i < numVars; i++) {
         __global
-        int *lowVal = &((__global
-        int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        uint * lowVal = &((__global
+        uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
         if (val == 0 && *lowVal == 0) {
             val = atomic_inc(treeSize) + 1;
         }
@@ -229,8 +229,20 @@ __kernel void solveJoin(__global long *solutions, __global long *edge1, __global
         }
     }
 
-    // we have some solutions in edge1
-    if (tmp >= 0.0) {
+
+    if (tmp_ >= 0.0 && tmp >= 0.0) {
+        if (tmp_ > 0.0 && tmp > 0.0) {
+            atom_add(sols, 1);
+        }
+#if !defined(NO_EXP)
+        solutions[id - startIDNode] = as_long(tmp_ * tmp / value / weight);
+#else
+        solutions[id - startIDNode] = as_long(tmp_ * tmp / weight);
+#endif
+    }
+
+        // we have some solutions in edge1
+    else if (tmp >= 0.0) {
         double oldVal = as_double(solutions[id - startIDNode]);
         if (oldVal < 0) {
             if (tmp > 0) {
@@ -247,8 +259,8 @@ __kernel void solveJoin(__global long *solutions, __global long *edge1, __global
         solutions[id - startIDNode] = as_long(tmp * oldVal / weight);
     }
 
-    // we have some solutions in edge2
-    if (tmp_ >= 0.0) {
+        // we have some solutions in edge2
+    else if (tmp_ >= 0.0) {
         double oldVal = as_double(solutions[id - startIDNode]);
         if (oldVal < 0) {
             if (tmp_ > 0) {

@@ -18,9 +18,9 @@ namespace gpusat {
      * @return
      */
     inline cl_double getCount(cl_long id, cl_long *tree, cl_int numVars) {
-        int nextId = 0;
-        for (int i = 0; i < numVars; i++) {
-            nextId = ((int *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        cl_uint nextId = 0;
+        for (cl_uint i = 0; i < numVars; i++) {
+            nextId = ((cl_uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
             if (nextId == 0) {
                 return 0.0;
             }

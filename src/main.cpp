@@ -22,6 +22,7 @@
 #include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 
 std::string kernelStr =
+
 #include <kernel.h>
 
 using namespace gpusat;
@@ -103,19 +104,12 @@ int main(int argc, char *argv[]) {
     app.add_flag("--AMD", amd, "run the solver on an AMD device");
     app.add_flag("--weighted", weighted, "use weighted model count");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
-    app.add_set("--dataStructure", type, {"array", "tree"}, "data structure for storing the solution")->set_default_str("tree");
+    app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("-1");
     app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("-1");
     CLI11_PARSE(app, argc, argv)
 
     srand(seed);
-
-    if (type == "array") {
-        kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
-        solutionType = dataStructure::ARRAY;
-    } else if (type == "tree") {
-        solutionType = dataStructure::TREE;
-    }
 
     if (noExp) {
         kernelStr = "#define NO_EXP\n" + kernelStr;
@@ -194,6 +188,20 @@ int main(int argc, char *argv[]) {
         std::cout << "\n    }";
         std::cout << "\n}\n";
         exit(20);
+    }
+
+    if (type == "array") {
+        kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
+        solutionType = dataStructure::ARRAY;
+    } else if (type == "tree") {
+        solutionType = dataStructure::TREE;
+    } else if (type == "combined") {
+        if (treeDecomp.width < 30) {
+            kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
+            solutionType = dataStructure::ARRAY;
+        } else {
+            solutionType = dataStructure::TREE;
+        }
     }
 
     cl::Context context;

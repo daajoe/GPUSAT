@@ -45,6 +45,7 @@ namespace gpusat {
     struct treedecType {
         cl_long numb = 0;
         cl_long numVars = 0;
+        cl_long width = 0;
         std::vector<bagType> bags;
     };
 

@@ -78,6 +78,10 @@ namespace gpusat {
             unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
             if (numForgetVars > 8) {
                 bagType *newEdge = new bagType;
+                if (newEdge == NULL || errno == ENOMEM) {
+                    std::cerr << "\nOut of Memory\n";
+                    exit(0);
+                }
                 newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
                 fVars.resize(0);
                 std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(), std::back_inserter(fVars));

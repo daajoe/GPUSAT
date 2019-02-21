@@ -14,6 +14,10 @@ namespace gpusat {
         std::string item;
         std::unordered_map<cl_long, cl_double> weights;
         std::vector<cl_long> *clause = new std::vector<cl_long>();
+        if (clause == NULL || errno == ENOMEM) {
+            std::cerr << "\nOut of Memory\n";
+            exit(0);
+        }
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 0) {
@@ -57,6 +61,10 @@ namespace gpusat {
 
         if (wmc) {
             ret.variableWeights = new cl_double[(ret.numVars + 1) * 2]();
+            if (ret.variableWeights == NULL || errno == ENOMEM) {
+                std::cerr << "\nOut of Memory\n";
+                exit(0);
+            }
             ret.numWeights = (ret.numVars + 1) * 2;
 
             for (cl_long i = 0; i <= ret.numVars; i++) {
@@ -248,6 +256,7 @@ namespace gpusat {
         ret.numb = stoi(i);
         edges.resize(stoi(i));
         getline(sline, i, ' '); //width
+        ret.width = stoi(i);
         getline(sline, i, ' '); //num vars
 
         ret.numVars = stoi(i);
