@@ -5,37 +5,57 @@ A #SAT solver based on dynamic programming running on the GPU.
 ## Dependencies
 
 * OpenCL 1.2
-
-## Build
+* cmake 3.2+
+* gcc 7+
+* Boost Multiprecision
 
 ### Tested with
 
+* ocl-icd-opencl-dev 2.2.11-1ubuntu1
+* AMD APP SDK 3.0/CUDA Toolkit 9.1
 * cmake 3.9.1
 * gcc 7.2.0
-* AMD APP SDK 3.0/CUDA Toolkit 9.1
 * Boost Multiprecision 1.66
 
-### Compilation
+## How to Build
 
-To build the program with normal double precision use `cmake` and the `make`.
+The following commands can be used to build `GPUSAT`
+```
+git clone https://github.com/Budddy/GPUSAT
+cd GPUSAT
+mkdir build && cd build
+cmake ..
+make
+```
 
 ## Usage
 
-* -h,--help                   Print this help message and exit
-* -s,--seed INT               path to the file containing the sat formula
-* -f,--formula TEXT           path to the file containing the sat formula
-* -d,--decomposition TEXT     path to the file containing the tree decomposition
-* -n,--numDecomps UINT=30     
-* --fitnessFunction TEXT 
-    * fitness functions:  
-    * **numJoin**: minimize the number of joins  
-    * **joinSize**: minimize the numer of variables in a join node  
-    * **width_cutSet**: minimize the width and then the cut set size  
-    * **cutSet_width**: minimize the cut set size and then the width  
-* --CPU                       run the solver on the cpu
-* --NVIDIA                    run the solver on an NVIDIA device
-* --AMD                       run the solver on an AMD device
-* --weighted                  use weighted model count
-* --noExp                     don't use extended exponents
-* --dataStructure TEXT in {array,tree}=tree
-                              choose a data structure for storing the solutions:
+A program call is of the following form
+
+./gpusat [-h] [-s \<seed\>] [-f \<formulaPath\>] [-d \<decompositionPath\>] [-n \<numberOfDecompositions\>] [--fitnessFunction \<fitness\>] [--CPU] [--NVIDIA] [--AMD] [--weighted] [--noExp] [--dataStructure \<dataStructure\>] [-m \<maxBagSize\>] [-w \<combineWidth\>] < $CNFFILE
+
+
+Options:
+*  -h,--help: Print this help message and exit.
+*  -s,--seed \<seed\>: path to the file containing the sat formula.
+*  -f,--formula \<formulaPath\>: path to the file containing the sat formula.
+*  -d,--decomposition \<decompositionPath\>: path to the file containing the tree decomposition.
+*  -n,--numDecomps \<numberOfDecompositions\>: number of decompositions to generate for the fitness function.
+*  --fitnessFunction \<function\>: use the fitnessfunction to optimize the tree decomposition.
+    * Permitted Values:
+        * numJoin: minimize the number of joins
+        * joinSize: minimize the numer of variables in a join node
+        * width_cutSet: minimize the width and then the cut set size (default)
+        * cutSet_width: minimize the cut set size and then the width
+*  --CPU: run the solver on a cpu
+*  --NVIDIA: run the solver on an NVIDIA device
+*  --AMD: run the solver on an AMD device
+*  --weighted: use weighted model count
+*  --noExp: don't use extended exponents
+*  --dataStructure \<dataStructure\>: data structure for storing the solution.
+    * Permitted Values:
+        * array: use an array to store the solutions
+        * tree: use a tree structure to store the solutions
+        * combined: use a combination of tree and array structure (default)
+*  -m,--maxBagSize \<maxBagSize\>: fixes the number of variables after which we need to split the bags
+*  -w,--combineWidth \<combineWidth\>: fixes the maximum width to combine bags of the decomposition
