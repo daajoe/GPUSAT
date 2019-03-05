@@ -13,8 +13,8 @@ namespace gpusat {
         // try to merge child nodes
         while (changed) {
             changed = false;
-            for (int a = 0; a < decomp->edges.size() && !changed; a++) {
-                for (int b = 0; b < decomp->edges.size() && !changed; b++) {
+            for (long a = 0; a < decomp->edges.size() && !changed; a++) {
+                for (long b = 0; b < decomp->edges.size() && !changed; b++) {
                     if (a != b && ((decomp->edges[a]->variables.size() < combineWidth && decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 || decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
                         std::vector<cl_long> v;
                         std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(), back_inserter(v));
@@ -41,7 +41,7 @@ namespace gpusat {
         if (decomp->variables.size() < combineWidth || decomp->variables.size() == 0) {
             while (changed) {
                 changed = false;
-                for (int i = 0; i < decomp->edges.size(); i++) {
+                for (long i = 0; i < decomp->edges.size(); i++) {
                     std::vector<cl_long> v;
                     std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), back_inserter(v));
                     if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
@@ -52,7 +52,7 @@ namespace gpusat {
                         std::vector<bagType *> v_;
                         std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), back_inserter(v_), compTreedType);
                         decomp->edges.resize(0);
-                        for (int asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
+                        for (long asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
                             bagType *&sdggg = v_[asdf];
                             if (v_[asdf]->id == cid) {
                                 x++;
@@ -67,12 +67,12 @@ namespace gpusat {
         }
 
         // process child nodes
-        for (int i = 0; i < decomp->edges.size(); i++) {
+        for (long i = 0; i < decomp->edges.size(); i++) {
             preprocessDecomp((decomp->edges)[i], combineWidth);
         }
         //std::sort(decomp->variables.begin(), decomp->variables.end());
 
-        for (int i = 0; i < decomp->edges.size(); i++) {
+        for (long i = 0; i < decomp->edges.size(); i++) {
             std::vector<cl_long> fVars;
             std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), std::back_inserter(fVars));
             unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
@@ -125,7 +125,7 @@ namespace gpusat {
                     }
                 }
             }
-            for (int j = i; j < formula.facts.size(); ++j) {
+            for (long j = i; j < formula.facts.size(); ++j) {
                 if (std::abs(formula.facts[j]) > std::abs(fact)) {
                     if (formula.facts[j] > 0) {
                         formula.facts[j]--;
@@ -144,7 +144,7 @@ namespace gpusat {
                     defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
                 }
                 formula.numWeights -= 2;
-                for (int j = std::abs(fact); j < formula.numVars; ++j) {
+                for (long j = std::abs(fact); j < formula.numVars; ++j) {
                     formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
                     formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
                 }
@@ -156,7 +156,7 @@ namespace gpusat {
 
 
     void Preprocessor::relableDecomp(bagType *decomp, cl_long id) {
-        for (int i = 0; i < decomp->variables.size(); i++) {
+        for (long i = 0; i < decomp->variables.size(); i++) {
             if (decomp->variables[i] > id) {
                 decomp->variables[i]--;
             } else if (decomp->variables[i] == id) {
@@ -164,14 +164,14 @@ namespace gpusat {
                 i--;
             }
         }
-        for (int j = 0; j < decomp->edges.size(); ++j) {
+        for (long j = 0; j < decomp->edges.size(); ++j) {
             relableDecomp(decomp->edges[j], id);
         }
     }
 
     void Preprocessor::relableFormula(satformulaType &formula, cl_long id) {
-        for (int i = 0; i < formula.clauses.size(); i++) {
-            for (int j = 0; j < formula.clauses[i].size(); ++j) {
+        for (long i = 0; i < formula.clauses.size(); i++) {
+            for (long j = 0; j < formula.clauses[i].size(); ++j) {
                 if (std::abs(formula.clauses[i][j]) > id) {
                     if (formula.clauses[i][j] > 0) {
                         formula.clauses[i][j]--;

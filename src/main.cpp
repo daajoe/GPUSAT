@@ -27,7 +27,7 @@ std::string kernelStr =
 
 using namespace gpusat;
 
-void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, int &combineWidth) {
+void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, long &combineWidth) {
     std::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
     std::vector<cl::Platform>::iterator iter;
@@ -58,7 +58,7 @@ void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::Com
             memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
             maxMemoryBuffer = devices[0].getInfo<CL_DEVICE_MAX_MEM_ALLOC_SIZE>();
             if (combineWidth < 0) {
-                combineWidth = (int) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
+                combineWidth = (long) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
             }
             break;
         }
@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
     std::string fitness;
     std::string type;
     std::string decompDir;
-    int combineWidth = -1;
+    long combineWidth = -1;
     time_t seed = time(0);
     bool cpu, weighted, noExp, nvidia, amd;
     dataStructure solutionType = dataStructure::TREE;

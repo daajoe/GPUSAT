@@ -62,7 +62,7 @@ namespace gpusat {
         std::stringstream sline(line);
         std::string i;
 
-        int num = 0;
+        long num = 0;
         while (!sline.eof()) {
             getline(sline, i, ' ');
             if (i.size() > 0) {

@@ -202,7 +202,7 @@ namespace gpusat {
         }
 
         if (!edges.empty()) {
-            for (int a = 0; a < edges.size(); a++) {
+            for (long a = 0; a < edges.size(); a++) {
                 std::sort(edges[a].begin(), edges[a].end());
             }
             std::list<cl_long> backlog;
@@ -221,8 +221,8 @@ namespace gpusat {
         }
 
         if (!edges.empty()) {
-            for (int a = 0; a < ret.numb; a++) {
-                int b = 0;
+            for (long a = 0; a < ret.numb; a++) {
+                long b = 0;
                 while (!edges[a].empty()) {
                     ret.bags[a].edges.push_back(&ret.bags[edges[a].back() - 1]);
                     edges[a].pop_back();
@@ -267,14 +267,14 @@ namespace gpusat {
         std::string i;
         getline(sline, i, ' '); //b
         getline(sline, i, ' '); //bag number
-        int bnum = stoi(i);
-        int a = 0;
+        long bnum = stoi(i);
+        long a = 0;
         cl_long match_count = 0;
         std::istringstream ss(item);
         std::string word;
         while (ss >> word) {
             std::istringstream maybenumber(word);
-            int number = 0;
+            long number = 0;
             if (maybenumber >> number) {
                 match_count++;
             }

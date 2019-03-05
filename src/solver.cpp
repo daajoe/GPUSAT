@@ -104,13 +104,13 @@ namespace gpusat {
 
             kernel_resize.setArg(4, table.minId);
 
-            cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &(node.exponent));
+            cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
             kernel_resize.setArg(5, buf_exp);
 
             cl_long error1 = 0, error2 = 0;
             cl_double range = table.maxId - table.minId;
             cl_long s = std::ceil(range / (1l << 31));
-            for (int i = 0; i < s; i++) {
+            for (cl_long i = 0; i < s; i++) {
                 cl_long id1 = (1 << 31) * i;
                 cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
                 error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(id1)), cl::NDRange(static_cast<size_t>(range)));
@@ -120,8 +120,8 @@ namespace gpusat {
                     exit(1);
                 }
             }
-            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &t.numSolutions);
-            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
+            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &(t.numSolutions));
+            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
 
             t.elements = (cl_long *) malloc(sizeof(cl_long) * (t.numSolutions + 1 + nextSize));
             if (t.elements == NULL || errno == ENOMEM) {
@@ -139,7 +139,7 @@ namespace gpusat {
 
     void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
         if (table.size > 0) {
-            cl::Kernel kernel_resize = cl::Kernel(program, "resize_");
+            cl::Kernel kernel_resize = cl::Kernel(program, "combineTree");
 
             kernel_resize.setArg(0, numVars);
 
@@ -158,7 +158,7 @@ namespace gpusat {
             cl_long error1 = 0, error2 = 0;
             cl_double range = table.maxId - table.minId;
             cl_long s = std::ceil(range / (1l << 31));
-            for (int i = 0; i < s; i++) {
+            for (long i = 0; i < s; i++) {
                 cl_long id1 = (1 << 31) * i;
                 cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
                 error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(id1)), cl::NDRange(static_cast<size_t>(range)));
@@ -211,13 +211,13 @@ namespace gpusat {
             kernel.setArg(16, NULL);
         }
 
-        node.exponent = CL_INT_MIN;
-        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &(node.exponent));
+        node.exponent = CL_LONG_MIN;
+        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
         kernel.setArg(19, buf_exp);
 
         kernel.setArg(18, pow(2, edge1.exponent + edge2.exponent));
 
-        node.exponent = CL_INT_MIN;
+        node.exponent = CL_LONG_MIN;
         cl_long usedMemory = sizeof(cl_long) * node.variables.size() * 3 + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
 
         cl_long s = sizeof(cl_long);
@@ -340,7 +340,7 @@ namespace gpusat {
             }
         }
         if (solutionType == ARRAY) {
-            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
+            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
         }
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
         cl_long tableSize = 0;
@@ -440,8 +440,8 @@ namespace gpusat {
 
         kernel.setArg(19, pow(2, cnode.exponent));
 
-        node.exponent = CL_INT_MIN;
-        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_int), &(node.exponent));
+        node.exponent = CL_LONG_MIN;
+        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
         kernel.setArg(18, buf_exp);
 
         cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
@@ -574,7 +574,7 @@ namespace gpusat {
                 }
             }
         }
-        queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_int), &(node.exponent));
+        queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
         node.correction = cnode.correction + cnode.exponent;
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {

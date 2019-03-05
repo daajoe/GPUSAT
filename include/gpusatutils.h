@@ -11,15 +11,20 @@
 
 namespace gpusat {
     /**
+     * returns the model count which corresponds to the given id
      *
      * @param id
+     *      the id for which the model count should be returned
      * @param tree
+     *      a pointer to the tree structure
      * @param numVars
+     *      the number of variables in the bag
      * @return
+     *      the model count
      */
-    inline cl_double getCount(cl_long id, cl_long *tree, cl_int numVars) {
-        cl_uint nextId = 0;
-        for (cl_uint i = 0; i < numVars; i++) {
+    inline cl_double getCount(cl_long id, cl_long *tree, cl_long numVars) {
+        cl_long nextId = 0;
+        for (cl_long i = 0; i < numVars; i++) {
             nextId = ((cl_uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
             if (nextId == 0) {
                 return 0.0;
@@ -29,8 +34,7 @@ namespace gpusat {
     }
 
     /**
-     *
-     * @return
+     * @return the time in millisecons since the epoch
      */
     inline long long int getTime() {
         return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
