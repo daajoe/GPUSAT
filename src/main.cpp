@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
     cl_long maxBag = -1;
 
     //cmd options
-    app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
+    app.add_option("-s,--seed", seed, "number used to initialize the pseudorandom number generator")->set_default_str("");
     app.add_option("-f,--formula", formulaDir, "path to the file containing the sat formula")->set_default_str("");
     app.add_option("-d,--decomposition", decompDir, "path to the file containing the tree decomposition")->set_default_str("");
     app.add_option("-n,--numDecomps", numDecomps, "")->set_default_str("30");
