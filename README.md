@@ -39,7 +39,7 @@ A program call is of the following form
 
 Options:
 *  -h,--help: Print this help message and exit.
-*  -s,--seed \<seed\>: path to the file containing the sat formula.
+*  -s,--seed \<seed\>: number used to initialize the pseudorandom number generator.
 *  -f,--formula \<formulaPath\>: path to the file containing the sat formula.
 *  -d,--decomposition \<decompositionPath\>: path to the file containing the tree decomposition.
 *  -n,--numDecomps \<numberOfDecompositions\>: number of decompositions to generate for the fitness function.
