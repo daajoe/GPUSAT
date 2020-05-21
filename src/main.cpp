@@ -27,51 +27,7 @@ std::string kernelStr =
 
 using namespace gpusat;
 
-void buildKernel(cl::Context &context, std::vector<cl::Device> &devices, cl::CommandQueue &queue, cl::Program &program, cl_long &memorySize, cl_long &maxMemoryBuffer, bool nvidia, bool amd, bool cpu, long &combineWidth) {
-    std::vector<cl::Platform> platforms;
-    cl::Platform::get(&platforms);
-    std::vector<cl::Platform>::iterator iter;
-    for (iter = platforms.begin(); iter != platforms.end(); ++iter) {
-        if (nvidia && amd) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation") && strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.")) {
-                continue;
-            }
-        } else if (nvidia) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "NVIDIA Corporation")) {
-                continue;
-            }
-        } else if (amd) {
-            if (strcmp((*iter).getInfo<CL_PLATFORM_VENDOR>().c_str(), "Advanced Micro Devices, Inc.")) {
-                continue;
-            }
-        }
-        cl_context_properties cps[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties) (*iter)(), 0};
-        if (cpu) {
-            context = cl::Context(CL_DEVICE_TYPE_CPU, cps);
-        } else {
-            context = cl::Context(CL_DEVICE_TYPE_GPU, cps);
-        }
-        cl_int err;
-        devices = context.getInfo<CL_CONTEXT_DEVICES>(&err);
-        if (err == CL_SUCCESS) {
-            queue = cl::CommandQueue(context, devices[0]);
-            memorySize = devices[0].getInfo<CL_DEVICE_GLOBAL_MEM_SIZE>();
-            maxMemoryBuffer = devices[0].getInfo<CL_DEVICE_MAX_MEM_ALLOC_SIZE>();
-            if (combineWidth < 0) {
-                combineWidth = (long) std::floor(std::log2(devices[0].getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() * devices[0].getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()));
-            }
-            break;
-        }
-    }
-    if (iter == platforms.end()) {
-        std::cout << "\nERROR: no GPU found!";
-        exit(1);
-    }
-
-    cl::Program::Sources sources(1, std::make_pair(kernelStr.c_str(), kernelStr.length()));
-    program = cl::Program(context, sources);
-    program.build(devices);
-}
+extern void helloWorldWrapper(int val);
 
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
@@ -212,7 +168,9 @@ int main(int argc, char *argv[]) {
     cl_long maxMemoryBuffer = 0;
 
     try {
-        buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
+	helloWorldWrapper(42);
+	return 0;
+        //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
 

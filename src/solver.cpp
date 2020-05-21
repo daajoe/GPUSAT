@@ -294,6 +294,8 @@ namespace gpusat {
                 error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId)));
                 error2 = queue.finish();
                 if (error1 != 0 || error2 != 0) {
+		    std::cerr << error1 << std::endl;	
+		    std::cerr << error2 << std::endl;	
                     std::cerr << "\nJoin - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
                     exit(1);
                 }

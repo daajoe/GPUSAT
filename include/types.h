@@ -9,8 +9,10 @@
 #include <list>
 #include <vector>
 #include <set>
+#include <stdint.h>
 
 namespace gpusat {
+
 
     /// tree type for storing the models
     struct treeType {

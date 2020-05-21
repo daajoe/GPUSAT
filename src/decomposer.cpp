@@ -36,6 +36,7 @@ namespace gpusat {
         htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, fitness);
         algorithm->setIterationCount(n);
         htd::ITreeDecomposition *decomp = algorithm->computeDecomposition(hypergraph);
+		std::cout << "Decomposition Width: " << decomp->maximumBagSize() << std::endl;
         htd_io::TdFormatExporter exp;
         std::ostringstream oss;
         exp.write(*decomp, hypergraph, oss);
