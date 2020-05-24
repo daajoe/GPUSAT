@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     std::string type;
     std::string decompDir;
     long combineWidth = -1;
-    time_t seed = time(0);
+    time_t seed = 2;
     bool cpu, weighted, noExp, nvidia, amd;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("-1");
     CLI11_PARSE(app, argc, argv)
 
-    srand(seed);
+    std::srand(seed);
 
     if (noExp) {
         kernelStr = "#define NO_EXP\n" + kernelStr;
