@@ -31,6 +31,7 @@
 .idea/
 cmake*/
 .vs/
+*.swp
 
 #build folder
 build*/
