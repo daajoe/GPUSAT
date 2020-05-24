@@ -20,6 +20,7 @@
 #include <FitnessFunctions/JoinSizeFitnessFunction.h>
 #include <FitnessFunctions/WidthCutSetFitnessFunction.h>
 #include <FitnessFunctions/CutSetWidthFitnessFunction.h>
+#include <cuda_runtime.h>
 
 std::string kernelStr =
 
@@ -164,12 +165,21 @@ int main(int argc, char *argv[]) {
     std::vector<cl::Device> devices;
     cl::CommandQueue queue;
     cl::Program program;
-    cl_long memorySize = 0;
-    cl_long maxMemoryBuffer = 0;
+
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+
+    cl_long memorySize = deviceProp.totalGlobalMem;
+    // FIXME: actual size
+    cl_long maxMemoryBuffer = deviceProp.totalGlobalMem;
+
+    if (combineWidth < 0) {
+	std::cout << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
+	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
+    }
 
     try {
 	helloWorldWrapper(42);
-	return 0;
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);

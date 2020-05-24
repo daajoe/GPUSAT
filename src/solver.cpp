@@ -3,10 +3,28 @@
 #include <iostream>
 #include <solver.h>
 #include <errno.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
+
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
+{
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) exit(code);
+   }
+}
+
+
+extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset);
 
 namespace gpusat {
 
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeType lastNode) {
+
+        std::cout << "solve problem. isSAT: " << isSat << " edges:" << node.edges.size() << std::endl;
         if (isSat > 0) {
             if (node.edges.empty()) {
                 bagType cNode;
@@ -73,6 +91,7 @@ namespace gpusat {
     }
 
     void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize) {
+        std::cout << "clean tree" << std::endl;
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
@@ -138,6 +157,7 @@ namespace gpusat {
     }
 
     void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
+        std::cout << "combine tree forget" << std::endl;
         if (table.size > 0) {
             cl::Kernel kernel_resize = cl::Kernel(program, "combineTree");
 
@@ -176,6 +196,7 @@ namespace gpusat {
     }
 
     void Solver::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode) {
+        std::cout << "solve join" << std::endl;
         isSat = 0;
         this->numJoin++;
         cl::Kernel kernel = cl::Kernel(program, "solveJoin");
@@ -365,6 +386,8 @@ namespace gpusat {
     }
 
     void Solver::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeType nextNode) {
+    
+        std::cout << "introduce forget" << std::endl;
         isSat = 0;
         std::vector<cl_long> fVars;
         std::set_intersection(node.variables.begin(), node.variables.end(), pnode.variables.begin(), pnode.variables.end(), std::back_inserter(fVars));
@@ -391,66 +414,47 @@ namespace gpusat {
             }
         }
 
-        cl::Kernel kernel = cl::Kernel(program, "solveIntroduceForget");
-
-        kernel.setArg(3, eVars.size());
-
-        cl::Buffer buf_varsE;
+        long *varsEMem = NULL;
         if (eVars.size() > 0) {
-            buf_varsE = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * eVars.size(), &eVars[0]);
-            kernel.setArg(4, buf_varsE);
-        } else {
-            kernel.setArg(4, NULL);
+            gpuErrchk(cudaMalloc((void**)&varsEMem, sizeof(cl_long) * eVars.size()));
+            gpuErrchk(cudaMemcpy(varsEMem, &eVars.front(), sizeof(cl_long) * eVars.size(), cudaMemcpyHostToDevice));
         }
 
-        kernel.setArg(5, (cl_long) pow(2, iVars.size() - fVars.size()));
-        kernel.setArg(6, fVars.size());
-
-        //number Variables introduce
-        kernel.setArg(12, iVars.size());
-
-        //variables introduce
-        cl::Buffer bufIVars;
+        long *varsIMem = NULL;
         if (iVars.size() > 0) {
-            bufIVars = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * iVars.size(), &iVars[0]);
-            kernel.setArg(13, bufIVars);
-        } else {
-            kernel.setArg(13, NULL);
+            gpuErrchk(cudaMalloc((void**)&varsIMem, sizeof(cl_long) * iVars.size()));
+            gpuErrchk(cudaMemcpy(varsIMem, &iVars.front(), sizeof(cl_long) * iVars.size(), cudaMemcpyHostToDevice));
         }
-        cl::Buffer bufClauses;
+
+        long *clausesMem = NULL;
         if (clauses.size() > 0) {
-            bufClauses = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
-            kernel.setArg(14, bufClauses);
-        } else {
-            kernel.setArg(14, NULL);
+            gpuErrchk(cudaMalloc((void**)&clausesMem, sizeof(cl_long) * clauses.size()));
+            gpuErrchk(cudaMemcpy(clausesMem, &clauses.front(), sizeof(cl_long) * clauses.size(), cudaMemcpyHostToDevice));
         }
-        cl::Buffer bufNumVarsC;
+
+        long *numVarsCMem = NULL;
         if (numClauses > 0) {
-            bufNumVarsC = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
-            kernel.setArg(15, bufNumVarsC);
-        } else {
-            kernel.setArg(15, NULL);
-        }
-        kernel.setArg(16, numClauses);
-        cl::Buffer bufWeights;
-        if (formula.variableWeights != nullptr) {
-            bufWeights = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
-            kernel.setArg(17, bufWeights);
-        } else {
-            kernel.setArg(17, NULL);
+            gpuErrchk(cudaMalloc((void**)&numVarsCMem, sizeof(cl_long) * numClauses));
+            gpuErrchk(cudaMemcpy(numVarsCMem, &numVarsClause.front(), sizeof(cl_long) * numClauses, cudaMemcpyHostToDevice));
         }
 
-        kernel.setArg(19, pow(2, cnode.exponent));
+        double *weightsMem = NULL;
+        if (formula.variableWeights != NULL) {
+            gpuErrchk(cudaMalloc((void**)&weightsMem, sizeof(cl_double) * formula.numWeights));
+            gpuErrchk(cudaMemcpy(weightsMem, formula.variableWeights, sizeof(cl_double) * formula.numWeights, cudaMemcpyHostToDevice));
+        }
 
+        long *exponentMem;
         node.exponent = CL_LONG_MIN;
-        cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
-        kernel.setArg(18, buf_exp);
+        gpuErrchk(cudaMalloc((void**)&exponentMem, sizeof(cl_long)));
+        gpuErrchk(cudaMemcpy(exponentMem, &(node.exponent), sizeof(cl_long), cudaMemcpyHostToDevice));
 
-        cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
+        size_t usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
         cl_long bagSizeForget = 1;
         cl_long s = sizeof(cl_long);
 
 
+        std::cout << "usedMemory: " << usedMemory << " nextNode " << nextNode << std::endl;
         if (maxBag > 0) {
             bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) maxBag);
         } else {
@@ -466,6 +470,7 @@ namespace gpusat {
         }
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
+        std::cout << "maxSize: " << maxSize << " bag size forget: " << bagSizeForget << std::endl;
         node.solution = new treeType[maxSize];
         if (node.solution == NULL || errno == ENOMEM) {
             std::cerr << "\nOut of Memory\n";
@@ -483,43 +488,86 @@ namespace gpusat {
                 exit(0);
             }
 
-            cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
+            long *solsFMem;
+            gpuErrchk(cudaMalloc((void**)&solsFMem, sizeof(cl_long) * node.solution[a].size));
+            gpuErrchk(cudaMemcpy(solsFMem, node.solution[a].elements, sizeof(cl_long) * node.solution[a].size, cudaMemcpyHostToDevice));
 
-            kernel.setArg(0, buf_solsF);
+            long *varsFMem = NULL;
             cl::Buffer buf_varsF;
             if (fVars.size() > 0) {
-                buf_varsF = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
-                kernel.setArg(1, buf_varsF);
-            } else {
-                kernel.setArg(1, NULL);
+                gpuErrchk(cudaMalloc((void**)&varsFMem, sizeof(cl_long) * fVars.size()));
+                gpuErrchk(cudaMemcpy(varsFMem, &fVars.front(), sizeof(cl_long) * fVars.size(), cudaMemcpyHostToDevice));
             }
-            kernel.setArg(9, node.solution[a].minId);
+            //kernel.setArg(9, node.solution[a].minId);
 
-            cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &node.solution[a].numSolutions);
-            kernel.setArg(11, bufsolBag);
+            long *solBagMem;
+            gpuErrchk(cudaMalloc((void**)&solBagMem, sizeof(cl_long)));
+            gpuErrchk(cudaMemcpy(solBagMem, &(node.solution[a].numSolutions), sizeof(cl_long), cudaMemcpyHostToDevice));
+            
             for (cl_long b = 0; b < cnode.bags; b++) {
                 if (cnode.solution[b].elements == NULL) {
                     continue;
                 }
-                cl::Buffer buf_solsE(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * cnode.solution[b].size, cnode.solution[b].elements);
-                if (!leaf) {
-                    kernel.setArg(2, buf_solsE);
-                } else {
-                    kernel.setArg(2, NULL);
-                }
-                kernel.setArg(7, cnode.solution[b].minId);
-                kernel.setArg(8, cnode.solution[b].maxId);
-                kernel.setArg(10, cnode.solution[b].minId);
 
-                cl_long error1 = 0, error2 = 0;
-                error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId)));
+                long *solsEMem = NULL;
+                if (!leaf) {
+                    cudaMalloc((void**)&solsEMem, sizeof(cl_long) * cnode.solution[b].size);
+                    cudaMemcpy(solsEMem, cnode.solution[b].elements, sizeof(cl_long) * cnode.solution[b].size, cudaMemcpyHostToDevice);
+                }
+
+                size_t threads = static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId); 
+                long id_offset = node.solution[a].minId;
+
+                long combinations = (cl_long) pow(2, iVars.size() - fVars.size());
+                
+                // FIXME: offset onto global id 
+                introduceForgetWrapper(
+                    solsFMem,
+                    varsFMem,
+                    solsEMem,
+                    eVars.size(),
+                    varsEMem,
+                    combinations,
+                    fVars.size(),
+                    cnode.solution[b].minId,
+                    cnode.solution[b].maxId,
+                    node.solution[a].minId,
+                    cnode.solution[b].minId,
+                    solBagMem,
+                    iVars.size(),
+                    varsIMem,
+                    clausesMem,
+                    numVarsCMem,
+                    numClauses,
+                    weightsMem,
+                    exponentMem, 
+                    pow(2, cnode.exponent),
+                    threads,
+                    id_offset
+                );
+
+                cudaFree(solsEMem);
+                /*
+                error1 = queue.enqueueNDRangeKernel(
+                        kernel,
+                        cl::NDRange(static_cast<size_t>(node.solution[a].minId)),
+                        cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId))
+                );
                 error2 = queue.finish();
                 if (error1 != 0 || error2 != 0) {
                     std::cerr << "\nIntroduce Forget - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
                     exit(1);
-                }
+                }*/
             }
-            queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_long), &node.solution[a].numSolutions);
+          
+            if (varsFMem) { 
+                cudaFree(varsFMem);
+            }
+
+            cudaMemcpy(&node.solution[a].numSolutions, solBagMem, sizeof(cl_long), cudaMemcpyDeviceToHost);
+            cudaFree(solBagMem);
+
+            std::cout << "num solutions: " << node.solution[a].numSolutions << std::endl;
             if (node.solution[a].numSolutions == 0) {
                 free(node.solution[a].elements);
                 node.solution[a].elements = NULL;
@@ -544,7 +592,9 @@ namespace gpusat {
                             std::cerr << "\nOut of Memory\n";
                             exit(0);
                         }
-                        queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2), node.solution[a].elements);
+
+                        long solFCount = sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2);
+                        cudaMemcpy(node.solution[a].elements, solsFMem, solFCount, cudaMemcpyDeviceToHost);
 
                         combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
                         node.solution[a - 1] = node.solution[a];
@@ -557,7 +607,8 @@ namespace gpusat {
                             std::cerr << "\nOut of Memory\n";
                             exit(0);
                         }
-                        queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a].numSolutions + 1), node.solution[a].elements);
+                        long solFCount = sizeof(cl_long) * (node.solution[a].numSolutions + 1);
+                        cudaMemcpy(node.solution[a].elements, solsFMem, solFCount, cudaMemcpyDeviceToHost);
 
                         if (a > 0 && node.solution[a - 1].elements == NULL) {
                             node.solution[a].minId = node.solution[a - 1].minId;
@@ -571,12 +622,15 @@ namespace gpusat {
                     node.maxSize = std::max(node.maxSize, node.solution[a].size);
                 } else if (solutionType == ARRAY) {
                     node.solution[a].size = bagSizeForget;
-                    queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * bagSizeForget, node.solution[a].elements);
 
+                    cudaMemcpy(node.solution[a].elements, solsFMem, sizeof(long) * bagSizeForget, cudaMemcpyDeviceToHost);
                 }
             }
+            cudaFree(solsFMem);
+
         }
-        queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
+
+        cudaMemcpy(&(node.exponent), exponentMem, sizeof(long), cudaMemcpyDeviceToHost);
         node.correction = cnode.correction + cnode.exponent;
         cl_long tableSize = 0;
         for (cl_long i = 0; i < node.bags; i++) {
@@ -589,5 +643,224 @@ namespace gpusat {
                 cnode.solution[a].elements = NULL;
             }
         }
+
+
+        if (varsEMem) {
+            cudaFree(varsEMem);
+        }
+        if (varsIMem) {
+            cudaFree(varsIMem);
+        }
+        if (clausesMem) {
+            cudaFree(clausesMem);
+        }
+        if (numVarsCMem) {
+            cudaFree(numVarsCMem);
+        }
+        if (weightsMem) {
+            cudaFree(weightsMem);
+        }
+        if (exponentMem) {
+            cudaFree(exponentMem);
+        }
+
+
+        return;  
+//         kernel.setArg(3, eVars.size());
+// 
+//         cl::Buffer buf_varsE;
+//         if (eVars.size() > 0) {
+//             buf_varsE = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * eVars.size(), &eVars[0]);
+//             kernel.setArg(4, buf_varsE);
+//         } else {
+//             kernel.setArg(4, NULL);
+//         }
+// 
+//         kernel.setArg(5, (cl_long) pow(2, iVars.size() - fVars.size()));
+//         kernel.setArg(6, fVars.size());
+// 
+//         //number Variables introduce
+//         kernel.setArg(12, iVars.size());
+// 
+//         //variables introduce
+//         cl::Buffer bufIVars;
+//         if (iVars.size() > 0) {
+//             bufIVars = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * iVars.size(), &iVars[0]);
+//             kernel.setArg(13, bufIVars);
+//         } else {
+//             kernel.setArg(13, NULL);
+//         }
+//         cl::Buffer bufClauses;
+//         if (clauses.size() > 0) {
+//             bufClauses = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (clauses.size()), &clauses[0]);
+//             kernel.setArg(14, bufClauses);
+//         } else {
+//             kernel.setArg(14, NULL);
+//         }
+//         cl::Buffer bufNumVarsC;
+//         if (numClauses > 0) {
+//             bufNumVarsC = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * (numClauses), &numVarsClause[0]);
+//             kernel.setArg(15, bufNumVarsC);
+//         } else {
+//             kernel.setArg(15, NULL);
+//         }
+//         kernel.setArg(16, numClauses);
+//         cl::Buffer bufWeights;
+//         if (formula.variableWeights != nullptr) {
+//             bufWeights = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * formula.numWeights, formula.variableWeights);
+//             kernel.setArg(17, bufWeights);
+//         } else {
+//             kernel.setArg(17, NULL);
+//         }
+// 
+//         kernel.setArg(19, pow(2, cnode.exponent));
+// 
+//         node.exponent = CL_LONG_MIN;
+//         cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
+//         kernel.setArg(18, buf_exp);
+// 
+//         cl_ulong usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
+//         cl_long bagSizeForget = 1;
+//         cl_long s = sizeof(cl_long);
+// 
+// 
+//         if (maxBag > 0) {
+//             bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) maxBag);
+//         } else {
+//             if (solutionType == TREE) {
+//                 if (nextNode == JOIN) {
+//                     bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
+//                 } else if (nextNode == INTRODUCEFORGET) {
+//                     bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
+//                 }
+//             } else if (solutionType == ARRAY) {
+//                 bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(cl_long)), log2(memorySize / sizeof(cl_long) / 3)));
+//             }
+//         }
+// 
+//         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
+//         node.solution = new treeType[maxSize];
+//         if (node.solution == NULL || errno == ENOMEM) {
+//             std::cerr << "\nOut of Memory\n";
+//             exit(0);
+//         }
+//         node.bags = maxSize;
+//         for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
+//             node.solution[a].numSolutions = 0;
+//             node.solution[a].minId = run * bagSizeForget;
+//             node.solution[a].maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
+//             node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
+//             node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
+//             if (node.solution[a].elements == NULL || errno == ENOMEM) {
+//                 std::cerr << "\nOut of Memory\n";
+//                 exit(0);
+//             }
+// 
+//             cl::Buffer buf_solsF(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * node.solution[a].size, node.solution[a].elements);
+// 
+//             kernel.setArg(0, buf_solsF);
+//             cl::Buffer buf_varsF;
+//             if (fVars.size() > 0) {
+//                 buf_varsF = cl::Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * fVars.size(), &fVars[0]);
+//                 kernel.setArg(1, buf_varsF);
+//             } else {
+//                 kernel.setArg(1, NULL);
+//             }
+//             kernel.setArg(9, node.solution[a].minId);
+// 
+//             cl::Buffer bufsolBag(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &node.solution[a].numSolutions);
+//             kernel.setArg(11, bufsolBag);
+//             for (cl_long b = 0; b < cnode.bags; b++) {
+//                 if (cnode.solution[b].elements == NULL) {
+//                     continue;
+//                 }
+//                 cl::Buffer buf_solsE(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * cnode.solution[b].size, cnode.solution[b].elements);
+//                 if (!leaf) {
+//                     kernel.setArg(2, buf_solsE);
+//                 } else {
+//                     kernel.setArg(2, NULL);
+//                 }
+//                 kernel.setArg(7, cnode.solution[b].minId);
+//                 kernel.setArg(8, cnode.solution[b].maxId);
+//                 kernel.setArg(10, cnode.solution[b].minId);
+// 
+//                 cl_long error1 = 0, error2 = 0;
+//                 error1 = queue.enqueueNDRangeKernel(kernel, cl::NDRange(static_cast<size_t>(node.solution[a].minId)), cl::NDRange(static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId)));
+//                 error2 = queue.finish();
+//                 if (error1 != 0 || error2 != 0) {
+//                     std::cerr << "\nIntroduce Forget - OpenCL error: " << (error1 != 0 ? error1 : error2) << "\n";
+//                     exit(1);
+//                 }
+//             }
+//             queue.enqueueReadBuffer(bufsolBag, CL_TRUE, 0, sizeof(cl_long), &node.solution[a].numSolutions);
+//             if (node.solution[a].numSolutions == 0) {
+//                 free(node.solution[a].elements);
+//                 node.solution[a].elements = NULL;
+// 
+//                 if (a > 0 and solutionType != ARRAY) {
+//                     node.solution[a - 1].maxId = node.solution[a].maxId;
+// 
+//                     node.bags--;
+//                     a--;
+//                 }
+//             } else {
+//                 this->isSat = 1;
+// 
+//                 if (solutionType == TREE) {
+//                     if (node.variables.size() == 0) {
+//                         node.solution[a].numSolutions--;
+//                     }
+//                     free(node.solution[a].elements);
+//                     if (a > 0 && node.solution[a - 1].elements != nullptr && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+//                         node.solution[a].elements = (cl_long *) malloc(sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2));
+//                         if (node.solution[a].elements == NULL || errno == ENOMEM) {
+//                             std::cerr << "\nOut of Memory\n";
+//                             exit(0);
+//                         }
+//                         queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2), node.solution[a].elements);
+// 
+//                         combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
+//                         node.solution[a - 1] = node.solution[a];
+// 
+//                         node.bags--;
+//                         a--;
+//                     } else {
+//                         node.solution[a].elements = (cl_long *) malloc(sizeof(cl_long) * (node.solution[a].numSolutions + 1));
+//                         if (node.solution[a].elements == NULL || errno == ENOMEM) {
+//                             std::cerr << "\nOut of Memory\n";
+//                             exit(0);
+//                         }
+//                         queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * (node.solution[a].numSolutions + 1), node.solution[a].elements);
+// 
+//                         if (a > 0 && node.solution[a - 1].elements == NULL) {
+//                             node.solution[a].minId = node.solution[a - 1].minId;
+//                             node.solution[a - 1] = node.solution[a];
+// 
+//                             node.bags--;
+//                             a--;
+//                         }
+//                     }
+//                     node.solution[a].size = node.solution[a].numSolutions + 1;
+//                     node.maxSize = std::max(node.maxSize, node.solution[a].size);
+//                 } else if (solutionType == ARRAY) {
+//                     node.solution[a].size = bagSizeForget;
+//                     queue.enqueueReadBuffer(buf_solsF, CL_TRUE, 0, sizeof(cl_long) * bagSizeForget, node.solution[a].elements);
+// 
+//                 }
+//             }
+//         }
+//         queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
+//         node.correction = cnode.correction + cnode.exponent;
+//         cl_long tableSize = 0;
+//         for (cl_long i = 0; i < node.bags; i++) {
+//             tableSize += node.solution[i].size;
+//         }
+//         this->maxTableSize = std::max(this->maxTableSize, tableSize);
+//         for (cl_long a = 0; a < cnode.bags; a++) {
+//             if (cnode.solution[a].elements != NULL) {
+//                 free(cnode.solution[a].elements);
+//                 cnode.solution[a].elements = NULL;
+//             }
+//         }
     }
 }

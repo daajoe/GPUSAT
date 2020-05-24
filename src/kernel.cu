@@ -67,9 +67,8 @@ __device__ double atomicMax(long* address, long val)
 
 
 __device__ long get_global_id() {
-    return blockIdx.x 
-            + blockIdx.y * gridDim.x 
-            + gridDim.x * gridDim.y * blockIdx.z; 
+    // TODO: y and z
+    return blockDim.x * blockIdx.x + threadIdx.x;
 }
 
 /**
@@ -149,8 +148,8 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
  * @param exponent
   *     the max exponent of this run
  */
-__global__ void resize(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent) {
-    long id = get_global_id();
+__global__ void resize(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset) {
+    long id = get_global_id() + id_offset;
     if (solutions_old[id] > 0) {
         setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
 #if !defined(NO_EXP)
@@ -173,8 +172,8 @@ __global__ void resize(long numVars, long *tree, double *solutions_old, long *tr
  * @param startId
   *     the start id of the current node
  */
-__global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId) {
-    long id = get_global_id();
+__global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long id_offset) {
+    long id = get_global_id() + id_offset;
     double val = getCount(id + startId, (long*)solutions_old, numVars);
     if (val > 0) {
         setCount(id + startId, tree, numVars, treeSize, val);
@@ -346,8 +345,8 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
   * @param exponent
   *     the max exponent of this run
   */
-__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent) {
-    long id = get_global_id();
+__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset) {
+    long id = get_global_id() + id_offset;
     double tmp = -1, tmp_ = -1;
     double weight = 1;
     if (minId1 != -1) {
@@ -468,6 +467,7 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
             }
         }
     }
+    //printf("tmp: %d, edge: %d\n", tmp, edge);
     if (tmp > 0.0) {
         // check if assignment satisfies the given clauses
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
@@ -523,8 +523,11 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
  * @param value
   *     correction value for the exponents
  */
-__global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value) {
-    long id = get_global_id();
+__global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, long id_offset, long max_id) {
+    long id = get_global_id() + id_offset;
+    if (id >= max_id) {
+        return;
+    }
     if (numVI != numVF) {
         double tmp = 0;
         long templateId = 0;
@@ -600,14 +603,45 @@ __global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, l
 }
 
 
-__global__ void helloWorldKernel(int* val)
+__global__ void helloWorldKernel(int val)
 {
     printf("[%d, %d]:\t\tHello, World! Val: %d\n",\
             blockIdx.y*gridDim.x+blockIdx.x,\
-            threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, *val);
+            threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
 }
 
-void helloWorldWrapper(int val) {
+void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset) {
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+
+    printf("blocks per grid: %d threadsPerBlock: %d\n", blocksPerGrid, threadsPerBlock);
+    solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
+                    solsF,
+                    varsF,
+                    solsE,
+                    numVE,
+                    varsE,
+                    combinations,
+                    numVF,
+                    minIdE,
+                    maxIdE,
+                    startIDF,
+                    startIDE,
+                    sols,
+                    numVI,
+                    varsI,
+                    clauses,
+                    numVarsC,
+                    numclauses,
+                    weights,
+                    exponent, 
+                    value,
+                    id_offset,
+                    threads + id_offset);
+
+    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+    /*
     int *mem;
     dim3 threads(2, 1);
     dim3 blocks(1, 1);
@@ -621,4 +655,21 @@ void helloWorldWrapper(int val) {
 
     printf("synchronize: %d\n", cudaDeviceSynchronize());
     cudaFree(mem);
+    */
+}
+
+void helloWorldWrapper(int val) {
+    int *mem;
+    dim3 threads(2, 1);
+    dim3 blocks(1, 1);
+
+    //cudaMalloc((void**)&mem, sizeof(int));
+
+    //cudaMemcpy(mem, &val, sizeof(int), cudaMemcpyHostToDevice);
+
+    printf("running kernel..\n");
+    helloWorldKernel<<< blocks, threads>>>(val);
+
+    printf("synchronize: %d\n", cudaDeviceSynchronize());
+    //cudaFree(mem);
 }

@@ -13,6 +13,7 @@ if (DEBUG)
     # linker flags
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     add_definitions(-DDEBUG)
+    message("Using debug mode!")
 elseif (UNIX)
     # compiler flags
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14 -O3 -Wno-ignored-attributes")
