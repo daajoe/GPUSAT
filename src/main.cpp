@@ -170,15 +170,16 @@ int main(int argc, char *argv[]) {
     cudaGetDeviceProperties(&deviceProp, 0);
 
     cl_long memorySize = deviceProp.totalGlobalMem;
-    // FIXME: actual size
-    cl_long maxMemoryBuffer = deviceProp.totalGlobalMem;
+    // FIXME: is 1 / 4 in opencl, calculations do not properly account for 
+    // full mem beeing available
+    cl_long maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
     if (combineWidth < 0) {
 	std::cout << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
 	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
     }
 
-    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
+    //cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
     try {
 	helloWorldWrapper(42);
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);

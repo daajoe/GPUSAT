@@ -284,7 +284,7 @@ namespace gpusat {
     }
 
     void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize) {
-        std::cout << "clean tree. input hashes: " << treeTypeHash(&table) << " " << bagTypeHash(&node) << std::endl;
+        std::cout << "clean tree" << std::endl;
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
@@ -300,7 +300,11 @@ namespace gpusat {
                 std::cerr << "\nOut of Memory\n";
                 exit(0);
             }
+            size_t mfree, total;
+            gpuErrchk(cudaMemGetInfo(&mfree, &total));
+            std::cout << "mem usage:" << mfree << " free, " << total <<" total." << std::endl;
 
+            std::cout << "old allocated" << "table size: " << table.size << "t.size: " << t.size << std::endl;
             CudaBuffer<cl_long> buf_sols_new(t.elements, t.size);
             free(t.elements);
 
@@ -341,11 +345,10 @@ namespace gpusat {
         t.maxId = std::max(table.maxId, t.maxId);
         table = t;
         std::cout << "tree output hash: " << treeTypeHash(&t) << std::endl;
-        exit(0);
     }
 
     void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
-        std::cout << "combine tree forget" << std::endl;
+        std::cout << "combine tree" << std::endl;
         if (table.size > 0) {
             cl::Kernel kernel_resize = cl::Kernel(program, "combineTree");
 
@@ -459,6 +462,7 @@ namespace gpusat {
                 }
 
                 long id_offset = node.solution[a].minId;
+                std::cout << "bagSizeNode: " << bagSizeNode << " memorySize: " << memorySize << " usedMemory: " << usedMemory << std::endl;
                 size_t threads = static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId);
                 std::cout << "thread offset: " << id_offset << " threads " << threads << std::endl;
                 
@@ -649,6 +653,9 @@ namespace gpusat {
                 long combinations = (cl_long) pow(2, iVars.size() - fVars.size());
                 std::cout << "tree hash: " << treeTypeHash(&node.solution[a]) << " offset: " << id_offset<< std::endl;
                 
+                size_t free, total;
+                gpuErrchk(cudaMemGetInfo(&free, &total));
+                std::cout << "mem usage:" << free << " free, " << total <<" total." << std::endl;
                 // FIXME: offset onto global id 
                 introduceForgetWrapper(
                     buf_solsF.device_mem,
