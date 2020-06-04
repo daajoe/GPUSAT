@@ -8,7 +8,7 @@
 
 using namespace gpusat;
 
-__device__ double atomicAdd(long* address, long val)
+__device__ long atomicAdd(long* address, long val)
 {
     unsigned long long int* address_as_ull =
                               (unsigned long long int*)address;
@@ -26,7 +26,7 @@ __device__ double atomicAdd(long* address, long val)
     return old;
 }
 
-__device__ double atomicSub(long* address, long val)
+__device__ long atomicSub(long* address, long val)
 {
     unsigned long long int* address_as_ull =
                               (unsigned long long int*)address;
@@ -44,7 +44,7 @@ __device__ double atomicSub(long* address, long val)
 }
 
 
-__device__ double atomicMax(long* address, long val)
+__device__ long atomicMax(long* address, long val)
 {
     unsigned long long int* address_as_ull =
                               (unsigned long long int*)address;
@@ -116,8 +116,9 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
         atomicAdd(treeSize, 1);
     }
     for (ulong i = 0; i < numVars; i++) { 
-        uint * lowVal = &((
-        uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        // lower or upper 32bit, depending on if bit of variable i is set in id
+        uint * lowVal = &((uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        // secure our slot by incrementing treeSize
         if (val == 0 && *lowVal == 0) {
             val = atomicAdd(treeSize, 1) + 1;
         }
@@ -232,7 +233,6 @@ __device__ double solveIntroduce_(long numV, long *edge, long numVE, long *varia
     }
 
     if (edge != 0 && otherId >= (minId) && otherId < (maxId)) {
-
 #if !defined(ARRAY_TYPE)
         return getCount(otherId, edge, numVE) * weight;
 #else
@@ -345,8 +345,12 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
   * @param exponent
   *     the max exponent of this run
   */
-__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset) {
+__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset, long max_id) {
     long id = get_global_id() + id_offset;
+    if (id >= max_id) {
+        return;
+    }
+
     double tmp = -1, tmp_ = -1;
     double weight = 1;
     if (minId1 != -1) {
@@ -385,7 +389,7 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
             }
         } else if (oldVal > 0) {
             if (tmp == 0) {
-                atomicSub(sols, 1u);
+                atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
@@ -403,7 +407,7 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
             }
         } else if (oldVal > 0) {
             if (tmp_ == 0) {
-                atomicSub(sols, 1u);
+                atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
@@ -467,7 +471,6 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
             }
         }
     }
-    //printf("tmp: %d, edge: %d\n", tmp, edge);
     if (tmp > 0.0) {
         // check if assignment satisfies the given clauses
         int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
@@ -549,7 +552,6 @@ __global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, l
                     b++;
                 }
             }
-            // get solution count of the corresponding assignment in the edge
             tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId);
         }
 #if !defined(ARRAY_TYPE)
@@ -610,12 +612,43 @@ __global__ void helloWorldKernel(int val)
             threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
 }
 
+void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset) {
+
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    int max_id = threads + id_offset;
+    printf("max id: %d\n", max_id);
+    solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
+                    solutions,
+                    edge1,
+                    edge2,
+                    variables,
+                    edgeVariables1,
+                    edgeVariables2,
+                    numV,
+                    numVE1,
+                    numVE2,
+                    minId1,
+                    maxId1,
+                    minId2,
+                    maxId2,
+                    startIDNode,
+                    startIDEdge1,
+                    startIDEdge2,
+                    weights,
+                    sols,
+                    value, 
+                    exponent,
+                    id_offset,
+                    max_id);
+
+    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+}
+
 void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset) {
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
-
-    printf("blocks per grid: %d threadsPerBlock: %d\n", blocksPerGrid, threadsPerBlock);
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
                     solsF,
                     varsF,

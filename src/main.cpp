@@ -178,6 +178,7 @@ int main(int argc, char *argv[]) {
 	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
     }
 
+    cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
     try {
 	helloWorldWrapper(42);
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
