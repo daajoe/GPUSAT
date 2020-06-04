@@ -28,6 +28,8 @@ extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long
 
 extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset);
 
+extern void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset);
+
 namespace gpusat {
 
     double getCount(long id, long *tree, long numVars) {
@@ -282,20 +284,15 @@ namespace gpusat {
     }
 
     void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize) {
-        std::cout << "clean tree" << std::endl;
+        std::cout << "clean tree. input hashes: " << treeTypeHash(&table) << " " << bagTypeHash(&node) << std::endl;
         treeType t;
         t.numSolutions = 0;
         t.size = size + numVars;
         t.minId = table.minId;
         t.maxId = table.maxId;
         if (table.size > 0) {
-            cl::Kernel kernel_resize = cl::Kernel(program, "resize");
 
-            kernel_resize.setArg(0, numVars);
-
-            cl::Buffer buf_sols_old(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(cl_double) * table.size, table.elements);
-            kernel_resize.setArg(2, buf_sols_old);
-
+            CudaBuffer<cl_double> buf_sols_old((cl_double*)table.elements, table.size);
             free(table.elements);
 
             t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars * 3));
@@ -304,18 +301,12 @@ namespace gpusat {
                 exit(0);
             }
 
-            cl::Buffer buf_sols_new(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long) * t.size, t.elements);
-            kernel_resize.setArg(1, buf_sols_new);
-
+            CudaBuffer<cl_long> buf_sols_new(t.elements, t.size);
             free(t.elements);
 
-            cl::Buffer buf_num_sol(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &t.numSolutions);
-            kernel_resize.setArg(3, buf_num_sol);
+            CudaBuffer<cl_long> buf_num_sol(&(t.numSolutions), 1);
 
-            kernel_resize.setArg(4, table.minId);
-
-            cl::Buffer buf_exp(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof(cl_long), &(node.exponent));
-            kernel_resize.setArg(5, buf_exp);
+            CudaBuffer<cl_long> buf_exp(&(node.exponent), 1);
 
             cl_long error1 = 0, error2 = 0;
             cl_double range = table.maxId - table.minId;
@@ -323,15 +314,19 @@ namespace gpusat {
             for (cl_long i = 0; i < s; i++) {
                 cl_long id1 = (1 << 31) * i;
                 cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
-                error1 = queue.enqueueNDRangeKernel(kernel_resize, cl::NDRange(static_cast<size_t>(id1)), cl::NDRange(static_cast<size_t>(range)));
-                error2 = queue.finish();
-                if (error1 != 0 || error2 != 0) {
-                    std::cerr << "\nResize 1 - OpenCL error: " << (error1 != 0 ? error1 : error2);
-                    exit(1);
-                }
+                resizeWrapper(
+                    numVars,
+                    buf_sols_new.device_mem,
+                    buf_sols_old.device_mem,
+                    buf_num_sol.device_mem,
+                    table.minId,
+                    buf_exp.device_mem,
+                    range,
+                    id1
+                ); 
             }
-            queue.enqueueReadBuffer(buf_num_sol, CL_TRUE, 0, sizeof(cl_long), &(t.numSolutions));
-            queue.enqueueReadBuffer(buf_exp, CL_TRUE, 0, sizeof(cl_long), &(node.exponent));
+            buf_num_sol.read(&(t.numSolutions));
+            buf_exp.read(&(node.exponent));
 
             t.elements = (cl_long *) malloc(sizeof(cl_long) * (t.numSolutions + 1 + nextSize));
             if (t.elements == NULL || errno == ENOMEM) {
@@ -339,12 +334,14 @@ namespace gpusat {
                 exit(0);
             }
 
-            queue.enqueueReadBuffer(buf_sols_new, CL_TRUE, 0, sizeof(cl_long) * (t.numSolutions + 1 + nextSize), t.elements);
+            gpuErrchk(cudaMemcpy(t.elements, buf_sols_new.device_mem, sizeof(cl_long) * (t.numSolutions + 1 + nextSize), cudaMemcpyDeviceToHost));
         }
         t.size = (t.numSolutions + 1 + nextSize);
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
         table = t;
+        std::cout << "tree output hash: " << treeTypeHash(&t) << std::endl;
+        exit(0);
     }
 
     void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
@@ -464,13 +461,6 @@ namespace gpusat {
                 long id_offset = node.solution[a].minId;
                 size_t threads = static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId);
                 std::cout << "thread offset: " << id_offset << " threads " << threads << std::endl;
-                std::cout <<    ((b < edge1.bags) ? edge1.solution[b].minId : -1) << std::endl;
-                std::cout <<    ((b < edge1.bags) ? edge1.solution[b].maxId : -1) << std::endl;
-                std::cout <<    ((b < edge2.bags) ? edge2.solution[b].minId : -1) << std::endl;
-                std::cout <<    ((b < edge2.bags) ? edge2.solution[b].maxId : -1) << std::endl;
-                std::cout <<    (node.solution[a].minId                        ) << std::endl;
-                std::cout <<    ((b < edge1.bags) ? edge1.solution[b].minId :  0) << std::endl;
-                std::cout <<    ((b < edge2.bags) ? edge2.solution[b].minId : 0 ) << std::endl;
                 
                 solveJoinWrapper(
                     buf_sol.device_mem,
@@ -500,7 +490,6 @@ namespace gpusat {
 
             buf_solBag.read(&(node.solution[a].numSolutions));
             std::cout << "num solutions (join): " << node.solution[a].numSolutions << std::endl;
-            exit(0);
             if (node.solution[a].numSolutions == 0) {
                 free(node.solution[a].elements);
                 node.solution[a].elements = NULL;

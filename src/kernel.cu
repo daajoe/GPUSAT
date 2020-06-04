@@ -149,8 +149,11 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
  * @param exponent
   *     the max exponent of this run
  */
-__global__ void resize(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset) {
+__global__ void resize(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset, long max_id) {
     long id = get_global_id() + id_offset;
+    if (id >= max_id) {
+        return;
+    }
     if (solutions_old[id] > 0) {
         setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
 #if !defined(NO_EXP)
@@ -173,7 +176,7 @@ __global__ void resize(long numVars, long *tree, double *solutions_old, long *tr
  * @param startId
   *     the start id of the current node
  */
-__global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long id_offset) {
+__global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long id_offset, long max_id) {
     long id = get_global_id() + id_offset;
     double val = getCount(id + startId, (long*)solutions_old, numVars);
     if (val > 0) {
@@ -612,12 +615,28 @@ __global__ void helloWorldKernel(int val)
             threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
 }
 
+
+void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset) {
+    
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    resize<<<blocksPerGrid, threadsPerBlock>>>(
+        numVars,
+        tree,
+        solutions_old,
+        treeSize,
+        startId,
+        exponent,
+        id_offset,
+        threads + id_offset
+    );
+    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+}
+
 void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset) {
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
-    int max_id = threads + id_offset;
-    printf("max id: %d\n", max_id);
     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
                     solutions,
                     edge1,
@@ -640,7 +659,7 @@ void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *varia
                     value, 
                     exponent,
                     id_offset,
-                    max_id);
+                    threads + id_offset);
 
     printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
 }

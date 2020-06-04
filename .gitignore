@@ -32,6 +32,8 @@
 cmake*/
 .vs/
 *.swp
+*.swn
+*.swo
 
 #build folder
 build*/
