@@ -178,6 +178,9 @@ __global__ void resize(long numVars, long *tree, double *solutions_old, long *tr
  */
 __global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long id_offset, long max_id) {
     long id = get_global_id() + id_offset;
+    if (id >= max_id) {
+        return;
+    }
     double val = getCount(id + startId, (long*)solutions_old, numVars);
     if (val > 0) {
         setCount(id + startId, tree, numVars, treeSize, val);
@@ -615,6 +618,20 @@ __global__ void helloWorldKernel(int val)
             threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
 }
 
+void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, size_t threads, long id_offset) {
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    combineTree<<<blocksPerGrid, threadsPerBlock>>>(
+        numVars,
+        tree,
+        solutions_old,
+        treeSize,
+        startId,
+        id_offset,
+        threads + id_offset
+    );
+    cudaDeviceSynchronize();
+}
 
 void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset) {
     
@@ -630,7 +647,7 @@ void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSi
         id_offset,
         threads + id_offset
     );
-    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+    cudaDeviceSynchronize();
 }
 
 void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset) {
@@ -661,7 +678,7 @@ void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *varia
                     id_offset,
                     threads + id_offset);
 
-    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+    cudaDeviceSynchronize();
 }
 
 void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset) {
@@ -692,7 +709,7 @@ void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,
                     id_offset,
                     threads + id_offset);
 
-    printf("synchronize: %s\n", cudaGetErrorString(cudaDeviceSynchronize()));
+    cudaDeviceSynchronize();
     /*
     int *mem;
     dim3 threads(2, 1);
