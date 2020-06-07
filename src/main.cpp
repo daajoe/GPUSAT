@@ -1,5 +1,8 @@
 #define __CL_ENABLE_EXCEPTIONS
 
+// do not extend function signatures for CUDA.
+#define GPU_HOST_ATTR
+
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -67,9 +70,6 @@ int main(int argc, char *argv[]) {
 
     std::srand(seed);
 
-    if (noExp) {
-        kernelStr = "#define NO_EXP\n" + kernelStr;
-    }
 
     satformulaType satFormula;
     treedecType treeDecomp;
@@ -146,20 +146,25 @@ int main(int argc, char *argv[]) {
         exit(20);
     }
 
+    SolveMode solve_mode = SolveMode::DEFAULT;
+    if (noExp) {
+        solve_mode = solve_mode | SolveMode::NO_EXP;
+    }
     if (type == "array") {
-        kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
+        solve_mode = solve_mode | SolveMode::ARRAY_TYPE;
         solutionType = dataStructure::ARRAY;
     } else if (type == "tree") {
         solutionType = dataStructure::TREE;
     } else if (type == "combined") {
         if (treeDecomp.width < 30) {
-            kernelStr = "#define ARRAY_TYPE\n" + kernelStr;
+            solve_mode = solve_mode | SolveMode::ARRAY_TYPE;
             solutionType = dataStructure::ARRAY;
         } else {
             solutionType = dataStructure::TREE;
         }
     }
 
+    std::cerr << "solve mode: " << solve_mode << std::endl;
     cl::Context context;
     std::vector<cl::Device> devices;
     cl::CommandQueue queue;
@@ -188,7 +193,8 @@ int main(int argc, char *argv[]) {
 
         Solver *sol;
         bagType next;
-        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag);
+        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode); 
+
         next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);

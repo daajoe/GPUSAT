@@ -1,6 +1,8 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
 
+#define GPU_HOST_ATTR 
+
 #include <queue>
 #include <types.h>
 #include <unordered_map>

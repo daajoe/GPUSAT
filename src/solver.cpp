@@ -1,3 +1,5 @@
+#define GPU_HOST_ATTR
+
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -5,6 +7,7 @@
 #include <errno.h>
 #include <cuda.h>
 #include <memory>
+#include <types.h>
 #include <cuda_runtime.h>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -24,15 +27,18 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset);
+using gpusat::SolveMode;
 
-extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset);
+extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
 
-extern void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset);
+    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-extern void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
+    extern void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-namespace gpusat {
+    extern void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
+
+
+namespace gpusat { 
 
     double getCount(long id, long *tree, long numVars) {
         ulong nextId = 0;
@@ -227,7 +233,7 @@ namespace gpusat {
 
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeType lastNode) {
 
-        std::cerr << "solve problem. isSAT: " << isSat << " edges:" << node.edges.size() << std::endl;
+        std::cerr << "solve problem. isSAT: " << isSat << " edges:" << node.edges.size() << " solve mode: " << solve_mode << std::endl;
         if (isSat > 0) {
             if (node.edges.empty()) {
                 bagType cNode;
@@ -334,7 +340,8 @@ namespace gpusat {
                     table.minId,
                     buf_exp.device_mem,
                     range,
-                    id1
+                    id1,
+                    solve_mode
                 ); 
             }
             // actually the tree size
@@ -494,7 +501,8 @@ namespace gpusat {
                     pow(2, edge1.exponent + edge2.exponent),
                     buf_exponent.device_mem,
                     threads,
-                    id_offset
+                    id_offset,
+                    solve_mode
                 );
             }
 
@@ -688,7 +696,8 @@ namespace gpusat {
                     buf_exponent.device_mem, 
                     pow(2, cnode.exponent),
                     threads,
-                    id_offset
+                    id_offset,
+                    solve_mode
                 );
             } 
             buf_solBag.read(&(node.solution[a].numSolutions));

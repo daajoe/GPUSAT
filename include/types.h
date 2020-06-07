@@ -77,6 +77,22 @@ namespace gpusat {
         ARRAY, TREE
     };
 
+    enum SolveMode {
+        DEFAULT = 0,
+        ARRAY_TYPE = 1 << 0,
+        NO_EXP = 1 << 1,
+    };
+
+    GPU_HOST_ATTR inline SolveMode operator|(SolveMode a, SolveMode b)
+    {
+        return static_cast<SolveMode>(static_cast<int>(a) | static_cast<int>(b));
+    }
+
+    GPU_HOST_ATTR inline SolveMode operator&(SolveMode a, SolveMode b)
+    {
+        return static_cast<SolveMode>(static_cast<int>(a) & static_cast<int>(b));
+    }
+
     /**
      * Function that compares two variables.
      *
