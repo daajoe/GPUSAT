@@ -4,7 +4,8 @@
 #include <stdint.h>
 #include <types.h>
 
-#if !defined(ARRAY_TYPE)
+//#define ARRAY_TYPE 1
+
 
 using namespace gpusat;
 
@@ -186,8 +187,6 @@ __global__ void combineTree(long numVars, long *tree, double *solutions_old, lon
         setCount(id + startId, tree, numVars, treeSize, val);
     }
 }
-
-#endif
 
 /**
  * Operation to solve a Introduce node in the decomposition.

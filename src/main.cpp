@@ -28,7 +28,6 @@ std::string kernelStr =
 
 using namespace gpusat;
 
-extern void helloWorldWrapper(int val);
 
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
@@ -175,13 +174,12 @@ int main(int argc, char *argv[]) {
     cl_long maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
     if (combineWidth < 0) {
-	std::cout << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
+	std::cerr << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
 	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
     }
 
     //cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
     try {
-	helloWorldWrapper(42);
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
         Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
@@ -238,11 +236,11 @@ int main(int argc, char *argv[]) {
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
         std::cout.precision(6);
-        std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
-        std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
-        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        std::cout << "\n    }";
+        // std::cout << "\n    ,\"Time\":{";
+        // std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+        // std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
+        // std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        // std::cout << "\n    }";
         std::cout << "\n}\n";
         std::cout.flush();
         if (sols > 0) {
