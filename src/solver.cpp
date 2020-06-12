@@ -9,6 +9,7 @@
 #include <memory>
 #include <types.h>
 #include <cuda_runtime.h>
+#include <signal.h>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
@@ -17,13 +18,13 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    if (code != cudaSuccess) 
    {
       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
+      if (abort) raise(SIGABRT);
    }
    code = cudaGetLastError();
    if (code != cudaSuccess) 
    {
       fprintf(stderr,"GPUassert last error: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
+      if (abort) raise(SIGABRT);
    }
 }
 
@@ -33,106 +34,60 @@ extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long
 
     extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-    extern void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
+    extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-    extern void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
+    extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
 
 
-namespace gpusat { 
+namespace gpusat {  
 
-    double getCount(long id, long *tree, long numVars) {
-        ulong nextId = 0;
-        for (ulong i = 0; i < numVars; i++) {
-            // upper
-            if ((id >> (numVars - i - 1)) & 1) {
-                nextId = ((ulong)tree[nextId] & 0xFFFFFFFF00000000) >> 32;
-            } else {
-                nextId = ((ulong)tree[nextId] & 0x00000000FFFFFFFF);
-            }
-            if (nextId == 0) {
-                return 0.0;
-            }
-        }
-        return *reinterpret_cast<double*>(&tree[nextId]);
-    }
-
-    size_t hashSubtree(long* elements, long element, int variables) {
-        if (element == 0) return 0;
+    size_t hashSubtree(TreeNode* tree, TreeNode current, int variables) {
+        if (current.empty == 0) return 0;
         // index cell
         if (variables > 0) {
-            uint32_t lower = element & 0x00000000FFFFFFFF;
-            uint32_t upper = (element & 0xFFFFFFFF00000000) >> 32;
             size_t hash = 0;
-            if (lower) {
+            if (current.lowerIdx) {
                 hash ^= 1;
-                hash ^= (hashSubtree(elements, elements[lower], variables - 1) << 1);
+                hash ^= (hashSubtree(tree, tree[current.lowerIdx], variables - 1) << 1);
             }
-            if (upper) {
+            if (current.upperIdx) {
                 hash ^= 2;
-                hash ^= (hashSubtree(elements, elements[upper], variables - 1) << 1);
+                hash ^= (hashSubtree(tree, tree[current.upperIdx], variables - 1) << 1);
             }
             return hash;
         } else {
-            return (size_t)element;
+            return (size_t)current.empty;
         }
     }
-    size_t hashSolution(treeType *t, int vars) {
-        if (t->elements == NULL) {
-            return 0;
-        }
-        return hashSubtree(t->elements, t->elements[0], vars);
-    }
-
-    size_t hashArray(long *elements, long size) {
+    size_t hashArray(ArraySolution *solution) {
         size_t h = 0;
-        for (int i=0; i < size; i++) {
-            h ^= (elements[i] << 1);
+        for (int i=0; i < solution->size; i++) {
+            h ^= (*reinterpret_cast<uint64_t*>(&solution->elements[i]) << 1);
         }
         return h;
     }
 
-    void enumerateSubtree(char* prefix, long* elements, long element, int variables) {
-        if (element == 0) return;
-        // index cell
-        if (variables > 0) {
-            uint32_t lower = element & 0x00000000FFFFFFFF;
-            uint32_t upper = (element & 0xFFFFFFFF00000000) >> 32;
-            char new_prefix[256] = {0};
-            if (lower) {
-                sprintf(new_prefix, "%s %d", prefix, 0);
-                enumerateSubtree(new_prefix, elements, elements[lower], variables - 1);
-            }
-            if (upper) {
-                sprintf(new_prefix, "%s %d", prefix, 1);
-                enumerateSubtree(new_prefix, elements, elements[upper], variables - 1);
-            }
-        // value cell
-        } else {
-            std::cerr << prefix << " : " << reinterpret_cast<double &>(element) << std::endl;
-        }
-    }
-    void enumerateSolutions(treeType *t) {
-        int vars = std::ceil(log2(t->maxId - t->minId));
-        std::cerr << "min ID: " << t->minId << " max ID: " << t->maxId << " -> vars: " << vars << std::endl;
-        if (t->elements == NULL) {
-            std::cerr << "empty tree!" << std::endl;
-            return;
-        }
-        enumerateSubtree("", t->elements, t->elements[0], vars);
-    }
-
-    size_t treeTypeHash(treeType *input, int vars) {
+    size_t treeTypeHash(TreeSolution *t, int vars) {
         size_t h = 0;
-        if (input == NULL) {
+        h = h ^ (t->minId << 1);
+        h = h ^ (t->maxId << 1);
+        h = h ^ (t->numSolutions << 1);
+        if (t->tree == NULL) {
             return h;
         }
-        h = h ^ (hashSolution(input, vars) << 1);
-        h = h ^ (input->minId << 1);
-        h = h ^ (input->maxId << 1);
-        h = h ^ (input->numSolutions << 1);
-        return h;
+        return h = h ^ (hashSubtree(t->tree, t->tree[0], vars) << 1);
     }
-    size_t bagTypeHash(bagType *input) {
+    size_t hashSolution(std::variant<TreeSolution, ArraySolution>* sol, int vars) {
+        if (auto t = std::get_if<TreeSolution>(sol)) {
+            return treeTypeHash(t, vars);
+        } else if (auto a = std::get_if<ArraySolution>(sol)) {
+            return hashArray(a);
+        }
+        std::cerr << "unknown solution data structure" << std::endl;
+        exit(1);
+    }
+
+    size_t BagTypeHash(BagType *input) {
         size_t h = 0;
         if (input == NULL) {
             return h;
@@ -143,16 +98,16 @@ namespace gpusat {
         for (cl_long var : input->variables) {
             h = h ^ (var << 1);
         }
-        for (bagType *edge : input->edges) {
-            h = h ^ (bagTypeHash(edge) << 1);
+        for (BagType *edge : input->edges) {
+            h = h ^ (BagTypeHash(edge) << 1);
         }  
-        h = h ^ (input->bags << 1);
-        for (int i=0; i < input->bags; i++) {
-            h = h ^ (treeTypeHash(&input->solution[i], input->variables.size()) << 1);
+        for (auto sol : input->solution) {
+            h = h ^ (hashSolution(&sol, input->variables.size()) << 1);
         }
         h = h ^ (input->maxSize << 1);
         return h;
     }
+
     template <typename T>
     class CudaBuffer {
         private:
@@ -167,7 +122,9 @@ namespace gpusat {
             T* device_mem;
             // creates a buffer with size 0.
             CudaBuffer();
-            /// Create an on-device array of T with given length
+            /// Create an on-device array of T with given length.
+            CudaBuffer(size_t length);
+            /// Copy a host array of given length to the device.
             CudaBuffer(T* from, size_t length);
             /// Copy a vector to the device.
             /// If the vector is empty, the memory pointer is NULL. 
@@ -190,6 +147,15 @@ namespace gpusat {
             gpuErrchk(cudaMemcpy(mem, from, sizeof(T) * length, cudaMemcpyHostToDevice));
             this->buf_size = length;
         }
+        this->device_mem = mem;
+    }
+
+    template <typename T>
+    CudaBuffer<T>::CudaBuffer(size_t length) {
+        T* mem = NULL;
+        gpuErrchk(cudaMalloc((void**)&mem, sizeof(T) * length));
+        gpuErrchk(cudaMemset(mem, 0, sizeof(T) * length));
+        this->buf_size = length;
         this->device_mem = mem;
     }
 
@@ -230,49 +196,56 @@ namespace gpusat {
         this->device_mem = NULL;
     }
 
+    
 
-    void Solver::solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeType lastNode) {
+    void Solver::solveProblem(treedecType &decomp, satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode) {
 
         std::cerr << "solve problem. isSAT: " << isSat << " edges:" << node.edges.size() << " solve mode: " << solve_mode << std::endl;
         if (isSat > 0) {
             if (node.edges.empty()) {
-                bagType cNode;
-                cNode.solution = new treeType[1];
-                if (cNode.solution == NULL || errno == ENOMEM) {
-                    std::cerr << "\nOut of Memory\n";
-                    exit(0);
-                }
-                cNode.solution[0].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), 1));
-                if (cNode.solution[0].elements == NULL || errno == ENOMEM) {
-                    std::cerr << "\nOut of Memory\n";
-                    exit(0);
-                }
+                BagType cNode;
+
                 double val = 1.0;
-                cNode.solution[0].elements[0] = *reinterpret_cast <cl_long *>(&val);
-                cNode.solution[0].maxId = 1;
-                cNode.solution[0].minId = 0;
-                cNode.solution[0].numSolutions = 0;
-                cNode.solution[0].size = 1;
-                cNode.bags = 1;
+
+                // create initial solution container
+                if (solutionType == dataStructure::TREE) {
+                    TreeSolution sol = TreeSolution();
+                    sol.tree = new TreeNode[1];
+                    sol.tree[0].content = val;
+                    sol.maxId = 1,
+                    sol.size = 1;
+                    cNode.solution.push_back(sol);
+                } else if (solutionType == dataStructure::ARRAY) {
+                    ArraySolution sol = ArraySolution();
+                    sol.elements = new double[1];
+                    sol.elements[0] = val;
+                    sol.maxId = 1,
+                    sol.size = 1;
+                    cNode.solution.push_back(sol);
+                } else {
+                    std::cerr << "unknown data structure" << std::endl;
+                    exit(1);
+                }
+
                 cNode.maxSize = 1;
                 solveIntroduceForget(formula, pnode, node, cNode, true, lastNode);
             } else if (node.edges.size() == 1) {
                 solveProblem(decomp, formula, *node.edges[0], node, INTRODUCEFORGET);
                 if (isSat == 1) {
-                    bagType &cnode = *node.edges[0];
+                    BagType &cnode = *node.edges[0];
                     solveIntroduceForget(formula, pnode, node, cnode, false, lastNode);
                 }
             } else if (node.edges.size() > 1) {
-                bagType &edge1 = *node.edges[0];
+                BagType &edge1 = *node.edges[0];
                 solveProblem(decomp, formula, edge1, node, JOIN);
                 if (isSat <= 0) {
                     return;
                 }
                 if (isSat == 1) {
-                    bagType tmp, edge2_, edge1_;
+                    BagType tmp, edge2_, edge1_;
 
                     for (cl_long i = 1; i < node.edges.size(); i++) {
-                        bagType &edge2 = *node.edges[i];
+                        BagType &edge2 = *node.edges[i];
                         solveProblem(decomp, formula, edge2, node, JOIN);
                         if (isSat <= 0) {
                             return;
@@ -299,32 +272,22 @@ namespace gpusat {
         }
     }
 
-    void Solver::cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize) {
-        std::cerr << "clean tree input hash: " << hashArray(table.elements, table.size) << " table size: " << table.size << " numVars: " << numVars << std::endl;
-        treeType t;
+    TreeSolution Solver::arrayToTree(ArraySolution &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize) {
+        TreeSolution t;
         t.numSolutions = 0;
         t.size = size + numVars;
         t.minId = table.minId;
         t.maxId = table.maxId;
         if (table.size > 0) {
 
-            CudaBuffer<cl_double> buf_sols_old((cl_double*)table.elements, table.size);
+            CudaBuffer<double> buf_sols_old(table.elements, table.size);
             free(table.elements);
 
-            t.elements = static_cast<cl_long *>(calloc(sizeof(cl_long), size + numVars * 3));
-            if (t.elements == NULL || errno == ENOMEM) {
-                std::cerr << "\nOut of Memory\n";
-                exit(0);
-            }
-            size_t mfree, total;
+            // FIXME: buffer allocate only
+            CudaBuffer<TreeNode> buf_sols_new(t.size);
 
-            CudaBuffer<cl_long> buf_sols_new(t.elements, t.size);
-            std::cerr << "clean tree new sols size: " << t.size << std::endl;
-            free(t.elements);
-
-            CudaBuffer<cl_long> buf_num_sol(&(t.numSolutions), 1);
-
-            CudaBuffer<cl_long> buf_exp(&(node.exponent), 1);
+            CudaBuffer<int64_t> buf_num_sol(&(t.numSolutions), 1);
+            CudaBuffer<int64_t> buf_exp(&(node.exponent), 1);
 
             cl_long error1 = 0, error2 = 0;
             cl_double range = table.maxId - table.minId;
@@ -332,9 +295,9 @@ namespace gpusat {
             for (cl_long i = 0; i < s; i++) {
                 cl_long id1 = (1 << 31) * i;
                 cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
-                resizeWrapper(
+                array2treeWrapper(
                     numVars,
-                    buf_sols_new.device_mem,
+                    (int64_t*)buf_sols_new.device_mem,
                     buf_sols_old.device_mem,
                     buf_num_sol.device_mem,
                     table.minId,
@@ -346,62 +309,83 @@ namespace gpusat {
             }
             // actually the tree size
             buf_num_sol.read(&(t.numSolutions));
-            buf_exp.read(&(node.exponent));
             std::cerr << "clean tree num solutions: " << t.numSolutions << std::endl;
+            buf_exp.read(&(node.exponent));
 
-            t.elements = (cl_long *) malloc(sizeof(cl_long) * (t.numSolutions + 1 + nextSize));
-            if (t.elements == NULL || errno == ENOMEM) {
-                std::cerr << "\nOut of Memory\n";
-                exit(0);
-            }
-
-            std::cerr << "clean tree new sols copy size: " << (t.numSolutions + 1 + nextSize) << std::endl;
-            // why not qual?
-            gpuErrchk(cudaMemcpy(t.elements, buf_sols_new.device_mem, sizeof(cl_long) * (t.numSolutions + 1 + nextSize), cudaMemcpyDeviceToHost));
+            int64_t nodeCount = t.numSolutions + 1 + nextSize;
+            t.tree = new TreeNode[nodeCount];
+            gpuErrchk(cudaMemcpy(t.tree, buf_sols_new.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost));
         }
         t.size = (t.numSolutions + 1 + nextSize);
         t.minId = std::min(table.minId, t.minId);
         t.maxId = std::max(table.maxId, t.maxId);
-        table = t;
-        std::cerr << "clean tree output hash: " << hashSolution(&t, numVars) << std::endl;
+        std::cerr << "tree output hash: " << treeTypeHash(&t, numVars) << std::endl;
+        return t;
     }
 
-    void Solver::combineTree(treeType &t, treeType &table, cl_long numVars) {
-        std::cerr << "combine tree" << treeTypeHash(&t, numVars) << " " << treeTypeHash(&table, numVars) << std::endl;
-        if (table.size > 0) {
+    void Solver::combineTree(TreeSolution &t, TreeSolution &old, cl_long numVars) {
+        std::cerr << "combine tree " << treeTypeHash(&t, numVars) << " " << treeTypeHash(&old, numVars) << std::endl;
+        if (old.size > 0) {
 
-            CudaBuffer<cl_long> buf_sols_new(t.elements, t.numSolutions + table.numSolutions + 2);
-            CudaBuffer<cl_double> buf_sols_old((double*)table.elements, t.size);
-
-            free(table.elements);
+            CudaBuffer<TreeNode> buf_sols_new(t.tree, t.numSolutions + old.numSolutions + 2);
+            CudaBuffer<TreeNode> buf_sols_old(old.tree, t.size);
+            free(old.tree);
 
             CudaBuffer<cl_long> buf_num_sol(&t.numSolutions, 1);
 
             cl_long error1 = 0, error2 = 0;
-            cl_double range = table.maxId - table.minId;
+            cl_double range = old.maxId - old.minId;
             cl_long s = std::ceil(range / (1l << 31));
             for (long i = 0; i < s; i++) {
                 cl_long id1 = (1 << 31) * i;
-                cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                cl_long range = std::min((cl_long) 1 << 31, old.maxId - old.minId - (1 << 31) * i);
                 combineTreeWrapper(
                     numVars,
-                    buf_sols_new.device_mem,
-                    buf_sols_old.device_mem,
+                    (int64_t*)buf_sols_new.device_mem,
+                    (int64_t*)buf_sols_old.device_mem,
                     buf_num_sol.device_mem,
-                    table.minId,
+                    old.minId,
                     range,
                     id1
                 );
             }
             buf_num_sol.read(&t.numSolutions);
-            gpuErrchk(cudaMemcpy(t.elements, buf_sols_new.device_mem, sizeof(cl_long) * (t.numSolutions + 1), cudaMemcpyDeviceToHost));
+            gpuErrchk(cudaMemcpy(t.tree, buf_sols_new.device_mem, sizeof(TreeNode) * (t.numSolutions + 1), cudaMemcpyDeviceToHost));
         }
-        t.minId = std::min(table.minId, t.minId);
-        t.maxId = std::max(table.maxId, t.maxId);
-        std::cerr << "combine tree output hash: " << hashSubtree(t.elements, t.elements[0], numVars) << std::endl;
+        t.minId = std::min(old.minId, t.minId);
+        t.maxId = std::max(old.maxId, t.maxId);
+        std::cerr << "combine tree output hash: " << hashSubtree(t.tree, t.tree[0], numVars) << std::endl;
     }
 
-    void Solver::solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode) {
+    std::variant<TreeSolution, ArraySolution> initializeSolution(dataStructure ds, int64_t minId, int64_t maxId, size_t size) {
+        if (ds == TREE) {
+            TreeSolution solution;
+            solution.minId = minId;
+            solution.numSolutions = 0; 
+            solution.maxId = maxId;
+            solution.size = size;
+            solution.tree = new TreeNode[solution.size];
+            for (size_t i=0; i < solution.size; i++) {
+                solution.tree[i].empty = 0;
+            }
+            return solution;
+        } else if (ds == ARRAY) {
+            ArraySolution solution;
+            solution.minId = minId;
+            solution.numSolutions = 0; 
+            solution.maxId = maxId;
+            solution.size = size;
+            solution.elements = new double[solution.size];
+            for (size_t i=0; i < solution.size; i++) {
+                ((int64_t*)solution.elements)[i] = 0;
+            }
+            return solution;
+        } 
+        std::cout << "unknown data structure: " << ds << std::endl;
+        exit(1);
+    }    
+
+    void Solver::solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode) {
         isSat = 0;
         this->numJoin++;
          
@@ -437,50 +421,49 @@ namespace gpusat {
             }
         }
 
-        cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
-        node.solution = new treeType[maxSize];
-        if (node.solution == NULL || errno == ENOMEM) {
-            std::cerr << "\nOut of Memory\n";
-            exit(0);
-        }
-        node.bags = maxSize;
-        for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
-            node.solution[a].numSolutions = 0;
-            node.solution[a].minId = run * bagSizeNode;
-            node.solution[a].maxId = std::min(run * bagSizeNode + bagSizeNode, 1l << (node.variables.size()));
-            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) + node.variables.size();
-            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
-            if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                std::cerr << "\nOut of Memory\n";
-                exit(0);
+        int64_t maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
+
+        node.solution.clear();
+
+        for (cl_long a = 0, run = 0; a < maxSize; a++, run++) {
+            ArraySolution solution;
+            solution.minId = a * bagSizeNode;
+            solution.maxId = std::min(a * bagSizeNode + bagSizeNode,
+                 1l << (node.variables.size()));
+            solution.numSolutions = 0; 
+            solution.size = (solution.maxId - solution.minId) + node.variables.size();
+            solution.elements = new double[solution.size];
+            for (size_t i=0; i < solution.size; i++) {
+                solution.elements[i] = -1.0;
             }
 
-            for (cl_long i = 0; i < node.solution[a].size; i++) {
-                double val = -1.0;
-                node.solution[a].elements[i] = *reinterpret_cast <cl_long *>(&val);
-            }
+            CudaBuffer<double> buf_sol(solution.elements, solution.size);
+            CudaBuffer<int64_t> buf_solBag(&(solution.numSolutions), 1);
 
-            CudaBuffer<cl_long> buf_sol(node.solution[a].elements, node.solution[a].size);
-            CudaBuffer<cl_long> buf_solBag(&(node.solution[a].numSolutions), 1);
-
-            for (cl_long b = 0; b < std::max(edge1.bags, edge2.bags); b++) {
+            for (cl_long b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
                 
-                std::unique_ptr<CudaBuffer<cl_long>> buf_sol1( std::make_unique<CudaBuffer<cl_long>>() );
-                if (b < edge1.bags && edge1.solution[b].elements != NULL) {
-                    buf_sol1 = std::make_unique<CudaBuffer<cl_long>>(edge1.solution[b].elements, edge1.solution[b].size);
+                std::unique_ptr<CudaBuffer<int64_t>> buf_sol1( std::make_unique<CudaBuffer<int64_t>>() );
+                if (b < edge1.solution.size() && dataPtr(&edge1.solution[b]) != NULL) {
+                    buf_sol1 = std::make_unique<CudaBuffer<int64_t>>(
+                        dataPtr(&edge1.solution[b]),
+                        dataStructureSize(&edge1.solution[b])
+                    );
                 }
 
                 std::unique_ptr<CudaBuffer<cl_long>> buf_sol2( std::make_unique<CudaBuffer<cl_long>>() );
-                if (b < edge2.bags && edge2.solution[b].elements != NULL) {
-                    buf_sol2 = std::make_unique<CudaBuffer<cl_long>>(edge2.solution[b].elements, edge2.solution[b].size);
+                if (b < edge2.solution.size() && dataPtr(&edge2.solution[b]) != NULL) {
+                    buf_sol2 = std::make_unique<CudaBuffer<int64_t>>(
+                        dataPtr(&edge2.solution[b]),
+                        dataStructureSize(&edge2.solution[b])
+                    );
                 }
 
-                long id_offset = node.solution[a].minId;
-                size_t threads = static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId);
+                long id_offset = solution.minId;
+                size_t threads = static_cast<size_t>(solution.maxId - solution.minId);
                 std::cerr << "thread offset: " << id_offset << " threads " << threads << std::endl;
                 
                 solveJoinWrapper(
-                    buf_sol.device_mem,
+                    (int64_t*)buf_sol.device_mem,
                     buf_sol1->device_mem,
                     buf_sol2->device_mem,
                     buf_solVars.device_mem,
@@ -489,13 +472,13 @@ namespace gpusat {
                     node.variables.size(),
                     edge1.variables.size(),
                     edge2.variables.size(),
-                    (b < edge1.bags) ? edge1.solution[b].minId : -1,
-                    (b < edge1.bags) ? edge1.solution[b].maxId : -1,
-                    (b < edge2.bags) ? edge2.solution[b].minId : -1,
-                    (b < edge2.bags) ? edge2.solution[b].maxId : -1,
-                    node.solution[a].minId,
-                    (b < edge1.bags) ? edge1.solution[b].minId : 0,
-                    (b < edge2.bags) ? edge2.solution[b].minId : 0,
+                    (b < edge1.solution.size()) ? minId(&edge1.solution[b]) : -1,
+                    (b < edge1.solution.size()) ? maxId(&edge1.solution[b]) : -1,
+                    (b < edge2.solution.size()) ? minId(&edge2.solution[b]) : -1,
+                    (b < edge2.solution.size()) ? maxId(&edge2.solution[b]) : -1,
+                    solution.minId,
+                    (b < edge1.solution.size()) ? minId(&edge1.solution[b]) : 0,
+                    (b < edge2.solution.size()) ? minId(&edge2.solution[b]) : 0,
                     buf_weights->device_mem,
                     buf_solBag.device_mem,
                     pow(2, edge1.exponent + edge2.exponent),
@@ -506,49 +489,73 @@ namespace gpusat {
                 );
             }
 
-            buf_solBag.read(&(node.solution[a].numSolutions));
-            std::cerr << "num solutions (join): " << node.solution[a].numSolutions << std::endl;
-            if (node.solution[a].numSolutions == 0) {
-                free(node.solution[a].elements);
-                node.solution[a].elements = NULL;
-
-                if (a > 0 and solutionType != ARRAY) {
-                    node.solution[a - 1].maxId = node.solution[a].maxId;
-
-                    node.bags--;
-                    a--;
+            buf_solBag.read(&(solution.numSolutions));
+            std::cerr << "num solutions (join): " << solution.numSolutions << std::endl;
+            if (solution.numSolutions == 0) {
+                free(solution.elements);
+                solution.elements = NULL;
+                if (a > 0 && solutionType != ARRAY) {
+                    auto last = std::get<TreeSolution>(node.solution.back());
+                    last.maxId = solution.maxId;
                 }
             } else {
                 // node.elements is an array here
-                buf_sol.read(node.solution[a].elements);
+                buf_sol.read(solution.elements);
                 this->isSat = 1;
                 if (solutionType == TREE) {
-
-                    if (a > 0 && node.solution[a - 1].elements != NULL && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
+                    TreeSolution* last = NULL;
+                    if (!node.solution.empty()) {
+                        last = &std::get<TreeSolution>(node.solution.back());
+                    }
+                    
+                    std::cout << "a is " << node.solution.size() << std::endl;
+                    // previous bag is not empty, combine if there is still space.
+                    if (last != NULL && last->tree != NULL && (solution.numSolutions + last->numSolutions + 2) < solution.size) {
                         std::cerr << "first branch" << std::endl;
-                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, node.solution[a - 1].numSolutions + 1);
-                        combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
-                        node.solution[a - 1] = node.solution[a];
-
-                        node.bags--;
-                        a--;
-                    } else if (a > 0 && node.solution[a - 1].elements == NULL) {
+                        auto tree = arrayToTree(
+                            solution, 
+                            (bagSizeNode) * 2, 
+                            node.variables.size(),
+                            node,
+                            last->numSolutions + 1
+                        );
+                        combineTree(tree, *last, node.variables.size());
+                        tree.size = tree.numSolutions + 1;
+                        node.solution.pop_back();
+                        node.solution.push_back(tree);
+                    // previous back is empty, replace it
+                    } else if (last != NULL && last->tree == NULL) {
                         std::cerr << "second branch" << std::endl;
-                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, 0);
-                        node.solution[a].minId = node.solution[a - 1].minId;
-                        node.solution[a - 1] = node.solution[a];
-
-                        node.bags--;
-                        a--;
+                        auto tree = arrayToTree(
+                            solution,
+                            (bagSizeNode) * 2,
+                            node.variables.size(),
+                            node,
+                            0
+                        );
+                        tree.minId = last->minId;
+                        tree.size = tree.numSolutions + 1;
+                        node.solution.pop_back();
+                        node.solution.push_back(tree);
                     } else {
                         std::cerr << "simple clean tree" << std::endl;
-                        cleanTree(node.solution[a], (bagSizeNode) * 2, node.variables.size(), node, 0);
+                        auto tree = arrayToTree(
+                            solution,
+                            (bagSizeNode) * 2,
+                            node.variables.size(),
+                            node,
+                            0
+                        );
+                        // size?
+                        tree.size = tree.numSolutions + 1;
+                        node.solution.push_back(tree);
                     }
-                    node.solution[a].size = node.solution[a].numSolutions + 1;
-                    node.maxSize = std::max(node.maxSize, node.solution[a].size);
+                    node.maxSize = std::max(node.maxSize,
+                        (int64_t)dataStructureSize(&node.solution.back()));
                 } else if (solutionType == ARRAY) {
-                    node.solution[a].size = bagSizeNode;
-                    node.maxSize = std::max(node.maxSize, node.solution[a].size);
+                    solution.size = bagSizeNode;
+                    node.maxSize = std::max(node.maxSize, (int64_t)solution.size);
+                    node.solution.push_back(solution);
                 }
             }
         }
@@ -556,26 +563,21 @@ namespace gpusat {
             buf_exponent.read(&(node.exponent));
         }
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
-        cl_long tableSize = 0;
-        for (cl_long i = 0; i < node.bags; i++) {
-            tableSize += node.solution[i].size;
+        int64_t tableSize = 0;
+        for (auto sol : node.solution) {
+            tableSize += dataStructureSize(&sol);
         }
+        std::cout << "table size: " << tableSize << std::endl;
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
-        for (cl_long a = 0; a < edge1.bags; a++) {
-            if (edge1.solution[a].elements != NULL) {
-                free(edge1.solution[a].elements);
-                edge1.solution[a].elements = NULL;
-            }
+        for (auto sol : edge1.solution) {
+            freeData(&sol);
         }
-        for (cl_long a = 0; a < edge2.bags; a++) {
-            if (edge2.solution[a].elements != NULL) {
-                free(edge2.solution[a].elements);
-                edge2.solution[a].elements = NULL;
-            }
+        for (auto sol : edge2.solution) {
+            freeData(&sol);
         }
     }
 
-    void Solver::solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeType nextNode) {
+    void Solver::solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
     
         isSat = 0;
         std::vector<cl_long> fVars;
@@ -632,43 +634,39 @@ namespace gpusat {
         }
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
-        node.solution = new treeType[maxSize];
-        if (node.solution == NULL || errno == ENOMEM) {
-            std::cerr << "\nOut of Memory\n";
-            exit(0);
-        }
-        node.bags = maxSize;
-        for (cl_long a = 0, run = 0; a < node.bags; a++, run++) {
-            node.solution[a].numSolutions = 0;
-            node.solution[a].minId = run * bagSizeForget;
-            node.solution[a].maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
-            node.solution[a].size = (node.solution[a].maxId - node.solution[a].minId) * 2 + node.variables.size();
-            node.solution[a].elements = static_cast<cl_long *>(calloc(sizeof(cl_long), node.solution[a].size));
-            if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                std::cerr << "\nOut of Memory\n";
-                exit(0);
-            }
+        
+        node.solution.clear();
 
+        for (cl_long a = 0, run = 0; a < maxSize; a++, run++) {
+
+            int64_t sol_minId =  a * bagSizeForget;
+            int64_t sol_maxId = std::min(a * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
+
+            std::variant<TreeSolution, ArraySolution> solution = initializeSolution(
+                solutionType,
+                sol_minId,
+                sol_maxId,
+                (sol_maxId - sol_minId) * 2 + node.variables.size()
+            );
             
-            CudaBuffer<cl_long> buf_solsF(node.solution[a].elements, node.solution[a].size);
+            CudaBuffer<cl_long> buf_solsF(dataPtr(&solution), dataStructureSize(&solution));
             CudaBuffer<cl_long> buf_varsF(fVars);
-            CudaBuffer<cl_long> buf_solBag(&(node.solution[a].numSolutions), 1);
+            CudaBuffer<cl_long> buf_solBag(numSolutionsPtr(&solution), 1);
  
-            for (cl_long b = 0; b < cnode.bags; b++) {
-                if (cnode.solution[b].elements == NULL) {
+            for (auto csol : cnode.solution) {
+                if (dataPtr(&csol) == NULL) {
                     continue;
                 }
 
-
-                std::unique_ptr<CudaBuffer<cl_long>> buf_solsE( std::make_unique<CudaBuffer<cl_long>>() );
+                std::unique_ptr<CudaBuffer<int64_t>> buf_solsE( std::make_unique<CudaBuffer<int64_t>>() );
                 if (!leaf) {
-                    buf_solsE = std::make_unique<CudaBuffer<cl_long>>(cnode.solution[b].elements, cnode.solution[b].size);
+                    buf_solsE = std::make_unique<CudaBuffer<cl_long>>(dataPtr(&csol), dataStructureSize(&csol));
                 }
 
-                size_t threads = static_cast<size_t>(node.solution[a].maxId - node.solution[a].minId); 
-                long id_offset = node.solution[a].minId;
+                size_t threads = static_cast<size_t>(maxId(&solution) - minId(&solution)); 
+                long id_offset = minId(&solution);
 
-                long combinations = (cl_long) pow(2, iVars.size() - fVars.size());
+                int64_t combinations = (int64_t) pow(2, iVars.size() - fVars.size());
                 
                 size_t free, total;
                 gpuErrchk(cudaMemGetInfo(&free, &total));
@@ -682,10 +680,10 @@ namespace gpusat {
                     buf_varsE.device_mem,
                     combinations,
                     fVars.size(),
-                    cnode.solution[b].minId,
-                    cnode.solution[b].maxId,
-                    node.solution[a].minId,
-                    cnode.solution[b].minId,
+                    minId(&csol),
+                    maxId(&csol),
+                    minId(&solution),
+                    minId(&csol),
                     buf_solBag.device_mem,
                     buf_varsI.size(),
                     buf_varsI.device_mem,
@@ -700,65 +698,65 @@ namespace gpusat {
                     solve_mode
                 );
             } 
-            buf_solBag.read(&(node.solution[a].numSolutions));
+            buf_solBag.read(numSolutionsPtr(&solution));
 
-            std::cerr << "num solutions: " << node.solution[a].numSolutions << std::endl;
-            if (node.solution[a].numSolutions == 0) {
-                free(node.solution[a].elements);
-                node.solution[a].elements = NULL;
+            std::cerr << "num solutions: " << numSolutions(&solution) << std::endl;
+            if (numSolutions(&solution) == 0) {
+                freeData(&solution);
 
-                if (a > 0 and solutionType != ARRAY) {
-                    node.solution[a - 1].maxId = node.solution[a].maxId;
-
-                    node.bags--;
-                    a--;
+                if (a > 0 && solutionType != ARRAY) {
+                    auto last = std::get<TreeSolution>(node.solution.back());
+                    last.maxId = maxId(&solution);
                 }
             } else {
                 this->isSat = 1;
 
-                if (solutionType == TREE) {
+                if (solutionType == TREE) { 
+                    auto sol = std::get<TreeSolution>(solution);
+                    TreeSolution* last = NULL;
+                    if (!node.solution.empty()) {
+                        last = &std::get<TreeSolution>(node.solution.back());
+                    }
+
                     if (node.variables.size() == 0) {
-                        node.solution[a].numSolutions--;
+                        sol.numSolutions--;
                     }
-                    free(node.solution[a].elements);
-                    if (a > 0 && node.solution[a - 1].elements != nullptr && (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2) < node.solution[a].size) {
-                        node.solution[a].elements = (cl_long *) malloc(sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2));
-                        if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                            std::cerr << "\nOut of Memory\n";
-                            exit(0);
-                        }
+                    free(sol.tree);
+                    if (last != NULL && last->tree != NULL 
+                        && (sol.numSolutions + last->numSolutions + 2) < sol.size) {
 
-                        long solFCount = sizeof(cl_long) * (node.solution[a].numSolutions + node.solution[a - 1].numSolutions + 2);
-                        cudaMemcpy(node.solution[a].elements, buf_solsF.device_mem, solFCount, cudaMemcpyDeviceToHost);
+                        int64_t nodeCount = sol.numSolutions + last->numSolutions + 2;
+                        sol.tree = new TreeNode[nodeCount];
+                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
 
-                        combineTree(node.solution[a], node.solution[a - 1], node.variables.size());
-                        node.solution[a - 1] = node.solution[a];
-
-                        node.bags--;
-                        a--;
+                        combineTree(sol, *last, node.variables.size());
+                        sol.size = sol.numSolutions + 1;
+                        node.solution.pop_back();
+                        node.solution.push_back(sol);
                     } else {
-                        node.solution[a].elements = (cl_long *) malloc(sizeof(cl_long) * (node.solution[a].numSolutions + 1));
-                        if (node.solution[a].elements == NULL || errno == ENOMEM) {
-                            std::cerr << "\nOut of Memory\n";
-                            exit(0);
-                        }
-                        long solFCount = sizeof(cl_long) * (node.solution[a].numSolutions + 1);
-                        cudaMemcpy(node.solution[a].elements, buf_solsF.device_mem, solFCount, cudaMemcpyDeviceToHost);
+                        int64_t nodeCount = sol.numSolutions + 1;
+                        sol.tree = new TreeNode[nodeCount];
+                        sol.size = sol.numSolutions + 1;
+                        
+                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
 
-                        if (a > 0 && node.solution[a - 1].elements == NULL) {
-                            node.solution[a].minId = node.solution[a - 1].minId;
-                            node.solution[a - 1] = node.solution[a];
-
-                            node.bags--;
-                            a--;
+                        // replace previous bag if needed
+                        if (last != NULL && last->tree == NULL) {
+                            sol.minId = last->minId;
+                            node.solution.pop_back();
+                            node.solution.push_back(sol);
+                        } else {    
+                            node.solution.push_back(sol);
                         }
                     }
-                    node.solution[a].size = node.solution[a].numSolutions + 1;
-                    node.maxSize = std::max(node.maxSize, node.solution[a].size);
+                    node.maxSize = std::max(node.maxSize,
+                        (int64_t)dataStructureSize(&node.solution.back()));
                 } else if (solutionType == ARRAY) {
-                    node.solution[a].size = bagSizeForget;
+                    auto sol = std::get<ArraySolution>(solution);
+                    sol.size = bagSizeForget;
 
-                    cudaMemcpy(node.solution[a].elements, buf_solsF.device_mem, sizeof(long) * bagSizeForget, cudaMemcpyDeviceToHost);
+                    cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(long) * bagSizeForget, cudaMemcpyDeviceToHost);
+                    node.solution.push_back(sol);
                 }
             }
         }
@@ -767,15 +765,13 @@ namespace gpusat {
         std::cerr << "exponent: " << node.exponent << std::endl;
         node.correction = cnode.correction + cnode.exponent;
         cl_long tableSize = 0;
-        for (cl_long i = 0; i < node.bags; i++) {
-            tableSize += node.solution[i].size;
+        for (auto sol : node.solution) {
+            tableSize += dataStructureSize(&sol);
         }
+        std::cout << "table size: " << tableSize << std::endl;
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
-        for (cl_long a = 0; a < cnode.bags; a++) {
-            if (cnode.solution[a].elements != NULL) {
-                free(cnode.solution[a].elements);
-                cnode.solution[a].elements = NULL;
-            }
+        for (auto csol : cnode.solution) {
+            freeData(&csol);
         }
     }
 }

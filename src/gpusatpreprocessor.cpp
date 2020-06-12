@@ -7,7 +7,7 @@
 #include <gpusatpreprocessor.h>
 
 namespace gpusat {
-    void Preprocessor::preprocessDecomp(bagType *decomp, cl_long combineWidth) {
+    void Preprocessor::preprocessDecomp(BagType *decomp, cl_long combineWidth) {
 
         bool changed = true;
         // try to merge child nodes
@@ -24,7 +24,7 @@ namespace gpusat {
                             cl_long cid = decomp->edges[b]->id;
                             decomp->edges[a]->variables.assign(v.begin(), v.end());
 
-                            std::vector<bagType *> v_;
+                            std::vector<BagType *> v_;
                             std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(), decomp->edges[b]->edges.end(), back_inserter(v_), compTreedType);
                             decomp->edges[a]->edges.assign(v_.begin(), v_.end());
                             if (b < decomp->edges.size()) {
@@ -49,11 +49,11 @@ namespace gpusat {
                         cl_long cid = decomp->edges[i]->id;
                         decomp->variables.assign(v.begin(), v.end());
 
-                        std::vector<bagType *> v_;
+                        std::vector<BagType *> v_;
                         std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), back_inserter(v_), compTreedType);
                         decomp->edges.resize(0);
                         for (long asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
-                            bagType *&sdggg = v_[asdf];
+                            BagType *&sdggg = v_[asdf];
                             if (v_[asdf]->id == cid) {
                                 x++;
                             }
@@ -77,7 +77,7 @@ namespace gpusat {
             std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), std::back_inserter(fVars));
             unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
             if (numForgetVars > 8) {
-                bagType *newEdge = new bagType;
+                BagType *newEdge = new BagType;
                 if (newEdge == NULL || errno == ENOMEM) {
                     std::cerr << "\nOut of Memory\n";
                     exit(0);
@@ -155,7 +155,7 @@ namespace gpusat {
     }
 
 
-    void Preprocessor::relableDecomp(bagType *decomp, cl_long id) {
+    void Preprocessor::relableDecomp(BagType *decomp, cl_long id) {
         for (long i = 0; i < decomp->variables.size(); i++) {
             if (decomp->variables[i] > id) {
                 decomp->variables[i]--;

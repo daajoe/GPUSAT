@@ -16,15 +16,15 @@ namespace gpusat {
         cl::Context &context;
         cl::CommandQueue &queue;
         cl::Program &program;
-        cl_long memorySize;
+        int64_t memorySize;
 
     public:
-        cl_long isSat = 1;
-        cl_long numJoin = 0;
-        cl_long numIntroduceForget = 0;
-        cl_long maxTableSize = 0;
-        cl_long maxBag = 0;
-        cl_long maxMemoryBuffer = 0;
+        int64_t isSat = 1;
+        int64_t numJoin = 0;
+        int64_t numIntroduceForget = 0;
+        int64_t maxTableSize = 0;
+        int64_t maxBag = 0;
+        int64_t maxMemoryBuffer = 0;
         SolveMode solve_mode = DEFAULT;
         dataStructure solutionType = TREE;
 
@@ -36,7 +36,7 @@ namespace gpusat {
          * @param memorySize_
          * @param maxMemoryBuffer_
          */
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, cl_long memorySize_, cl_long maxMemoryBuffer_, dataStructure solutionType_, cl_long maxBag_, SolveMode solve_mode_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_), maxBag(maxBag_), solve_mode(solve_mode_) {}
+        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int64_t memorySize_, int64_t maxMemoryBuffer_, dataStructure solutionType_, int64_t maxBag_, SolveMode solve_mode_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_), maxBag(maxBag_), solve_mode(solve_mode_) {}
 
         /**
          * function to solve the sat problem
@@ -45,7 +45,7 @@ namespace gpusat {
          * @param formula   the sat formula
          * @param node      the node to start from in the tree decompostion
          */
-        void solveProblem(treedecType &decomp, satformulaType &formula, bagType &node, bagType &pnode, nodeType lastNode);
+        void solveProblem(treedecType &decomp, satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
 
     protected:
 
@@ -58,7 +58,7 @@ namespace gpusat {
          * @param cnode     the child of the current node
          * @param leaf      indicates that the current node is a leaf node
          */
-        void solveIntroduceForget(satformulaType &formula, bagType &pnode, bagType &node, bagType &cnode, bool leaf, nodeType nextNode);
+        void solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode);
 
         /**
          * function to solve a join node
@@ -68,7 +68,7 @@ namespace gpusat {
          * @param edge2     the second child node
          * @param formula   the sat formula
          */
-        void solveJoin(bagType &node, bagType &edge1, bagType &edge2, satformulaType &formula, nodeType nextNode);
+        void solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode);
 
         /**
          *
@@ -77,7 +77,7 @@ namespace gpusat {
          * @param numVars
          * @param node
          */
-        void cleanTree(treeType &table, cl_long size, cl_long numVars, bagType &node, cl_long nextSize);
+        TreeSolution arrayToTree(ArraySolution &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize);
 
         /**
          *
@@ -85,7 +85,7 @@ namespace gpusat {
          * @param from
          * @param numVars
          */
-        void combineTree(treeType &to, treeType &from, cl_long numVars);
+        void combineTree(TreeSolution &to, TreeSolution &from, int64_t numVars);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

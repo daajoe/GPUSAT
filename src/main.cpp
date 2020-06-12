@@ -25,12 +25,33 @@
 #include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 #include <cuda_runtime.h>
 
-std::string kernelStr =
-
-#include <kernel.h>
 
 using namespace gpusat;
 
+template<class... Ts> struct free_visitor : Ts... { using Ts::operator()...; };
+template<class... Ts> struct sum_visitor : Ts... { using Ts::operator()...; };
+// explicit deduction guide (not needed as of C++20)
+template<class... Ts> free_visitor(Ts...) -> free_visitor<Ts...>;
+template<class... Ts> sum_visitor(Ts...) -> sum_visitor<Ts...>;
+
+boost::multiprecision::cpp_bin_float_100 bag_sum(BagType &bag) {
+    boost::multiprecision::cpp_bin_float_100 sols = 0.0;
+    for (auto solution : bag.solution) {
+        std::visit(sum_visitor {
+            [&](TreeSolution sol) {
+                for (int64_t i = sol.minId; i < sol.maxId; i++) {
+                    sols = sols + getCount(i, sol.tree, bag.variables.size());
+                }
+            },
+            [&](ArraySolution sol) {
+                for (int64_t i = sol.minId; i < sol.maxId; i++) {
+                    sols = sols + sol.elements[i - sol.minId];
+                }
+            },
+        }, solution);
+    }
+    return sols;
+}
 
 int main(int argc, char *argv[]) {
     long long int time_total = getTime();
@@ -45,7 +66,7 @@ int main(int argc, char *argv[]) {
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
-    cl_long maxBag = -1;
+    int64_t maxBag = -1;
 
     //cmd options
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
@@ -173,10 +194,10 @@ int main(int argc, char *argv[]) {
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
 
-    cl_long memorySize = deviceProp.totalGlobalMem;
+    int64_t memorySize = deviceProp.totalGlobalMem;
     // FIXME: is 1 / 4 in opencl, calculations do not properly account for 
     // full mem beeing available
-    cl_long maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
+    int64_t maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
     if (combineWidth < 0) {
 	std::cerr << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
@@ -192,10 +213,10 @@ int main(int argc, char *argv[]) {
         std::cout.flush();
 
         Solver *sol;
-        bagType next;
+        BagType next;
         sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode); 
 
-        next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((cl_long) treeDecomp.bags[0].variables.size(), (cl_long) 12));
+        next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t) 12));
         long long int time_solving = getTime();
         (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
         time_solving = getTime() - time_solving;
@@ -209,22 +230,17 @@ int main(int argc, char *argv[]) {
         long long int time_model = getTime();
         boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
-            for (cl_long a = 0; a < treeDecomp.bags[0].bags; a++) {
-                for (cl_long i = treeDecomp.bags[0].solution[a].minId; i < treeDecomp.bags[0].solution[a].maxId; i++) {
-                    if (treeDecomp.bags[0].solution[a].elements != nullptr) {
-                        if (solutionType == TREE) {
-                            sols = sols + getCount(i, treeDecomp.bags[0].solution[a].elements, treeDecomp.bags[0].variables.size());
-                        } else if (solutionType == ARRAY) {
-                            sols = sols + *reinterpret_cast <cl_double *>(&treeDecomp.bags[0].solution[a].elements[i - treeDecomp.bags[0].solution[a].minId]);
-                        }
-                    }
-                }
-                if (treeDecomp.bags[0].solution[a].elements != NULL)
-                    free(treeDecomp.bags[0].solution[a].elements);
+            sols += bag_sum(treeDecomp.bags[0]);
+            for (auto solution : treeDecomp.bags[0].solution) {
+                std::visit(free_visitor {
+                    [](TreeSolution sol) { if (sol.tree != NULL) free(sol.tree); },
+                    [](ArraySolution sol) { if (sol.elements != NULL) free(sol.elements); },
+                }, solution);
             }
 
             if (!noExp) {
-                boost::multiprecision::cpp_bin_float_100 base = 2, exponent = treeDecomp.bags[0].correction;
+                boost::multiprecision::cpp_bin_float_100 base = 2;
+                boost::multiprecision::cpp_bin_float_100 exponent = treeDecomp.bags[0].correction;
                 sols = sols * pow(base, exponent);
             }
 
@@ -242,11 +258,11 @@ int main(int argc, char *argv[]) {
         time_model = getTime() - time_model;
         time_total = getTime() - time_total;
         std::cout.precision(6);
-        // std::cout << "\n    ,\"Time\":{";
-        // std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
-        // std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
-        // std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        // std::cout << "\n    }";
+        std::cout << "\n    ,\"Time\":{";
+        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+        std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
+        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+        std::cout << "\n    }";
         std::cout << "\n}\n";
         std::cout.flush();
         if (sols > 0) {

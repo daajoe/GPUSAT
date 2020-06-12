@@ -152,7 +152,7 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
  * @param exponent
   *     the max exponent of this run
  */
-__global__ void resize(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset, long max_id, SolveMode mode) {
+__global__ void array2tree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset, long max_id, SolveMode mode) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
@@ -179,12 +179,12 @@ __global__ void resize(long numVars, long *tree, double *solutions_old, long *tr
  * @param startId
   *     the start id of the current node
  */
-__global__ void combineTree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long id_offset, long max_id) {
+__global__ void combineTree(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, long id_offset, long max_id) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
     }
-    double val = getCount(id + startId, (long*)solutions_old, numVars);
+    double val = getCount(id + startId, solutions_old, numVars);
     if (val > 0) {
         setCount(id + startId, tree, numVars, treeSize, val);
     }
@@ -619,7 +619,7 @@ __global__ void helloWorldKernel(int val)
             threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
 }
 
-void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, size_t threads, long id_offset) {
+void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset) {
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
@@ -634,11 +634,11 @@ void combineTreeWrapper(long numVars, long *tree, double *solutions_old, long *t
     cudaDeviceSynchronize();
 }
 
-void resizeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode) {
+void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode) {
     
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
-    resize<<<blocksPerGrid, threadsPerBlock>>>(
+    array2tree<<<blocksPerGrid, threadsPerBlock>>>(
         numVars,
         tree,
         solutions_old,

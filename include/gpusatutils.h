@@ -8,6 +8,7 @@
 #include <queue>
 #include <chrono>
 #include <numeric>
+#include <types.h>
 
 namespace gpusat {
     /**
@@ -22,15 +23,19 @@ namespace gpusat {
      * @return
      *      the model count
      */
-    inline cl_double getCount(cl_long id, cl_long *tree, cl_long numVars) {
-        cl_long nextId = 0;
-        for (cl_long i = 0; i < numVars; i++) {
-            nextId = ((cl_uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
-            if (nextId == 0) {
+    inline double getCount(int64_t id, TreeNode *tree, int64_t numVars) {
+        TreeNode current = tree[0];
+        for (int64_t i = 0; i < numVars; i++) {
+            if ((id >> (numVars - i - 1)) & 1) {
+                current = tree[current.upperIdx];
+            } else { 
+                current = tree[current.lowerIdx];
+            }
+            if (current.empty == 0) {
                 return 0.0;
             }
         }
-        return *reinterpret_cast <cl_double *>(&tree[nextId]);
+        return current.content;
     }
 
     /**
