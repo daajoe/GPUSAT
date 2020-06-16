@@ -31,9 +31,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 using gpusat::SolveMode;
 using gpusat::GPUVars;
 
-extern void introduceForgetWrapper(long *solsF,  GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
+extern void introduceForgetWrapper(long *solsF,  GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, GPUVars varsIntroduce, long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
 
-    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
+    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  GPUVars variables, GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
 
     extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
@@ -467,7 +467,10 @@ namespace gpusat {
                     (int64_t*)buf_sol.device_mem,
                     buf_sol1->device_mem,
                     buf_sol2->device_mem,
-                    buf_solVars.device_mem,
+                    GPUVars {
+                        .count = (int64_t)node.variables.size(),
+                        .vars = buf_solVars.device_mem
+                    },
                     GPUVars {
                         .count = (int64_t)edge1.variables.size(),
                         .vars = buf_solVars1.device_mem
@@ -476,7 +479,6 @@ namespace gpusat {
                         .count = (int64_t)edge2.variables.size(),
                         .vars = buf_solVars2.device_mem
                     },
-                    node.variables.size(),
                     (b < edge1.solution.size()) ? minId(&edge1.solution[b]) : -1,
                     (b < edge1.solution.size()) ? maxId(&edge1.solution[b]) : -1,
                     (b < edge2.solution.size()) ? minId(&edge2.solution[b]) : -1,
@@ -694,8 +696,10 @@ namespace gpusat {
                     minId(&solution),
                     minId(&csol),
                     buf_solBag.device_mem,
-                    buf_varsI.size(),
-                    buf_varsI.device_mem,
+                    GPUVars {
+                        .count = (int64_t)buf_varsI.size(),
+                        .vars = buf_varsI.device_mem
+                    },
                     buf_clauses.device_mem,
                     buf_numVarsC.device_mem,
                     numClauses,

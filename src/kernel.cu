@@ -193,14 +193,12 @@ __global__ void combineTree(long numVars, long *tree, long *solutions_old, long 
 /**
  * Operation to solve a Introduce node in the decomposition.
  *
- * @param numV
- *      the number of variables in the current bag
+ * @param variables
+ *      the ids of the variables in the current bag
  * @param edge
  *      the number of models for each assignment of the next bag
  * @param edgeVariables
  *      variables in the next bag
- * @param variables
- *      the ids of the variables in the current bag
  * @param minId
  *      the start id of the last bag
  * @param maxId
@@ -212,12 +210,12 @@ __global__ void combineTree(long numVars, long *tree, long *solutions_old, long 
  * @return
  *      the model count
  */
-__device__ double solveIntroduce_(long numV, long *edge, GPUVars edgeVariables, long *variables, long minId, long maxId, double *weights, long id, SolveMode mode) {
+__device__ double solveIntroduce_(GPUVars variables, long *edge, GPUVars edgeVariables, long minId, long maxId, double *weights, long id, SolveMode mode) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
-    for (b = 0; b < edgeVariables.count && a < numV; b++) {
-        while ((variables[a] != edgeVariables.vars[b])) {
+    for (b = 0; b < edgeVariables.count && a < variables.count; b++) {
+        while ((variables.vars[a] != edgeVariables.vars[b])) {
             a++;
         }
 
@@ -227,11 +225,11 @@ __device__ double solveIntroduce_(long numV, long *edge, GPUVars edgeVariables, 
 
     //weighted model count
     if (weights != 0) {
-        for (b = 0, a = 0; a < numV; a++) {
-            if (edgeVariables.vars == 0 || (variables[a] != edgeVariables.vars[b])) {
-                weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
+        for (b = 0, a = 0; a < variables.count; a++) {
+            if (edgeVariables.vars == 0 || (variables.vars[a] != edgeVariables.vars[b])) {
+                weight *= weights[((id >> a) & 1) > 0 ? variables.vars[a] * 2 : variables.vars[a] * 2 + 1];
             }
-            if (edgeVariables.vars != 0 && (variables[a] == edgeVariables.vars[b]) && (b < (edgeVariables.count - 1))) {
+            if (edgeVariables.vars != 0 && (variables.vars[a] == edgeVariables.vars[b]) && (b < (edgeVariables.count - 1))) {
                 b++;
             }
         }
@@ -262,15 +260,13 @@ __device__ double solveIntroduce_(long numV, long *edge, GPUVars edgeVariables, 
  *      the number of clauses in the sat formula
  * @param id
  *      the id of the thread - used to get the variable assignment
- * @param numV
- *      the number of variables
  * @param variables
  *      a vector containing the ids of the variables
  * @return
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-__device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id, long numV, long *variables) {
+__device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id, GPUVars variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     // iterate through all clauses
@@ -280,10 +276,10 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
         for (a = 0; a < numVarsC[i] && !satC; a++) {
             satC = 1;
             //check current variables
-            for (b = 0; b < numV; b++) {
+            for (b = 0; b < variables.count; b++) {
                 // check if clause is satisfied
-                if ((clauses[varNum + a] == variables[b]) ||
-                    (clauses[varNum + a] == -variables[b])) {
+                if ((clauses[varNum + a] == variables.vars[b]) ||
+                    (clauses[varNum + a] == -variables.vars[b])) {
                     satC = 0;
                     if (clauses[varNum + a] < 0) {
                         //clause contains negative var and var is assigned negative
@@ -346,7 +342,7 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
   * @param exponent
   *     the max exponent of this run
   */
-__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset, long max_id, SolveMode mode) {
+__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  GPUVars variables, GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset, long max_id, SolveMode mode) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
@@ -356,16 +352,16 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
     double weight = 1;
     if (minId1 != -1) {
         // get solution count from first edge
-        tmp = solveIntroduce_(numV, edge1, edgeVariables1, variables, minId1, maxId1, weights, id, mode);
+        tmp = solveIntroduce_(variables, edge1, edgeVariables1, minId1, maxId1, weights, id, mode);
     }
     if (minId2 != -1) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(numV, edge2, edgeVariables2, variables, minId2, maxId2, weights, id, mode);
+        tmp_ = solveIntroduce_(variables, edge2, edgeVariables2, minId2, maxId2, weights, id, mode);
     }
     // weighted model count
     if (weights != 0) {
-        for (long a = 0; a < numV; a++) {
-            weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
+        for (long a = 0; a < variables.count; a++) {
+            weight *= weights[((id >> a) & 1) > 0 ? variables.vars[a] * 2 : variables.vars[a] * 2 + 1];
         }
     }
 
@@ -435,14 +431,12 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
  *      the number of variables for each clause
  * @param numclauses
  *      the number of clauses
- * @param numV
- *      the number of variables in the current bag
+ * @param variables
+ *      the ids of the variables in the current bag
  * @param edge
  *      the number of models for each assignment of the last bags
  * @param edgeVariables
  *      variables of the last bag
- * @param variables
- *      the ids of the variables in the current bag
  * @param minId
  *      the start id of the last bag
  * @param maxId
@@ -454,25 +448,25 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
  * @return
  *      the model count
  */
-__device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclauses, long numV,  long *edge, GPUVars edgeVariables,  long *variables, long minId, long maxId,  double *weights, long id, SolveMode mode) {
+__device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclauses, GPUVars variables, long *edge, GPUVars edgeVariables, long minId, long maxId,  double *weights, long id, SolveMode mode) {
     double tmp;
     if (edge != 0) {
         // get solutions count edge
-        tmp = solveIntroduce_(numV, edge, edgeVariables, variables, minId, maxId, weights, id, mode);
+        tmp = solveIntroduce_(variables, edge, edgeVariables, minId, maxId, weights, id, mode);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
 
         //weighted model count
         if (weights != 0) {
-            for (long i = 0; i < numV; i++) {
-                tmp *= weights[((id >> i) & 1) > 0 ? variables[i] * 2 : variables[i] * 2 + 1];
+            for (long i = 0; i < variables.count; i++) {
+                tmp *= weights[((id >> i) & 1) > 0 ? variables.vars[i] * 2 : variables.vars[i] * 2 + 1];
             }
         }
     }
     if (tmp > 0.0) {
         // check if assignment satisfies the given clauses
-        int sat = checkBag(clauses, numVarsC, numclauses, id, numV, variables);
+        int sat = checkBag(clauses, numVarsC, numclauses, id, variables);
         if (sat != 1) {
             return 0.0;
         } else {
@@ -504,8 +498,6 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
  *      start id of the chung from the current node
  * @param sols
   *     the number of assignments which lead to a solution
- * @param numVI
- *      number of variables after the introduce
  * @param varsI
  *      the variables after the introduce
  * @param clauses
@@ -521,17 +513,17 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
  * @param value
   *     correction value for the exponents
  */
-__global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *solsE, GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, long id_offset, long max_id, SolveMode mode) {
+__global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *solsE, GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, GPUVars varsIntroduce,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, long id_offset, long max_id, SolveMode mode) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
     }
-    if (numVI != varsForget.count) {
+    if (varsIntroduce.count != varsForget.count) {
         double tmp = 0;
         long templateId = 0;
         // generate templateId
-        for (long i = 0, a = 0; i < numVI && a < varsForget.count; i++) {
-            if (varsI[i] == varsForget.vars[a]) {
+        for (long i = 0, a = 0; i < varsIntroduce.count && a < varsForget.count; i++) {
+            if (varsIntroduce.vars[i] == varsForget.vars[a]) {
                 templateId = templateId | (((id >> a) & 1) << i);
                 a++;
             }
@@ -540,14 +532,14 @@ __global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *s
         // iterate through all corresponding edge solutions
         for (long i = 0; i < combinations; i++) {
             long b = 0, otherId = templateId;
-            for (long a = 0; a < numVI; a++) {
-                if (b >= varsForget.count || varsI[a] != varsForget.vars[b]) {
+            for (long a = 0; a < varsIntroduce.count; a++) {
+                if (b >= varsForget.count || varsIntroduce.vars[a] != varsForget.vars[b]) {
                     otherId = otherId | (((i >> (a - b)) & 1) << a);
                 } else {
                     b++;
                 }
             }
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, lastVars, varsI, minIdE, maxIdE, weights, otherId, mode);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, minIdE, maxIdE, weights, otherId, mode);
         }
         if (!(mode & ARRAY_TYPE)) {
             if (tmp > 0) {
@@ -573,7 +565,7 @@ __global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *s
         }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, lastVars, varsI, minIdE, maxIdE, weights, id, mode);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, minIdE, maxIdE, weights, id, mode);
         if (!(mode & ARRAY_TYPE)) {
             if (tmp > 0) {
                 double last = getCount(id, solsF, varsForget.count);
@@ -640,7 +632,7 @@ void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *tr
     cudaDeviceSynchronize();
 }
 
-void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode) {
+void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  GPUVars variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode) {
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
@@ -651,7 +643,6 @@ void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *varia
                     variables,
                     edgeVariables1,
                     edgeVariables2,
-                    numV,
                     minId1,
                     maxId1,
                     minId2,
@@ -682,8 +673,7 @@ void introduceForgetWrapper(
         long startIDF,
         long startIDE,
         long *sols,
-        long numVI,
-        long *varsI,
+        GPUVars varsIntroduce,
         long *clauses,
         long *numVarsC,
         long numclauses,
@@ -708,8 +698,7 @@ void introduceForgetWrapper(
                     startIDF,
                     startIDE,
                     sols,
-                    numVI,
-                    varsI,
+                    varsIntroduce,
                     clauses,
                     numVarsC,
                     numclauses,
