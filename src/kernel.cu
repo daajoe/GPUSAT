@@ -197,12 +197,10 @@ __global__ void combineTree(long numVars, long *tree, long *solutions_old, long 
  *      the number of variables in the current bag
  * @param edge
  *      the number of models for each assignment of the next bag
- * @param numVE
- *      the number of variables in the next bag
+ * @param edgeVariables
+ *      variables in the next bag
  * @param variables
  *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the next bag
  * @param minId
  *      the start id of the last bag
  * @param maxId
@@ -214,12 +212,12 @@ __global__ void combineTree(long numVars, long *tree, long *solutions_old, long 
  * @return
  *      the model count
  */
-__device__ double solveIntroduce_(long numV, long *edge, long numVE, long *variables, long *edgeVariables, long minId, long maxId, double *weights, long id, SolveMode mode) {
+__device__ double solveIntroduce_(long numV, long *edge, GPUVars edgeVariables, long *variables, long minId, long maxId, double *weights, long id, SolveMode mode) {
     long otherId = 0;
     long a = 0, b = 0;
     double weight = 1.0;
-    for (b = 0; b < numVE && a < numV; b++) {
-        while ((variables[a] != edgeVariables[b])) {
+    for (b = 0; b < edgeVariables.count && a < numV; b++) {
+        while ((variables[a] != edgeVariables.vars[b])) {
             a++;
         }
 
@@ -230,10 +228,10 @@ __device__ double solveIntroduce_(long numV, long *edge, long numVE, long *varia
     //weighted model count
     if (weights != 0) {
         for (b = 0, a = 0; a < numV; a++) {
-            if (edgeVariables == 0 || (variables[a] != edgeVariables[b])) {
+            if (edgeVariables.vars == 0 || (variables[a] != edgeVariables.vars[b])) {
                 weight *= weights[((id >> a) & 1) > 0 ? variables[a] * 2 : variables[a] * 2 + 1];
             }
-            if (edgeVariables != 0 && (variables[a] == edgeVariables[b]) && (b < (numVE - 1))) {
+            if (edgeVariables.vars != 0 && (variables[a] == edgeVariables.vars[b]) && (b < (edgeVariables.count - 1))) {
                 b++;
             }
         }
@@ -243,7 +241,7 @@ __device__ double solveIntroduce_(long numV, long *edge, long numVE, long *varia
         if (mode & ARRAY_TYPE) {
             return __longlong_as_double(edge[otherId - (minId)]) * weight;
         } else {
-            return getCount(otherId, edge, numVE) * weight;
+            return getCount(otherId, edge, edgeVariables.count) * weight;
         }
 
     } else if (edge == 0 && otherId >= (minId) && otherId < (maxId)) {
@@ -329,10 +327,6 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
  *      the variables in the bag of the second edge
  * @param numV
  *      the number of variables in the join bag
- * @param numVE1
- *      the number of variables in the first edge
- * @param numVE2
- *      the number of variables in the second edge
   * @param minId1
   *     the start id of the first edge
   * @param maxId1
@@ -352,7 +346,7 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id,
   * @param exponent
   *     the max exponent of this run
   */
-__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset, long max_id, SolveMode mode) {
+__global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, long id_offset, long max_id, SolveMode mode) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
@@ -362,11 +356,11 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
     double weight = 1;
     if (minId1 != -1) {
         // get solution count from first edge
-        tmp = solveIntroduce_(numV, edge1, numVE1, variables, edgeVariables1, minId1, maxId1, weights, id, mode);
+        tmp = solveIntroduce_(numV, edge1, edgeVariables1, variables, minId1, maxId1, weights, id, mode);
     }
     if (minId2 != -1) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(numV, edge2, numVE2, variables, edgeVariables2, minId2, maxId2, weights, id, mode);
+        tmp_ = solveIntroduce_(numV, edge2, edgeVariables2, variables, minId2, maxId2, weights, id, mode);
     }
     // weighted model count
     if (weights != 0) {
@@ -445,12 +439,10 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
  *      the number of variables in the current bag
  * @param edge
  *      the number of models for each assignment of the last bags
- * @param numVE
- *      the number of variables of the last bag
+ * @param edgeVariables
+ *      variables of the last bag
  * @param variables
  *      the ids of the variables in the current bag
- * @param edgeVariables
- *      the ids of the variables in the last bag
  * @param minId
  *      the start id of the last bag
  * @param maxId
@@ -462,11 +454,11 @@ __global__ void solveJoin( long *solutions,  long *edge1,  long *edge2,  long *v
  * @return
  *      the model count
  */
-__device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclauses, long numV,  long *edge, long numVE,  long *variables,  long *edgeVariables, long minId, long maxId,  double *weights, long id, SolveMode mode) {
+__device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclauses, long numV,  long *edge, GPUVars edgeVariables,  long *variables, long minId, long maxId,  double *weights, long id, SolveMode mode) {
     double tmp;
     if (edge != 0) {
         // get solutions count edge
-        tmp = solveIntroduce_(numV, edge, numVE, variables, edgeVariables, minId, maxId, weights, id, mode);
+        tmp = solveIntroduce_(numV, edge, edgeVariables, variables, minId, maxId, weights, id, mode);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
@@ -496,18 +488,14 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
  *
  * @param solsF
  *      the number of models for each assignment
- * @param varsF
+ * @param varsForget
  *      the variables after the forget operation
  * @param solsE
  *      the solutions from the last node
- * @param numVE
- *      number of variables in the last node
- * @param varsE
+ * @param lastVars
  *      the variables from the alst oepration
  * @param combinations
  *      the number of assignments for which we have to collect the model counts
- * @param numVF
- *      number of variables after the forget operation
  * @param minIdE
  *      start id of the chunk from the last node
  * @param maxIdE
@@ -533,17 +521,17 @@ __device__ double solveIntroduceF( long *clauses,  long *numVarsC, long numclaus
  * @param value
   *     correction value for the exponents
  */
-__global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, long id_offset, long max_id, SolveMode mode) {
+__global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *solsE, GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, long id_offset, long max_id, SolveMode mode) {
     long id = get_global_id() + id_offset;
     if (id >= max_id) {
         return;
     }
-    if (numVI != numVF) {
+    if (numVI != varsForget.count) {
         double tmp = 0;
         long templateId = 0;
         // generate templateId
-        for (long i = 0, a = 0; i < numVI && a < numVF; i++) {
-            if (varsI[i] == varsF[a]) {
+        for (long i = 0, a = 0; i < numVI && a < varsForget.count; i++) {
+            if (varsI[i] == varsForget.vars[a]) {
                 templateId = templateId | (((id >> a) & 1) << i);
                 a++;
             }
@@ -553,22 +541,22 @@ __global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, l
         for (long i = 0; i < combinations; i++) {
             long b = 0, otherId = templateId;
             for (long a = 0; a < numVI; a++) {
-                if (b >= numVF || varsI[a] != varsF[b]) {
+                if (b >= varsForget.count || varsI[a] != varsForget.vars[b]) {
                     otherId = otherId | (((i >> (a - b)) & 1) << a);
                 } else {
                     b++;
                 }
             }
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, otherId, mode);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, lastVars, varsI, minIdE, maxIdE, weights, otherId, mode);
         }
         if (!(mode & ARRAY_TYPE)) {
             if (tmp > 0) {
-                double last = getCount(id, solsF, numVF);
+                double last = getCount(id, solsF, varsForget.count);
                 if (!(mode & NO_EXP))  {
-                    setCount(id, solsF, numVF, sols, (tmp / value + last));
+                    setCount(id, solsF, varsForget.count, sols, (tmp / value + last));
                     atomicMax(exponent, ilogb((tmp / value + last)));
                 } else {
-                    setCount(id, solsF, numVF, sols, (tmp + last));
+                    setCount(id, solsF, varsForget.count, sols, (tmp + last));
                 }
             }
         } else {
@@ -585,15 +573,15 @@ __global__ void solveIntroduceForget( long *solsF,  long *varsF,  long *solsE, l
         }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, numVE, varsI, varsE, minIdE, maxIdE, weights, id, mode);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, numVI, solsE, lastVars, varsI, minIdE, maxIdE, weights, id, mode);
         if (!(mode & ARRAY_TYPE)) {
             if (tmp > 0) {
-                double last = getCount(id, solsF, numVF);
+                double last = getCount(id, solsF, varsForget.count);
                 if (!(mode & NO_EXP))  {
-                    setCount(id, solsF, numVF, sols, (tmp / value + last));
+                    setCount(id, solsF, varsForget.count, sols, (tmp / value + last));
                     atomicMax(exponent, ilogb((tmp / value + last)));
                 } else {
-                    setCount(id, solsF, numVF, sols, (tmp + last));
+                    setCount(id, solsF, varsForget.count, sols, (tmp + last));
                 }
             }
         } else {
@@ -652,7 +640,7 @@ void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *tr
     cudaDeviceSynchronize();
 }
 
-void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode) {
+void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode) {
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
@@ -664,8 +652,6 @@ void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *varia
                     edgeVariables1,
                     edgeVariables2,
                     numV,
-                    numVE1,
-                    numVE2,
                     minId1,
                     maxId1,
                     minId2,
@@ -685,18 +671,38 @@ void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *varia
     cudaDeviceSynchronize();
 }
 
-void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode) {
+void introduceForgetWrapper(
+        long *solsF,
+        GPUVars varsForget,
+        long *solsE,
+        GPUVars lastVars,
+        long combinations,
+        long minIdE,
+        long maxIdE,
+        long startIDF,
+        long startIDE,
+        long *sols,
+        long numVI,
+        long *varsI,
+        long *clauses,
+        long *numVarsC,
+        long numclauses,
+        double *weights,
+        long *exponent,
+        double value,
+        size_t threads,
+        long id_offset,
+        SolveMode mode
+    ) {
 
     int threadsPerBlock = 256;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
                     solsF,
-                    varsF,
+                    varsForget,
                     solsE,
-                    numVE,
-                    varsE,
+                    lastVars,
                     combinations,
-                    numVF,
                     minIdE,
                     maxIdE,
                     startIDF,

@@ -15,13 +15,13 @@
 
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
-   if (code != cudaSuccess) 
+   if (code != cudaSuccess)
    {
       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
       if (abort) raise(SIGABRT);
    }
    code = cudaGetLastError();
-   if (code != cudaSuccess) 
+   if (code != cudaSuccess)
    {
       fprintf(stderr,"GPUassert last error: %s %s %d\n", cudaGetErrorString(code), file, line);
       if (abort) raise(SIGABRT);
@@ -29,17 +29,18 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 }
 
 using gpusat::SolveMode;
+using gpusat::GPUVars;
 
-extern void introduceForgetWrapper(long *solsF,  long *varsF,  long *solsE, long numVE,  long *varsE, long combinations, long numVF, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
+extern void introduceForgetWrapper(long *solsF,  GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, long numVI,  long *varsI,  long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
 
-    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  long *edgeVariables1,  long *edgeVariables2, long numV, long numVE1, long numVE2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
+    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  long *variables,  GPUVars edgeVariables1,  GPUVars edgeVariables2, long numV, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
 
     extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
     extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
 
 
-namespace gpusat {  
+namespace gpusat {
 
     size_t hashSubtree(TreeNode* tree, TreeNode current, int variables) {
         if (current.empty == 0) return 0;
@@ -100,7 +101,7 @@ namespace gpusat {
         }
         for (BagType *edge : input->edges) {
             h = h ^ (BagTypeHash(edge) << 1);
-        }  
+        }
         for (auto sol : input->solution) {
             h = h ^ (hashSolution(&sol, input->variables.size()) << 1);
         }
@@ -127,7 +128,7 @@ namespace gpusat {
             /// Copy a host array of given length to the device.
             CudaBuffer(T* from, size_t length);
             /// Copy a vector to the device.
-            /// If the vector is empty, the memory pointer is NULL. 
+            /// If the vector is empty, the memory pointer is NULL.
             CudaBuffer(std::vector<T> &vec);
             /// Copy on-device array to `to`
             void read(T* to);
@@ -196,7 +197,7 @@ namespace gpusat {
         this->device_mem = NULL;
     }
 
-    
+
 
     void Solver::solveProblem(treedecType &decomp, satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode) {
 
@@ -305,7 +306,7 @@ namespace gpusat {
                     range,
                     id1,
                     solve_mode
-                ); 
+                );
             }
             // actually the tree size
             buf_num_sol.read(&(t.numSolutions));
@@ -361,7 +362,7 @@ namespace gpusat {
         if (ds == TREE) {
             TreeSolution solution;
             solution.minId = minId;
-            solution.numSolutions = 0; 
+            solution.numSolutions = 0;
             solution.maxId = maxId;
             solution.size = size;
             solution.tree = new TreeNode[solution.size];
@@ -372,7 +373,7 @@ namespace gpusat {
         } else if (ds == ARRAY) {
             ArraySolution solution;
             solution.minId = minId;
-            solution.numSolutions = 0; 
+            solution.numSolutions = 0;
             solution.maxId = maxId;
             solution.size = size;
             solution.elements = new double[solution.size];
@@ -380,25 +381,25 @@ namespace gpusat {
                 ((int64_t*)solution.elements)[i] = 0;
             }
             return solution;
-        } 
+        }
         std::cout << "unknown data structure: " << ds << std::endl;
         exit(1);
-    }    
+    }
 
     void Solver::solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode) {
         isSat = 0;
         this->numJoin++;
-         
+
         CudaBuffer<cl_long> buf_solVars(node.variables);
         CudaBuffer<cl_long> buf_solVars1(edge1.variables);
         CudaBuffer<cl_long> buf_solVars2(edge2.variables);
 
-        
+
         std::unique_ptr<CudaBuffer<cl_double>> buf_weights( std::make_unique<CudaBuffer<cl_double>>() );
         if (formula.variableWeights != nullptr) {
             buf_weights = std::make_unique<CudaBuffer<cl_double>>(formula.variableWeights, formula.numWeights);
         }
-        
+
         node.exponent = CL_LONG_MIN;
         CudaBuffer<cl_long> buf_exponent(&(node.exponent), 1);
 
@@ -430,7 +431,7 @@ namespace gpusat {
             solution.minId = a * bagSizeNode;
             solution.maxId = std::min(a * bagSizeNode + bagSizeNode,
                  1l << (node.variables.size()));
-            solution.numSolutions = 0; 
+            solution.numSolutions = 0;
             solution.size = (solution.maxId - solution.minId) + node.variables.size();
             solution.elements = new double[solution.size];
             for (size_t i=0; i < solution.size; i++) {
@@ -441,7 +442,7 @@ namespace gpusat {
             CudaBuffer<int64_t> buf_solBag(&(solution.numSolutions), 1);
 
             for (cl_long b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
-                
+
                 std::unique_ptr<CudaBuffer<int64_t>> buf_sol1( std::make_unique<CudaBuffer<int64_t>>() );
                 if (b < edge1.solution.size() && dataPtr(&edge1.solution[b]) != NULL) {
                     buf_sol1 = std::make_unique<CudaBuffer<int64_t>>(
@@ -461,17 +462,21 @@ namespace gpusat {
                 long id_offset = solution.minId;
                 size_t threads = static_cast<size_t>(solution.maxId - solution.minId);
                 std::cerr << "thread offset: " << id_offset << " threads " << threads << std::endl;
-                
+
                 solveJoinWrapper(
                     (int64_t*)buf_sol.device_mem,
                     buf_sol1->device_mem,
                     buf_sol2->device_mem,
                     buf_solVars.device_mem,
-                    buf_solVars1.device_mem,
-                    buf_solVars2.device_mem,
+                    GPUVars {
+                        .count = (int64_t)edge1.variables.size(),
+                        .vars = buf_solVars1.device_mem
+                    },
+                    GPUVars {
+                        .count = (int64_t)edge2.variables.size(),
+                        .vars = buf_solVars2.device_mem
+                    },
                     node.variables.size(),
-                    edge1.variables.size(),
-                    edge2.variables.size(),
                     (b < edge1.solution.size()) ? minId(&edge1.solution[b]) : -1,
                     (b < edge1.solution.size()) ? maxId(&edge1.solution[b]) : -1,
                     (b < edge2.solution.size()) ? minId(&edge2.solution[b]) : -1,
@@ -507,14 +512,14 @@ namespace gpusat {
                     if (!node.solution.empty()) {
                         last = &std::get<TreeSolution>(node.solution.back());
                     }
-                    
+
                     std::cout << "a is " << node.solution.size() << std::endl;
                     // previous bag is not empty, combine if there is still space.
                     if (last != NULL && last->tree != NULL && (solution.numSolutions + last->numSolutions + 2) < solution.size) {
                         std::cerr << "first branch" << std::endl;
                         auto tree = arrayToTree(
-                            solution, 
-                            (bagSizeNode) * 2, 
+                            solution,
+                            (bagSizeNode) * 2,
                             node.variables.size(),
                             node,
                             last->numSolutions + 1
@@ -578,7 +583,7 @@ namespace gpusat {
     }
 
     void Solver::solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
-    
+
         isSat = 0;
         std::vector<cl_long> fVars;
         std::set_intersection(node.variables.begin(), node.variables.end(), pnode.variables.begin(), pnode.variables.end(), std::back_inserter(fVars));
@@ -604,7 +609,7 @@ namespace gpusat {
                 }
             }
         }
-        
+
         node.exponent = CL_LONG_MIN;
 
         CudaBuffer<cl_long> buf_varsE(eVars);
@@ -634,7 +639,7 @@ namespace gpusat {
         }
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
-        
+
         node.solution.clear();
 
         for (cl_long a = 0, run = 0; a < maxSize; a++, run++) {
@@ -648,11 +653,11 @@ namespace gpusat {
                 sol_maxId,
                 (sol_maxId - sol_minId) * 2 + node.variables.size()
             );
-            
+
             CudaBuffer<cl_long> buf_solsF(dataPtr(&solution), dataStructureSize(&solution));
             CudaBuffer<cl_long> buf_varsF(fVars);
             CudaBuffer<cl_long> buf_solBag(numSolutionsPtr(&solution), 1);
- 
+
             for (auto csol : cnode.solution) {
                 if (dataPtr(&csol) == NULL) {
                     continue;
@@ -663,23 +668,27 @@ namespace gpusat {
                     buf_solsE = std::make_unique<CudaBuffer<cl_long>>(dataPtr(&csol), dataStructureSize(&csol));
                 }
 
-                size_t threads = static_cast<size_t>(maxId(&solution) - minId(&solution)); 
+                size_t threads = static_cast<size_t>(maxId(&solution) - minId(&solution));
                 long id_offset = minId(&solution);
 
                 int64_t combinations = (int64_t) pow(2, iVars.size() - fVars.size());
-                
+
                 size_t free, total;
                 gpuErrchk(cudaMemGetInfo(&free, &total));
                 std::cerr << "mem usage:" << free << " free, " << total <<" total." << std::endl;
-                // FIXME: offset onto global id 
+                // FIXME: offset onto global id
                 introduceForgetWrapper(
                     buf_solsF.device_mem,
-                    buf_varsF.device_mem,
+                    GPUVars {
+                        .count = (int64_t)fVars.size(),
+                        .vars = buf_varsF.device_mem
+                    },
                     buf_solsE->device_mem,
-                    buf_varsE.size(),
-                    buf_varsE.device_mem,
+                    GPUVars {
+                        .count = (int64_t)eVars.size(),
+                        .vars = buf_varsE.device_mem
+                    },
                     combinations,
-                    fVars.size(),
                     minId(&csol),
                     maxId(&csol),
                     minId(&solution),
@@ -691,13 +700,13 @@ namespace gpusat {
                     buf_numVarsC.device_mem,
                     numClauses,
                     buf_weights.device_mem,
-                    buf_exponent.device_mem, 
+                    buf_exponent.device_mem,
                     pow(2, cnode.exponent),
                     threads,
                     id_offset,
                     solve_mode
                 );
-            } 
+            }
             buf_solBag.read(numSolutionsPtr(&solution));
 
             std::cerr << "num solutions: " << numSolutions(&solution) << std::endl;
@@ -711,7 +720,7 @@ namespace gpusat {
             } else {
                 this->isSat = 1;
 
-                if (solutionType == TREE) { 
+                if (solutionType == TREE) {
                     auto sol = std::get<TreeSolution>(solution);
                     TreeSolution* last = NULL;
                     if (!node.solution.empty()) {
@@ -722,7 +731,7 @@ namespace gpusat {
                         sol.numSolutions--;
                     }
                     free(sol.tree);
-                    if (last != NULL && last->tree != NULL 
+                    if (last != NULL && last->tree != NULL
                         && (sol.numSolutions + last->numSolutions + 2) < sol.size) {
 
                         int64_t nodeCount = sol.numSolutions + last->numSolutions + 2;
@@ -737,7 +746,7 @@ namespace gpusat {
                         int64_t nodeCount = sol.numSolutions + 1;
                         sol.tree = new TreeNode[nodeCount];
                         sol.size = sol.numSolutions + 1;
-                        
+
                         cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
 
                         // replace previous bag if needed
@@ -745,7 +754,7 @@ namespace gpusat {
                             sol.minId = last->minId;
                             node.solution.pop_back();
                             node.solution.push_back(sol);
-                        } else {    
+                        } else {
                             node.solution.push_back(sol);
                         }
                     }

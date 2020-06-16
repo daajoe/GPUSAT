@@ -24,7 +24,7 @@ namespace gpusat {
     };
 
     union TreeNode {
-        int64_t empty = 0; 
+        int64_t empty = 0;
         struct {
             uint32_t lowerIdx;
             uint32_t upperIdx;
@@ -39,8 +39,16 @@ namespace gpusat {
         int64_t minId = 0;
         int64_t maxId = 0;
     };
-    
+
     static_assert(sizeof(TreeNode) == sizeof(int64_t));
+
+    struct GPUVars {
+        /// Number of variables.
+        int64_t count;
+        /// Pointer to GPU memory containing the variable buffer.
+        int64_t* vars;
+    };
+
 
     inline int64_t minId(std::variant<TreeSolution, ArraySolution>* solution) {
         return std::visit([](auto sol) -> int64_t { return sol.minId; }, *solution);
