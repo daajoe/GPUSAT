@@ -554,7 +554,8 @@ __global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *s
         } else {
             if (tmp > 0) {
                 double last=__longlong_as_double(solsF[id - (startIDF)]);
-                *sols += 1;
+                atomicAdd(sols, 1);
+                //*sols += 1;
                 if (!(mode & NO_EXP))  {
                     solsF[id - (startIDF)] = __double_as_longlong(tmp / value + last);
                     atomicMax(exponent, ilogb(tmp / value + last));
@@ -579,7 +580,8 @@ __global__ void solveIntroduceForget( long *solsF,  GPUVars varsForget,  long *s
         } else {
             if (tmp > 0) {
                 double last=__longlong_as_double(solsF[id - (startIDF)]);
-                *sols += 1;
+                atomicAdd(sols, 1);
+                //*sols += 1;
                 if (!(mode & NO_EXP))  {
                     solsF[id - (startIDF)] = __double_as_longlong(tmp / value + last);
                     atomicMax(exponent, ilogb(tmp / value + last));

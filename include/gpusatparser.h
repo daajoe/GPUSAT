@@ -1,7 +1,7 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
 
-#define GPU_HOST_ATTR 
+#define GPU_HOST_ATTR
 
 #include <queue>
 #include <types.h>
@@ -124,6 +124,8 @@ namespace gpusat {
          *      a line from the decomposition
          */
         void parseBagLine(treedecType &ret, std::string item);
+
+        BagType constructTree(long nodeIndex, std::vector<std::vector<long>>& edges, std::vector<BagType>& bags);
     };
 }
 #endif //GPUSAT_PARSER_H

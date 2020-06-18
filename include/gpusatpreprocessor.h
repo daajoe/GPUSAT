@@ -16,7 +16,7 @@ namespace gpusat {
          * @param combineWidth
          *      max width to combine bags
          */
-        static void preprocessDecomp(BagType *decomp, cl_long combineWidth);
+        static void preprocessDecomp(BagType& decomp, cl_long combineWidth);
 
         /**
          * removes facts from the sat formula
@@ -33,24 +33,24 @@ namespace gpusat {
     private:
 
         /**
-         * used to relable a decomposition if a node is removed
+         * used to relabel a decomposition if a node is removed
          *
          * @param decomp
          *      the tree decomposition
          * @param id
          *      the id of the removed node
          */
-        static void relableDecomp(BagType *decomp, cl_long id);
+        static void relabelDecomp(BagType& decomp, cl_long id);
 
         /**
-         * used to relable a formula if a variable is removed
+         * used to relabel a formula if a variable is removed
          *
          * @param formula
          *      the formula
          * @param id
          *      the id of the removed variable
          */
-        static void relableFormula(satformulaType &formula, cl_long id);
+        static void relabelFormula(satformulaType &formula, cl_long id);
     };
 }
 #endif //GPUSAT_GPUSATPREPROCESSOR_H

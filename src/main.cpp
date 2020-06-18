@@ -34,16 +34,16 @@ template<class... Ts> struct sum_visitor : Ts... { using Ts::operator()...; };
 template<class... Ts> free_visitor(Ts...) -> free_visitor<Ts...>;
 template<class... Ts> sum_visitor(Ts...) -> sum_visitor<Ts...>;
 
-boost::multiprecision::cpp_bin_float_100 bag_sum(BagType &bag) {
+boost::multiprecision::cpp_bin_float_100 bag_sum(BagType& bag) {
     boost::multiprecision::cpp_bin_float_100 sols = 0.0;
-    for (auto solution : bag.solution) {
+    for (auto& solution : bag.solution) {
         std::visit(sum_visitor {
-            [&](TreeSolution sol) {
+            [&](TreeSolution& sol) {
                 for (int64_t i = sol.minId; i < sol.maxId; i++) {
                     sols = sols + getCount(i, sol.tree, bag.variables.size());
                 }
             },
-            [&](ArraySolution sol) {
+            [&](ArraySolution& sol) {
                 for (int64_t i = sol.minId; i < sol.maxId; i++) {
                     sols = sols + sol.elements[i - sol.minId];
                 }
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
     cudaGetDeviceProperties(&deviceProp, 0);
 
     int64_t memorySize = deviceProp.totalGlobalMem;
-    // FIXME: is 1 / 4 in opencl, calculations do not properly account for 
+    // FIXME: is 1 / 4 in opencl, calculations do not properly account for
     // full mem beeing available
     int64_t maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
@@ -208,17 +208,20 @@ int main(int argc, char *argv[]) {
     try {
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
-        Preprocessor::preprocessDecomp(&treeDecomp.bags[0], combineWidth);
+        //Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
 
         std::cout.flush();
 
         Solver *sol;
-        BagType next;
-        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode); 
+        auto next = BagType();
+        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode);
 
-        next.variables.assign(treeDecomp.bags[0].variables.begin(), treeDecomp.bags[0].variables.begin() + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t) 12));
+        next.variables.assign(
+                treeDecomp.bags[0].variables.begin(),
+                treeDecomp.bags[0].variables.begin()
+                    + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t)12));
         long long int time_solving = getTime();
-        (*sol).solveProblem(treeDecomp, satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
+        (*sol).solveProblem(satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
         time_solving = getTime() - time_solving;
 
         std::cout << "\n{\n";
@@ -231,10 +234,10 @@ int main(int argc, char *argv[]) {
         boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if ((*sol).isSat > 0) {
             sols += bag_sum(treeDecomp.bags[0]);
-            for (auto solution : treeDecomp.bags[0].solution) {
+            for (auto& solution : treeDecomp.bags[0].solution) {
                 std::visit(free_visitor {
-                    [](TreeSolution sol) { if (sol.tree != NULL) free(sol.tree); },
-                    [](ArraySolution sol) { if (sol.elements != NULL) free(sol.elements); },
+                    [](TreeSolution& sol) { if (sol.tree != NULL) free(sol.tree); },
+                    [](ArraySolution& sol) { if (sol.elements != NULL) free(sol.elements); },
                 }, solution);
             }
 

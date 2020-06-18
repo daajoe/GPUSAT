@@ -7,29 +7,49 @@
 #include <gpusatpreprocessor.h>
 
 namespace gpusat {
-    void Preprocessor::preprocessDecomp(BagType *decomp, cl_long combineWidth) {
+    void Preprocessor::preprocessDecomp(BagType& decomp, cl_long combineWidth) {
 
         bool changed = true;
         // try to merge child nodes
         while (changed) {
             changed = false;
-            for (long a = 0; a < decomp->edges.size() && !changed; a++) {
-                for (long b = 0; b < decomp->edges.size() && !changed; b++) {
-                    if (a != b && ((decomp->edges[a]->variables.size() < combineWidth && decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 || decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
-                        std::vector<cl_long> v;
-                        std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(), back_inserter(v));
-                        if (v.size() < combineWidth || decomp->edges[a]->variables.size() == 0 ||
-                            decomp->edges[b]->variables.size() == 0) {
-                            changed = true;
-                            cl_long cid = decomp->edges[b]->id;
-                            decomp->edges[a]->variables.assign(v.begin(), v.end());
+            for (long a = 0; a < decomp.edges.size() && !changed; a++) {
+                for (long b = 0; b < decomp.edges.size() && !changed; b++) {
+                    auto& edge_a = decomp.edges[a];
+                    auto& edge_b = decomp.edges[b];
+                    if (a != b &&
+                            ((edge_a.variables.size() < combineWidth
+                                && edge_b.variables.size() < combineWidth)
+                             || edge_a.variables.size() == 0
+                             || edge_b.variables.size() == 0
+                             ) && decomp.edges.size() > 1) {
 
-                            std::vector<BagType *> v_;
-                            std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(), decomp->edges[b]->edges.end(), back_inserter(v_), compTreedType);
-                            decomp->edges[a]->edges.assign(v_.begin(), v_.end());
-                            if (b < decomp->edges.size()) {
-                                decomp->edges.erase(decomp->edges.begin() + b);
-                            }
+                        std::vector<cl_long> v;
+                        std::set_union(
+                                edge_a.variables.begin(), edge_a.variables.end(),
+                                edge_b.variables.begin(), edge_b.variables.end(),
+                                back_inserter(v)
+                        );
+                        if (v.size() < combineWidth || edge_a.variables.size() == 0 ||
+                            edge_b.variables.size() == 0) {
+                            changed = true;
+                            cl_long cid = edge_b.id;
+                            edge_a.variables.assign(v.begin(), v.end());
+
+                            std::vector<BagType> v_;
+                            std::set_union(
+                                    std::make_move_iterator(edge_a.edges.begin()),
+                                    std::make_move_iterator(edge_a.edges.end()),
+                                    std::make_move_iterator(edge_b.edges.begin()),
+                                    std::make_move_iterator(edge_b.edges.end()),
+                                    std::back_inserter(v_), compTreedType);
+                            // FIXME: check
+                            edge_a.edges.resize(0);
+                            std::move(v_.begin(), v_.end(), edge_a.edges.begin());
+                            //if (b < decomp.edges.size()) {
+                            // delete edge b
+                            decomp.edges.erase(decomp.edges.begin() + b);
+                            //}
                         }
                     }
                 }
@@ -38,27 +58,37 @@ namespace gpusat {
 
         changed = true;
         // try to merge with child nodes
-        if (decomp->variables.size() < combineWidth || decomp->variables.size() == 0) {
+        if (decomp.variables.size() < combineWidth || decomp.variables.size() == 0) {
             while (changed) {
                 changed = false;
-                for (long i = 0; i < decomp->edges.size(); i++) {
+                for (long i = 0; i < decomp.edges.size(); i++) {
                     std::vector<cl_long> v;
-                    std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), back_inserter(v));
-                    if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
+                    auto& edge_i = decomp.edges[i];
+                    std::set_union(
+                            decomp.variables.begin(), decomp.variables.end(),
+                            edge_i.variables.begin(), edge_i.variables.end(),
+                            back_inserter(v)
+                    );
+                    if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
                         changed = true;
-                        cl_long cid = decomp->edges[i]->id;
-                        decomp->variables.assign(v.begin(), v.end());
+                        cl_long cid = edge_i.id;
+                        decomp.variables.assign(v.begin(), v.end());
 
-                        std::vector<BagType *> v_;
-                        std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), back_inserter(v_), compTreedType);
-                        decomp->edges.resize(0);
+                        std::vector<BagType> v_;
+                        std::set_union(
+                                std::make_move_iterator(decomp.edges.begin()),
+                                std::make_move_iterator(decomp.edges.end()),
+                                std::make_move_iterator(edge_i.edges.begin()),
+                                std::make_move_iterator(edge_i.edges.end()),
+                                std::back_inserter(v_), compTreedType);
+                        decomp.edges.resize(0);
                         for (long asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
-                            BagType *&sdggg = v_[asdf];
-                            if (v_[asdf]->id == cid) {
+                            if (v_[asdf].id == cid) {
                                 x++;
                             }
                             if (x < v_.size()) {
-                                decomp->edges.push_back(v_[x]);
+                                /// elements moved out of v, do not use again!
+                                decomp.edges.push_back(std::move(v_[x]));
                             }
                         }
                     }
@@ -67,32 +97,37 @@ namespace gpusat {
         }
 
         // process child nodes
-        for (long i = 0; i < decomp->edges.size(); i++) {
-            preprocessDecomp((decomp->edges)[i], combineWidth);
+        for (long i = 0; i < decomp.edges.size(); i++) {
+            preprocessDecomp((decomp.edges)[i], combineWidth);
         }
-        //std::sort(decomp->variables.begin(), decomp->variables.end());
+        //std::sort(decomp.variables.begin(), decomp.variables.end());
 
-        for (long i = 0; i < decomp->edges.size(); i++) {
+        for (long i = 0; i < decomp.edges.size(); i++) {
             std::vector<cl_long> fVars;
-            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), std::back_inserter(fVars));
-            unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
+            auto& edge_i = decomp.edges[i];
+            std::set_intersection(
+                    decomp.variables.begin(), decomp.variables.end(),
+                    edge_i.variables.begin(), edge_i.variables.end(),
+                    std::back_inserter(fVars));
+            unsigned long long int numForgetVars = (edge_i.variables.size() - fVars.size());
             if (numForgetVars > 8) {
-                BagType *newEdge = new BagType;
-                if (newEdge == NULL || errno == ENOMEM) {
-                    std::cerr << "\nOut of Memory\n";
-                    exit(0);
-                }
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
+                auto newEdge = BagType();
+                newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.end());
                 fVars.resize(0);
-                std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(), std::back_inserter(fVars));
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
-                newEdge->edges.push_back(decomp->edges[i]);
-                decomp->edges[i] = newEdge;
-                std::sort(newEdge->variables.begin(), newEdge->variables.end());
+                std::set_difference(
+                        edge_i.variables.begin(), edge_i.variables.end(),
+                        decomp.variables.begin(), decomp.variables.end(),
+                        std::back_inserter(fVars));
+                newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
+                // move existing node to be child of newEdge,
+                // wich becomes decomp.edges[i]
+                newEdge.edges.push_back(std::move(decomp.edges[i]));
+                decomp.edges[i] = std::move(newEdge);
+                std::sort(newEdge.variables.begin(), newEdge.variables.end());
             }
         }
 
-        if (decomp->variables.size() > 61) {
+        if (decomp.variables.size() > 61) {
             // can't solve problems with width > 60
             std::cout << "\nERROR: width > 60";
             exit(0);
@@ -134,7 +169,7 @@ namespace gpusat {
                     }
                 }
             }
-            relableDecomp(&decomp.bags[0], std::abs(fact));
+            relabelDecomp(decomp.bags[0], std::abs(fact));
             decomp.numVars--;
             if (formula.variableWeights != nullptr) {
                 //make product of removed variable weights
@@ -149,27 +184,27 @@ namespace gpusat {
                     formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
                 }
             }
-            relableFormula(formula, std::abs(fact));
+            relabelFormula(formula, std::abs(fact));
             formula.numVars--;
         }
     }
 
 
-    void Preprocessor::relableDecomp(BagType *decomp, cl_long id) {
-        for (long i = 0; i < decomp->variables.size(); i++) {
-            if (decomp->variables[i] > id) {
-                decomp->variables[i]--;
-            } else if (decomp->variables[i] == id) {
-                decomp->variables.erase(decomp->variables.begin() + i);
+    void Preprocessor::relabelDecomp(BagType& decomp, cl_long id) {
+        for (long i = 0; i < decomp.variables.size(); i++) {
+            if (decomp.variables[i] > id) {
+                decomp.variables[i]--;
+            } else if (decomp.variables[i] == id) {
+                decomp.variables.erase(decomp.variables.begin() + i);
                 i--;
             }
         }
-        for (long j = 0; j < decomp->edges.size(); ++j) {
-            relableDecomp(decomp->edges[j], id);
+        for (long j = 0; j < decomp.edges.size(); ++j) {
+            relabelDecomp(decomp.edges[j], id);
         }
     }
 
-    void Preprocessor::relableFormula(satformulaType &formula, cl_long id) {
+    void Preprocessor::relabelFormula(satformulaType &formula, cl_long id) {
         for (long i = 0; i < formula.clauses.size(); i++) {
             for (long j = 0; j < formula.clauses[i].size(); ++j) {
                 if (std::abs(formula.clauses[i][j]) > id) {

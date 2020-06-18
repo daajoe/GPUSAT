@@ -9,6 +9,7 @@
 #include <list>
 #include <vector>
 #include <variant>
+#include <memory>
 #include <set>
 #include <stdint.h>
 
@@ -21,6 +22,15 @@ namespace gpusat {
         size_t size = 0;
         int64_t minId = 0;
         int64_t maxId = 0;
+
+        ArraySolution() = default;
+        ArraySolution(const ArraySolution&) = delete;
+        ArraySolution& operator=(ArraySolution& other) = delete;
+
+        // move constructor to ovoid copying solutions
+        ArraySolution(ArraySolution&& other) = default;
+        // move assignment
+        ArraySolution& operator=(ArraySolution&& other) = default;
     };
 
     union TreeNode {
@@ -38,6 +48,15 @@ namespace gpusat {
         size_t size = 0;
         int64_t minId = 0;
         int64_t maxId = 0;
+
+        TreeSolution() = default;
+        TreeSolution(const TreeSolution&) = delete;
+        TreeSolution& operator=(TreeSolution& other) = delete;
+
+        // move constructor to ovoid copying solutions
+        TreeSolution(TreeSolution&& other) = default;
+        // move assignment
+        TreeSolution& operator=(TreeSolution&& other) = default;
     };
 
     static_assert(sizeof(TreeNode) == sizeof(int64_t));
@@ -50,47 +69,47 @@ namespace gpusat {
     };
 
 
-    inline int64_t minId(std::variant<TreeSolution, ArraySolution>* solution) {
-        return std::visit([](auto sol) -> int64_t { return sol.minId; }, *solution);
+    inline int64_t minId(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return std::visit([](auto& sol) -> int64_t { return sol.minId; }, solution);
     }
 
-    inline int64_t maxId(std::variant<TreeSolution, ArraySolution>* solution) {
-        return std::visit([](auto sol) -> int64_t { return sol.maxId; }, *solution);
+    inline int64_t maxId(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return std::visit([](auto& sol) -> int64_t { return sol.maxId; }, solution);
     }
 
-    inline size_t dataStructureSize(std::variant<TreeSolution, ArraySolution>* solution) {
-        return std::visit([](auto sol) -> int64_t { return sol.size; }, *solution);
+    inline size_t dataStructureSize(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return std::visit([](auto& sol) -> int64_t { return sol.size; }, solution);
     }
 
-    inline int64_t numSolutions(std::variant<TreeSolution, ArraySolution>* solution) {
-        return std::visit([](auto sol) -> int64_t { return sol.numSolutions; }, *solution);
+    inline int64_t numSolutions(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return std::visit([](auto& sol) -> int64_t { return sol.numSolutions; }, solution);
     }
 
-    inline int64_t* numSolutionsPtr(std::variant<TreeSolution, ArraySolution>* solution) {
-        if (auto sol = std::get_if<TreeSolution>(solution)) {
+    inline int64_t* numSolutionsPtr(std::variant<TreeSolution, ArraySolution>& solution) {
+        if (auto sol = std::get_if<TreeSolution>(&solution)) {
             return (int64_t*)&(sol->numSolutions);
-        } else if (auto sol = std::get_if<ArraySolution>(solution)) {
+        } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             return (int64_t*)&(sol->numSolutions);
         }
         return NULL;
     }
 
-    inline int64_t* dataPtr(std::variant<TreeSolution, ArraySolution>* solution) {
-        if (auto sol = std::get_if<TreeSolution>(solution)) {
+    inline int64_t* dataPtr(std::variant<TreeSolution, ArraySolution>& solution) {
+        if (auto sol = std::get_if<TreeSolution>(&solution)) {
             return (int64_t*)sol->tree;
-        } else if (auto sol = std::get_if<ArraySolution>(solution)) {
+        } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             return (int64_t*)sol->elements;
         }
         return NULL;
     }
 
-    inline void freeData(std::variant<TreeSolution, ArraySolution>* solution) {
-        if (auto sol = std::get_if<TreeSolution>(solution)) {
+    inline void freeData(std::variant<TreeSolution, ArraySolution>& solution) {
+        if (auto sol = std::get_if<TreeSolution>(&solution)) {
             if (sol->tree != NULL) {
                 free(sol->tree);
                 sol->tree = NULL;
             }
-        } else if (auto sol = std::get_if<ArraySolution>(solution)) {
+        } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             if (sol->elements != NULL) {
                 free(sol->elements);
                 sol->elements = NULL;
@@ -104,9 +123,19 @@ namespace gpusat {
         int64_t exponent = 0;
         int64_t id = 0;
         std::vector<int64_t> variables;
-        std::vector<BagType *> edges;
+        std::vector<BagType> edges;
         std::vector<std::variant<TreeSolution, ArraySolution>> solution;
         int64_t maxSize = 0;
+
+        BagType() = default;
+
+        BagType(const BagType&) = delete;
+        BagType& operator=(BagType& other) = delete;
+
+        // move constructor to ovoid copying solutions
+        BagType(BagType&& other) = default;
+        // move assignment
+        BagType& operator=(BagType&& other) = default;
     };
 
     /// type for saving a tree decomposition
@@ -127,9 +156,10 @@ namespace gpusat {
      * @return
      *      a < b
      */
-    inline bool compTreedType(const BagType *a, const BagType *b) {
-        return a->id < b->id;
+    inline bool compTreedType(const BagType& a, const BagType& b) {
+        return a.id < b.id;
     }
+
 
     /// type for saving the sat formula
     struct satformulaType {

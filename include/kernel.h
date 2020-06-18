@@ -504,7 +504,8 @@ __kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, _
 #else
         if (tmp > 0) {
             double last=as_double(solsF[id - (startIDF)]);
-            *sols += 1;
+            atom_add(sols, 1);
+            //*sols += 1;
 #if !defined(NO_EXP)
             solsF[id - (startIDF)] = as_long(tmp / value + last);
             atom_max(exponent, ilogb(tmp / value + last));
@@ -529,7 +530,8 @@ __kernel void solveIntroduceForget(__global long *solsF, __global long *varsF, _
 #else
         if (tmp > 0) {
             double last=as_double(solsF[id - (startIDF)]);
-            *sols += 1;
+            atom_add(sols, 1);
+            //*sols += 1;
 #if !defined(NO_EXP)
             solsF[id - (startIDF)] = as_long(tmp / value + last);
             atom_max(exponent, ilogb(tmp / value + last));

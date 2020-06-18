@@ -177,6 +177,8 @@ namespace gpusat {
 
     }
 
+
+
     treedecType TDParser::parseTreeDecomp(std::string graph, satformulaType &formula) {
         treedecType ret;
         std::stringstream ss(graph);
@@ -220,19 +222,33 @@ namespace gpusat {
             }
         }
 
+        std::vector<BagType*> bag_refs;
+        for (auto& bag : ret.bags) {
+            bag_refs.push_back(&bag);
+        }
+
         if (!edges.empty()) {
-            for (long a = 0; a < ret.numb; a++) {
-                long b = 0;
-                while (!edges[a].empty()) {
-                    ret.bags[a].edges.push_back(&ret.bags[edges[a].back() - 1]);
-                    edges[a].pop_back();
-                    b++;
-                }
-                std::sort(ret.bags[a].edges.begin(), ret.bags[a].edges.end(), compTreedType);
-            }
+            auto root = constructTree(0, edges, ret.bags);
+            ret.bags.resize(0);
+            ret.bags.push_back(std::move(root));
         }
 
         return ret;
+    }
+
+    BagType TDParser::constructTree(long nodeIndex, std::vector<std::vector<long>>& edges, std::vector<BagType>& bags) {
+        // intermediate node
+        if (edges[nodeIndex].size() > 0) {
+            auto bag = std::move(bags[nodeIndex]);
+            for (auto edgeIndex : edges[nodeIndex]) {
+                // edge indices are 1-based.
+                bag.edges.push_back(std::move(constructTree(edgeIndex - 1, edges, bags)));
+            }
+            return std::move(bag);
+        // leaf node
+        } else {
+            return std::move(bags[nodeIndex]);
+        }
     }
 
     void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {

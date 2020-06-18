@@ -45,7 +45,7 @@ namespace gpusat {
          * @param formula   the sat formula
          * @param node      the node to start from in the tree decompostion
          */
-        void solveProblem(treedecType &decomp, satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
+        void solveProblem(satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
 
     protected:
 
