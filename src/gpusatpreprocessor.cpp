@@ -36,20 +36,13 @@ namespace gpusat {
                             cl_long cid = edge_b.id;
                             edge_a.variables.assign(v.begin(), v.end());
 
-                            std::vector<BagType> v_;
-                            std::set_union(
-                                    std::make_move_iterator(edge_a.edges.begin()),
-                                    std::make_move_iterator(edge_a.edges.end()),
+                            edge_a.edges.insert(
+                                    edge_a.edges.end(),
                                     std::make_move_iterator(edge_b.edges.begin()),
-                                    std::make_move_iterator(edge_b.edges.end()),
-                                    std::back_inserter(v_), compTreedType);
-                            // FIXME: check
-                            edge_a.edges.resize(0);
-                            std::move(v_.begin(), v_.end(), edge_a.edges.begin());
-                            //if (b < decomp.edges.size()) {
-                            // delete edge b
+                                    std::make_move_iterator(edge_b.edges.end())
+                            );
                             decomp.edges.erase(decomp.edges.begin() + b);
-                            //}
+                            sort(edge_a.edges.begin(), edge_a.edges.end(), compTreedType);
                         }
                     }
                 }
@@ -69,28 +62,19 @@ namespace gpusat {
                             edge_i.variables.begin(), edge_i.variables.end(),
                             back_inserter(v)
                     );
+
                     if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
                         changed = true;
                         cl_long cid = edge_i.id;
                         decomp.variables.assign(v.begin(), v.end());
 
-                        std::vector<BagType> v_;
-                        std::set_union(
-                                std::make_move_iterator(decomp.edges.begin()),
-                                std::make_move_iterator(decomp.edges.end()),
+                        decomp.edges.insert(
+                                decomp.edges.end(),
                                 std::make_move_iterator(edge_i.edges.begin()),
-                                std::make_move_iterator(edge_i.edges.end()),
-                                std::back_inserter(v_), compTreedType);
-                        decomp.edges.resize(0);
-                        for (long asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
-                            if (v_[asdf].id == cid) {
-                                x++;
-                            }
-                            if (x < v_.size()) {
-                                /// elements moved out of v, do not use again!
-                                decomp.edges.push_back(std::move(v_[x]));
-                            }
-                        }
+                                std::make_move_iterator(edge_i.edges.end())
+                        );
+                        decomp.edges.erase(decomp.edges.begin() + i);
+                        std::sort(decomp.edges.begin(), decomp.edges.end(), compTreedType);
                     }
                 }
             }
@@ -119,11 +103,11 @@ namespace gpusat {
                         decomp.variables.begin(), decomp.variables.end(),
                         std::back_inserter(fVars));
                 newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
+                std::sort(newEdge.variables.begin(), newEdge.variables.end());
                 // move existing node to be child of newEdge,
                 // wich becomes decomp.edges[i]
                 newEdge.edges.push_back(std::move(decomp.edges[i]));
                 decomp.edges[i] = std::move(newEdge);
-                std::sort(newEdge.variables.begin(), newEdge.variables.end());
             }
         }
 
