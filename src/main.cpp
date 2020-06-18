@@ -208,7 +208,9 @@ int main(int argc, char *argv[]) {
     try {
         //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
         // combine small bags
-        //Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
+        std::cerr << "before pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
+        Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
+        std::cerr << "after pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
 
         std::cout.flush();
 
@@ -236,8 +238,8 @@ int main(int argc, char *argv[]) {
             sols += bag_sum(treeDecomp.bags[0]);
             for (auto& solution : treeDecomp.bags[0].solution) {
                 std::visit(free_visitor {
-                    [](TreeSolution& sol) { if (sol.tree != NULL) free(sol.tree); },
-                    [](ArraySolution& sol) { if (sol.elements != NULL) free(sol.elements); },
+                    [](TreeSolution& sol) { if (sol.tree != NULL) delete [] sol.tree; },
+                    [](ArraySolution& sol) { if (sol.elements != NULL) delete [] sol.elements; },
                 }, solution);
             }
 

@@ -84,6 +84,7 @@ namespace gpusat {
                 }
             }
         }
+        delete clause;
         return ret;
     }
 
@@ -244,6 +245,7 @@ namespace gpusat {
                 // edge indices are 1-based.
                 bag.edges.push_back(std::move(constructTree(edgeIndex - 1, edges, bags)));
             }
+            sort(bag.edges.begin(), bag.edges.end(), compTreedType);
             return std::move(bag);
         // leaf node
         } else {

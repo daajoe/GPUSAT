@@ -90,11 +90,11 @@ namespace gpusat {
 
     size_t bagTypeHash(const BagType& input) {
         size_t h = 0;
-        h = h ^ (input.correction << 1);
-        h = h ^ (input.exponent << 1);
-        h = h ^ (input.id << 1);
+        h = h ^ input.correction << 1;
+        h = h ^ input.exponent << 1;
+        h = h ^ input.id << 1;
         for (cl_long var : input.variables) {
-            h = h ^ (var << 1);
+            h = (h ^ var) << 1;
         }
         for (const BagType& edge : input.edges) {
             h = h ^ (bagTypeHash(edge) << 1);
@@ -302,7 +302,7 @@ namespace gpusat {
         if (table.size > 0) {
 
             CudaBuffer<double> buf_sols_old(table.elements, table.size);
-            free(table.elements);
+            delete [] table.elements;
             table.elements = NULL;
 
             CudaBuffer<int64_t> buf_sols_new(t.size + 2 * numVars);
@@ -353,7 +353,7 @@ namespace gpusat {
             gpuErrchk(cudaMemcpy(buf_sols_new.device_mem, t.tree, sizeof(TreeNode) * (t.numSolutions + old.numSolutions + 2), cudaMemcpyHostToDevice));
 
             CudaBuffer<TreeNode> buf_sols_old(old.tree, old.size);
-            free(old.tree);
+            delete [] old.tree;
             old.tree = NULL;
 
             CudaBuffer<cl_long> buf_num_sol(&t.numSolutions, 1);
@@ -531,7 +531,7 @@ namespace gpusat {
             std::cerr << "num solutions (join): " << solution.numSolutions << std::endl;
             std::cout << "a is " << node.solution.size() << std::endl;
             if (solution.numSolutions == 0) {
-                free(solution.elements);
+                delete [] solution.elements;
                 solution.elements = NULL;
 
                 if (solutionType == TREE) {
@@ -636,6 +636,9 @@ namespace gpusat {
         std::vector<cl_long> iVars = node.variables;
         std::vector<cl_long> eVars = cnode.variables;
 
+        std::cerr << "variables: " << node.variables.size() << std::endl;
+        std::cerr << "fvars: " << fVars.size() << std::endl;
+
         node.variables = fVars;
 
         this->numIntroduceForget++;
@@ -684,6 +687,9 @@ namespace gpusat {
         }
 
         cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
+        std::cerr << "bag size forget: " << bagSizeForget << std::endl;
+        std::cerr << "variables: " << node.variables.size() << std::endl;
+        std::cerr << "used memory: " << usedMemory << std::endl;
 
         node.solution.clear();
 
@@ -780,7 +786,8 @@ namespace gpusat {
                     if (node.variables.size() == 0) {
                         sol.numSolutions--;
                     }
-                    free(sol.tree);
+                    delete [] sol.tree;
+                    sol.tree = NULL;
                     if (last != NULL && last->tree != NULL
                         && (sol.numSolutions + last->numSolutions + 2) < sol.size) {
 
@@ -809,11 +816,11 @@ namespace gpusat {
                     node.maxSize = std::max(node.maxSize,
                         (int64_t)dataStructureSize(node.solution.back()));
                 } else if (solutionType == ARRAY) {
-                    auto sol = std::get<ArraySolution>(std::move(solution));
+                    auto& sol = std::get<ArraySolution>(solution);
                     sol.size = bagSizeForget;
 
                     cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(int64_t) * bagSizeForget, cudaMemcpyDeviceToHost);
-                    node.solution.push_back(std::move(sol));
+                    node.solution.push_back(std::move(solution));
                 }
             }
         }

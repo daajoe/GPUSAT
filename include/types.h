@@ -106,12 +106,12 @@ namespace gpusat {
     inline void freeData(std::variant<TreeSolution, ArraySolution>& solution) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
             if (sol->tree != NULL) {
-                free(sol->tree);
+                delete[] sol->tree;
                 sol->tree = NULL;
             }
         } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             if (sol->elements != NULL) {
-                free(sol->elements);
+                delete[] sol->elements;
                 sol->elements = NULL;
             }
         }
