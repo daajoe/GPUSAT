@@ -48,12 +48,12 @@ namespace gpusat {
         if (variables > 0) {
             size_t hash = 0;
             if (current.lowerIdx) {
-                hash ^= 1;
-                hash ^= (hashSubtree(tree, tree[current.lowerIdx], variables - 1) << 1);
+                hash = (hash ^ 1) << 1;
+                hash = (hash ^ hashSubtree(tree, tree[current.lowerIdx], variables - 1)) << 1;
             }
             if (current.upperIdx) {
-                hash ^= 2;
-                hash ^= (hashSubtree(tree, tree[current.upperIdx], variables - 1) << 1);
+                hash = (hash ^ 2) << 1;
+                hash = (hash ^ hashSubtree(tree, tree[current.upperIdx], variables - 1)) << 1;
             }
             return hash;
         } else {
@@ -63,20 +63,20 @@ namespace gpusat {
     size_t hashArray(const ArraySolution& solution) {
         size_t h = 0;
         for (int i=0; i < solution.size; i++) {
-            h ^= (*reinterpret_cast<uint64_t*>(&solution.elements[i]) << 1);
+            h = (h ^ *reinterpret_cast<uint64_t*>(&solution.elements[i])) << 1;
         }
         return h;
     }
 
     size_t treeTypeHash(const TreeSolution& t, int vars) {
         size_t h = 0;
-        h = h ^ (t.minId << 1);
-        h = h ^ (t.maxId << 1);
-        h = h ^ (t.numSolutions << 1);
+        h = (h ^ t.minId) << 1;
+        h = (h ^ t.maxId) << 1;
+        h = (h ^ t.numSolutions) << 1;
         if (t.tree == NULL) {
             return h;
         }
-        return h = h ^ (hashSubtree(t.tree, t.tree[0], vars) << 1);
+        return h = (h ^ hashSubtree(t.tree, t.tree[0], vars)) << 1;
     }
     size_t hashSolution(const std::variant<TreeSolution, ArraySolution>& sol, int vars) {
         if (auto t = std::get_if<TreeSolution>(&sol)) {
@@ -90,19 +90,19 @@ namespace gpusat {
 
     size_t bagTypeHash(const BagType& input) {
         size_t h = 0;
-        h = h ^ input.correction << 1;
-        h = h ^ input.exponent << 1;
-        h = h ^ input.id << 1;
+        h = (h ^ input.correction) << 1;
+        h = (h ^ input.exponent) << 1;
+        h = (h ^ input.id) << 1;
         for (cl_long var : input.variables) {
             h = (h ^ var) << 1;
         }
         for (const BagType& edge : input.edges) {
-            h = h ^ (bagTypeHash(edge) << 1);
+            h = (h ^ bagTypeHash(edge)) << 1;
         }
         for (const auto &sol : input.solution) {
-            h = h ^ (hashSolution(sol, input.variables.size()) << 1);
+            h = (h ^ hashSolution(sol, input.variables.size())) << 1;
         }
-        h = h ^ (input.maxSize << 1);
+        h = (h ^ input.maxSize) << 1;
         return h;
     }
 
