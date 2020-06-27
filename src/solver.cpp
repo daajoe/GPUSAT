@@ -30,14 +30,16 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
 
 using gpusat::SolveMode;
 using gpusat::GPUVars;
+using gpusat::TreeSolution;
+using gpusat::ArraySolution;
 
-extern void introduceForgetWrapper(long *solsF,  GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, GPUVars varsIntroduce, long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
+extern void introduceForgetWrapper(std::variant<TreeSolution, ArraySolution> solsF, GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, GPUVars varsIntroduce, long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
 
-    extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  GPUVars variables, GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
+extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  GPUVars variables, GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-    extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
+extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
-    extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
+extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
 
 
 namespace gpusat {
@@ -149,6 +151,26 @@ namespace gpusat {
 
             ~CudaBuffer();
     };
+
+    std::variant<TreeSolution, ArraySolution> gpuSolutionCopy(const std::variant<TreeSolution, ArraySolution>& solution, long* element_buffer) {
+        if (auto sol = std::get_if<TreeSolution>(&solution)) {
+            return TreeSolution {
+                .tree = (TreeNode*)element_buffer,
+                .numSolutions = sol->numSolutions,
+                .size = sol->size,
+                .minId = sol->minId,
+                .maxId = sol->maxId
+            };
+        } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
+            return ArraySolution {
+                .elements = (double*)element_buffer,
+                .numSolutions = sol->numSolutions,
+                .size = sol->size,
+                .minId = sol->minId,
+                .maxId = sol->maxId
+            };
+        }
+    }
 
     template <typename T>
     CudaBuffer<T>::CudaBuffer(T* from, size_t length) {
@@ -636,6 +658,10 @@ namespace gpusat {
         std::cerr << "JOIN output hash: " << bagTypeHash(node) << std::endl;
     }
 
+    long qmin(long a, long b, long c, long d) {
+        return std::min(a, std::min(b, std::min(c, d)));
+    }
+
     void Solver::solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
 
         std::cerr << "IF input hash: " << std::endl;
@@ -692,9 +718,19 @@ namespace gpusat {
         } else {
             if (solutionType == TREE) {
                 if (nextNode == JOIN) {
-                    bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
+                    bagSizeForget = qmin(
+                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long),
+                        (memorySize - usedMemory - cnode.maxSize * s) / s / 2,
+                        (memorySize - usedMemory) / 2 / 3 / s,
+                        1l << node.variables.size()
+                    );
                 } else if (nextNode == INTRODUCEFORGET) {
-                    bagSizeForget = std::min((cl_long) (maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long)), std::min((cl_long) std::min((memorySize - usedMemory - cnode.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
+                    bagSizeForget = qmin(
+                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long),
+                        (memorySize - usedMemory - cnode.maxSize * s) / s / 2,
+                        (memorySize - usedMemory) / 2 / 2 / s,
+                        1l << node.variables.size()
+                    );
                 }
             } else if (solutionType == ARRAY) {
                 bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(cl_long)), log2(memorySize / sizeof(cl_long) / 3)));
@@ -741,7 +777,7 @@ namespace gpusat {
 
                 // FIXME: offset onto global id
                 introduceForgetWrapper(
-                    buf_solsF.device_mem,
+                    std::move(gpuSolutionCopy(solution, buf_solsF.device_mem)),
                     GPUVars {
                         .count = (int64_t)fVars.size(),
                         .vars = buf_varsF.device_mem
