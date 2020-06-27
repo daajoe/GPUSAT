@@ -41,6 +41,13 @@ extern void introduceForgetWrapper(long *solsF,  GPUVars varsF,  long *solsE,  G
 
 
 namespace gpusat {
+    // taken from boost
+    template <class T>
+    inline void hash_combine(std::size_t& seed, const T& v)
+    {
+        std::hash<T> hasher;
+        seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
+    }
 
     size_t hashSubtree(const TreeNode* tree, TreeNode current, int variables) {
         if (current.empty == 0) return 0;
@@ -48,12 +55,12 @@ namespace gpusat {
         if (variables > 0) {
             size_t hash = 0;
             if (current.lowerIdx) {
-                hash = (hash ^ 1) << 1;
-                hash = (hash ^ hashSubtree(tree, tree[current.lowerIdx], variables - 1)) << 1;
+                hash_combine(hash, 1);
+                hash_combine(hash, hashSubtree(tree, tree[current.lowerIdx], variables - 1));
             }
             if (current.upperIdx) {
-                hash = (hash ^ 2) << 1;
-                hash = (hash ^ hashSubtree(tree, tree[current.upperIdx], variables - 1)) << 1;
+                hash_combine(hash, 2);
+                hash_combine(hash, hashSubtree(tree, tree[current.upperIdx], variables - 1));
             }
             return hash;
         } else {
@@ -61,23 +68,31 @@ namespace gpusat {
         }
     }
     size_t hashArray(const ArraySolution& solution) {
-        size_t h = 0;
+        size_t h = solution.size;
+        hash_combine(h, solution.minId);
+        hash_combine(h, solution.maxId);
+        hash_combine(h, solution.numSolutions);
+        if (solution.elements == NULL) {
+            return h;
+        }
         for (int i=0; i < solution.size; i++) {
-            h = (h ^ *reinterpret_cast<uint64_t*>(&solution.elements[i])) << 1;
+            hash_combine(h, *reinterpret_cast<uint64_t*>(&solution.elements[i]));
         }
         return h;
     }
 
     size_t treeTypeHash(const TreeSolution& t, int vars) {
         size_t h = 0;
-        h = (h ^ t.minId) << 1;
-        h = (h ^ t.maxId) << 1;
-        h = (h ^ t.numSolutions) << 1;
+        hash_combine(h, t.minId);
+        hash_combine(h, t.maxId);
+        hash_combine(h, t.numSolutions);
         if (t.tree == NULL) {
             return h;
         }
-        return h = (h ^ hashSubtree(t.tree, t.tree[0], vars)) << 1;
+        hash_combine(h, hashSubtree(t.tree, t.tree[0], vars));
+        return h;
     }
+
     size_t hashSolution(const std::variant<TreeSolution, ArraySolution>& sol, int vars) {
         if (auto t = std::get_if<TreeSolution>(&sol)) {
             return treeTypeHash(*t, vars);
@@ -90,19 +105,19 @@ namespace gpusat {
 
     size_t bagTypeHash(const BagType& input) {
         size_t h = 0;
-        h = (h ^ input.correction) << 1;
-        h = (h ^ input.exponent) << 1;
-        h = (h ^ input.id) << 1;
+        hash_combine(h, input.correction);
+        hash_combine(h, input.exponent);
+        hash_combine(h, input.id);
         for (cl_long var : input.variables) {
-            h = (h ^ var) << 1;
+            hash_combine(h, var);
         }
         for (const BagType& edge : input.edges) {
-            h = (h ^ bagTypeHash(edge)) << 1;
+            hash_combine(h, bagTypeHash(edge));
         }
         for (const auto &sol : input.solution) {
-            h = (h ^ hashSolution(sol, input.variables.size())) << 1;
+            hash_combine(h, hashSolution(sol, input.variables.size()));
         }
-        h = (h ^ input.maxSize) << 1;
+        hash_combine(h, input.maxSize);
         return h;
     }
 
