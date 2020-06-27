@@ -10,6 +10,7 @@
 #include <types.h>
 #include <cuda_runtime.h>
 #include <signal.h>
+#include <optional>
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 
@@ -33,9 +34,45 @@ using gpusat::GPUVars;
 using gpusat::TreeSolution;
 using gpusat::ArraySolution;
 
-extern void introduceForgetWrapper(std::variant<TreeSolution, ArraySolution> solsF, GPUVars varsF,  long *solsE,  GPUVars lastVars, long combinations, long minIdE, long maxIdE, long startIDF, long startIDE,  long *sols, GPUVars varsIntroduce, long *clauses,  long *numVarsC, long numclauses,  double *weights,  long *exponent, double value, size_t threads, long id_offset, SolveMode mode);
+extern void introduceForgetWrapper(
+    std::variant<TreeSolution, ArraySolution> solsF,
+    GPUVars varsForget,
+    std::variant<TreeSolution, ArraySolution> solsE,
+    GPUVars lastVars,
+    long combinations,
+    long startIDF,
+    long startIDE,
+    long *sols,
+    GPUVars varsIntroduce,
+    long *clauses,
+    long *numVarsC,
+    long numclauses,
+    double *weights,
+    long *exponent,
+    double value,
+    size_t threads,
+    long id_offset,
+    SolveMode mode
+);
 
-extern void solveJoinWrapper( long *solutions,  long *edge1,  long *edge2,  GPUVars variables, GPUVars edgeVariables1,  GPUVars edgeVariables2, long minId1, long maxId1, long minId2, long maxId2, long startIDNode, long startIDEdge1, long startIDEdge2,  double *weights,  long *sols, double value,  long *exponent, size_t threads, long id_offset, SolveMode mode);
+extern void solveJoinWrapper(
+    double *solutions,
+    std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
+    std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
+    GPUVars variables,
+    GPUVars edgeVariables1,
+    GPUVars edgeVariables2,
+    long startIDNode,
+    long startIDEdge1,
+    long startIDEdge2,
+    double *weights,
+    long *sols,
+    double value,
+    long *exponent,
+    size_t threads,
+    long id_offset,
+    SolveMode mode
+);
 
 extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
 
@@ -511,20 +548,26 @@ namespace gpusat {
 
             for (cl_long b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
+                std::optional<std::variant<TreeSolution, ArraySolution>> edge1_sol = std::nullopt;
                 std::unique_ptr<CudaBuffer<int64_t>> buf_sol1( std::make_unique<CudaBuffer<int64_t>>() );
                 if (b < edge1.solution.size() && dataPtr(edge1.solution[b]) != NULL) {
                     buf_sol1 = std::make_unique<CudaBuffer<int64_t>>(
                         dataPtr(edge1.solution[b]),
                         dataStructureSize(edge1.solution[b])
                     );
+                    auto copy = gpuSolutionCopy(edge1.solution[b], buf_sol1->device_mem);
+                    edge1_sol = std::move(copy);
                 }
 
-                std::unique_ptr<CudaBuffer<cl_long>> buf_sol2( std::make_unique<CudaBuffer<cl_long>>() );
+                std::optional<std::variant<TreeSolution, ArraySolution>> edge2_sol = std::nullopt;
+                std::unique_ptr<CudaBuffer<int64_t>> buf_sol2( std::make_unique<CudaBuffer<int64_t>>() );
                 if (b < edge2.solution.size() && dataPtr(edge2.solution[b]) != NULL) {
                     buf_sol2 = std::make_unique<CudaBuffer<int64_t>>(
                         dataPtr(edge2.solution[b]),
                         dataStructureSize(edge2.solution[b])
                     );
+                    auto copy = gpuSolutionCopy(edge2.solution[b], buf_sol2->device_mem);
+                    edge2_sol = std::move(copy);
                 }
 
                 long id_offset = solution.minId;
@@ -532,9 +575,9 @@ namespace gpusat {
                 std::cerr << "thread offset: " << id_offset << " threads " << threads << std::endl;
 
                 solveJoinWrapper(
-                    (int64_t*)buf_sol.device_mem,
-                    buf_sol1->device_mem,
-                    buf_sol2->device_mem,
+                    buf_sol.device_mem,
+                    std::move(edge1_sol),
+                    std::move(edge2_sol),
                     GPUVars {
                         .count = (int64_t)node.variables.size(),
                         .vars = buf_solVars.device_mem
@@ -547,10 +590,6 @@ namespace gpusat {
                         .count = (int64_t)edge2.variables.size(),
                         .vars = buf_solVars2.device_mem
                     },
-                    (b < edge1.solution.size()) ? minId(edge1.solution[b]) : -1,
-                    (b < edge1.solution.size()) ? maxId(edge1.solution[b]) : -1,
-                    (b < edge2.solution.size()) ? minId(edge2.solution[b]) : -1,
-                    (b < edge2.solution.size()) ? maxId(edge2.solution[b]) : -1,
                     solution.minId,
                     (b < edge1.solution.size()) ? minId(edge1.solution[b]) : 0,
                     (b < edge2.solution.size()) ? minId(edge2.solution[b]) : 0,
@@ -769,6 +808,7 @@ namespace gpusat {
                 if (!leaf) {
                     buf_solsE = std::make_unique<CudaBuffer<cl_long>>(dataPtr(csol), dataStructureSize(csol));
                 }
+                auto solsE = gpuSolutionCopy(csol, buf_solsE->device_mem);
 
                 size_t threads = static_cast<size_t>(maxId(solution) - minId(solution));
                 long id_offset = minId(solution);
@@ -782,14 +822,12 @@ namespace gpusat {
                         .count = (int64_t)fVars.size(),
                         .vars = buf_varsF.device_mem
                     },
-                    buf_solsE->device_mem,
+                    std::move(solsE),
                     GPUVars {
                         .count = (int64_t)eVars.size(),
                         .vars = buf_varsE.device_mem
                     },
                     combinations,
-                    minId(csol),
-                    maxId(csol),
                     minId(solution),
                     minId(csol),
                     buf_solBag.device_mem,

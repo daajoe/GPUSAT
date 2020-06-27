@@ -9,6 +9,7 @@
 #include <list>
 #include <vector>
 #include <variant>
+#include <assert.h>
 #include <memory>
 #include <set>
 #include <stdint.h>
@@ -68,21 +69,46 @@ namespace gpusat {
         int64_t* vars;
     };
 
-
-    inline int64_t minId(const std::variant<TreeSolution, ArraySolution>& solution) {
-        return std::visit([](auto& sol) -> int64_t { return sol.minId; }, solution);
+    template <class T>
+    GPU_HOST_ATTR T dataStructureVisit(
+        const std::variant<TreeSolution, ArraySolution>& solution,
+        T(*treeFunc)(const TreeSolution& sol),
+        T(*arrayFunc)(const ArraySolution& sol)
+    ) {
+        if (std::holds_alternative<TreeSolution>(solution)) {
+            return treeFunc(std::get<TreeSolution>(solution));
+        } else if (std::holds_alternative<ArraySolution>(solution)) {
+            return arrayFunc(std::get<ArraySolution>(solution));
+        }
+        assert(0);
     }
 
-    inline int64_t maxId(const std::variant<TreeSolution, ArraySolution>& solution) {
-        return std::visit([](auto& sol) -> int64_t { return sol.maxId; }, solution);
+    GPU_HOST_ATTR inline int64_t minId(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<int64_t>(solution,
+            [](const TreeSolution& sol) { return sol.minId; },
+            [](const ArraySolution& sol) { return sol.minId; }
+        );
     }
 
-    inline size_t dataStructureSize(const std::variant<TreeSolution, ArraySolution>& solution) {
-        return std::visit([](auto& sol) -> int64_t { return sol.size; }, solution);
+    GPU_HOST_ATTR inline int64_t maxId(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<int64_t>(solution,
+            [](const TreeSolution& sol) { return sol.maxId; },
+            [](const ArraySolution& sol) { return sol.maxId; }
+        );
     }
 
-    inline int64_t numSolutions(const std::variant<TreeSolution, ArraySolution>& solution) {
-        return std::visit([](auto& sol) -> int64_t { return sol.numSolutions; }, solution);
+    GPU_HOST_ATTR inline size_t dataStructureSize(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<size_t>(solution,
+            [](const TreeSolution& sol) { return sol.size; },
+            [](const ArraySolution& sol) { return sol.size; }
+        );
+    }
+
+    GPU_HOST_ATTR inline int64_t numSolutions(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<int64_t>(solution,
+            [](const TreeSolution& sol) { return sol.numSolutions; },
+            [](const ArraySolution& sol) { return sol.numSolutions; }
+        );
     }
 
     inline int64_t* numSolutionsPtr(std::variant<TreeSolution, ArraySolution>& solution) {
@@ -94,13 +120,20 @@ namespace gpusat {
         return NULL;
     }
 
-    inline int64_t* dataPtr(std::variant<TreeSolution, ArraySolution>& solution) {
+    GPU_HOST_ATTR inline int64_t* dataPtr(std::variant<TreeSolution, ArraySolution>& solution) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
             return (int64_t*)sol->tree;
         } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             return (int64_t*)sol->elements;
         }
         return NULL;
+    }
+
+    GPU_HOST_ATTR inline bool dataEmpty(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<bool>(solution,
+            [](const TreeSolution& sol) { return sol.tree == NULL; },
+            [](const ArraySolution& sol) { return sol.elements == NULL; }
+        );
     }
 
     inline void freeData(std::variant<TreeSolution, ArraySolution>& solution) {
