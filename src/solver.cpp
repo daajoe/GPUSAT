@@ -29,57 +29,54 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-using gpusat::SolveMode;
-using gpusat::GPUVars;
-using gpusat::TreeSolution;
-using gpusat::ArraySolution;
-
-extern void introduceForgetWrapper(
-    std::variant<TreeSolution, ArraySolution> solsF,
-    GPUVars varsForget,
-    std::variant<TreeSolution, ArraySolution> solsE,
-    GPUVars lastVars,
-    long combinations,
-    long startIDF,
-    long startIDE,
-    long *sols,
-    GPUVars varsIntroduce,
-    long *clauses,
-    long *numVarsC,
-    long numclauses,
-    double *weights,
-    long *exponent,
-    double value,
-    size_t threads,
-    long id_offset,
-    SolveMode mode
-);
-
-extern void solveJoinWrapper(
-    double *solutions,
-    std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
-    std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
-    GPUVars variables,
-    GPUVars edgeVariables1,
-    GPUVars edgeVariables2,
-    long startIDNode,
-    long startIDEdge1,
-    long startIDEdge2,
-    double *weights,
-    long *sols,
-    double value,
-    long *exponent,
-    size_t threads,
-    long id_offset,
-    SolveMode mode
-);
-
-extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
-
-extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
-
-
 namespace gpusat {
+    extern void introduceForgetWrapper(
+        std::variant<TreeSolution, ArraySolution> solsF,
+        GPUVars varsForget,
+        std::variant<TreeSolution, ArraySolution> solsE,
+        GPUVars lastVars,
+        long combinations,
+        long startIDF,
+        long startIDE,
+        long *sols,
+        GPUVars varsIntroduce,
+        long *clauses,
+        long *numVarsC,
+        long numclauses,
+        double *weights,
+        long *exponent,
+        double value,
+        size_t threads,
+        long id_offset,
+        SolveMode mode
+    );
+
+    extern void solveJoinWrapper(
+        double *solutions,
+        std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
+        std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
+        GPUVars variables,
+        GPUVars edgeVariables1,
+        GPUVars edgeVariables2,
+        long startIDNode,
+        long startIDEdge1,
+        long startIDEdge2,
+        double *weights,
+        long *sols,
+        double value,
+        long *exponent,
+        size_t threads,
+        long id_offset,
+        SolveMode mode
+    );
+
+    extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
+
+    extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
+
+
+
+
     // taken from boost
     template <class T>
     inline void hash_combine(std::size_t& seed, const T& v)
@@ -88,7 +85,7 @@ namespace gpusat {
         seed ^= hasher(v) + 0x9e3779b9 + (seed<<6) + (seed>>2);
     }
 
-    size_t hashSubtree(const TreeNode* tree, TreeNode current, int variables) {
+    size_t hashSubtree(const TreeNode* tree, const TreeNode& current, int variables) {
         if (current.empty == 0) return 0;
         // index cell
         if (variables > 0) {
@@ -284,14 +281,14 @@ namespace gpusat {
                 // create initial solution container
                 if (solutionType == dataStructure::TREE) {
                     TreeSolution sol = TreeSolution();
-                    sol.tree = new TreeNode[1];
+                    sol.tree = (TreeNode*)malloc(sizeof(TreeNode));
                     sol.tree[0].content = val;
                     sol.maxId = 1,
                     sol.size = 1;
                     cNode.solution.push_back(std::move(sol));
                 } else if (solutionType == dataStructure::ARRAY) {
                     ArraySolution sol = ArraySolution();
-                    sol.elements = new double[1];
+                    sol.elements = (double*)malloc(sizeof(double));
                     sol.elements[0] = val;
                     sol.maxId = 1,
                     sol.size = 1;
@@ -408,7 +405,8 @@ namespace gpusat {
             buf_exp.read(&(node.exponent));
 
             int64_t nodeCount = t.numSolutions + 1 + nextSize;
-            t.tree = new TreeNode[nodeCount];
+            t.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
+
             gpuErrchk(cudaMemcpy(t.tree, buf_sols_new.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost));
         }
         t.size = (t.numSolutions + 1 + nextSize);
@@ -427,7 +425,8 @@ namespace gpusat {
             gpuErrchk(cudaMemcpy(buf_sols_new.device_mem, t.tree, sizeof(TreeNode) * (t.numSolutions + old.numSolutions + 2), cudaMemcpyHostToDevice));
 
             CudaBuffer<TreeNode> buf_sols_old(old.tree, old.size);
-            delete [] old.tree;
+
+            free(old.tree);
             old.tree = NULL;
 
             CudaBuffer<cl_long> buf_num_sol(&t.numSolutions, 1);
@@ -463,7 +462,7 @@ namespace gpusat {
             solution.numSolutions = 0;
             solution.maxId = maxId;
             solution.size = size;
-            solution.tree = new TreeNode[solution.size];
+            solution.tree = (TreeNode*)malloc(solution.size * sizeof(TreeNode)); //new TreeNode[solution.size]();
             for (size_t i=0; i < solution.size; i++) {
                 solution.tree[i].empty = 0;
             }
@@ -474,7 +473,7 @@ namespace gpusat {
             solution.numSolutions = 0;
             solution.maxId = maxId;
             solution.size = size;
-            solution.elements = new double[solution.size];
+            solution.elements = (double*)malloc(solution.size * sizeof(double));
             for (size_t i=0; i < solution.size; i++) {
                 ((int64_t*)solution.elements)[i] = 0;
             }
@@ -875,13 +874,15 @@ namespace gpusat {
                     if (node.variables.size() == 0) {
                         sol.numSolutions--;
                     }
-                    delete [] sol.tree;
+
+                    free(sol.tree);
                     sol.tree = NULL;
+
                     if (last != NULL && last->tree != NULL
                         && (sol.numSolutions + last->numSolutions + 2) < sol.size) {
 
                         int64_t nodeCount = sol.numSolutions + last->numSolutions + 2;
-                        sol.tree = new TreeNode[nodeCount];
+                        sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
                         cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
 
                         combineTree(sol, *last, node.variables.size());
@@ -889,7 +890,7 @@ namespace gpusat {
                         node.solution.back() = std::move(sol);
                     } else {
                         int64_t nodeCount = sol.numSolutions + 1;
-                        sol.tree = new TreeNode[nodeCount];
+                        sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
                         sol.size = sol.numSolutions + 1;
 
                         cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);

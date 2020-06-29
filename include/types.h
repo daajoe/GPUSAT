@@ -34,14 +34,22 @@ namespace gpusat {
         ArraySolution& operator=(ArraySolution&& other) = default;
     };
 
-    union TreeNode {
-        int64_t empty = 0;
-        struct {
-            uint32_t lowerIdx;
-            uint32_t upperIdx;
-        } __attribute__((packed));
-        double content;
+    struct TreeNode {
+        union {
+            int64_t empty;
+            struct {
+                uint32_t lowerIdx;
+                uint32_t upperIdx;
+            } __attribute__((packed));
+            double content;
+        };
+
+        // delete constructor / destrucor.
+        // only create via malloc / free
+        TreeNode() = delete;
+        ~TreeNode() = delete;
     } __attribute__((packed));
+
     /// tree type for storing the models
     struct TreeSolution {
         TreeNode *tree = nullptr;
@@ -139,12 +147,12 @@ namespace gpusat {
     inline void freeData(std::variant<TreeSolution, ArraySolution>& solution) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
             if (sol->tree != NULL) {
-                delete[] sol->tree;
+                free(sol->tree);
                 sol->tree = NULL;
             }
         } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
             if (sol->elements != NULL) {
-                delete[] sol->elements;
+                free(sol->elements);
                 sol->elements = NULL;
             }
         }

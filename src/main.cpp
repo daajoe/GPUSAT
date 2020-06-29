@@ -237,10 +237,7 @@ int main(int argc, char *argv[]) {
         if ((*sol).isSat > 0) {
             sols += bag_sum(treeDecomp.bags[0]);
             for (auto& solution : treeDecomp.bags[0].solution) {
-                std::visit(free_visitor {
-                    [](TreeSolution& sol) { if (sol.tree != NULL) delete [] sol.tree; },
-                    [](ArraySolution& sol) { if (sol.elements != NULL) delete [] sol.elements; },
-                }, solution);
+                freeData(solution);
             }
 
             if (!noExp) {

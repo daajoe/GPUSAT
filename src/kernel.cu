@@ -8,8 +8,7 @@
 
 
 
-using namespace gpusat;
-
+namespace gpusat {
 
 __device__ long atomicAdd(long* address, long val)
 {
@@ -86,7 +85,7 @@ __device__ long get_global_id() {
  * @return
  *      the model count
  */
-__device__ double getCount(long id, const TreeNode *tree, long numVars) {
+__host__ __device__ double getCount(long id, const TreeNode *tree, long numVars) {
     ulong nextId = 0;
     for (ulong i = 0; i < numVars; i++) {
         nextId = ((uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
@@ -786,4 +785,5 @@ void introduceForgetWrapper(
     printf("synchronize: %d\n", cudaDeviceSynchronize());
     cudaFree(mem);
     */
+}
 }
