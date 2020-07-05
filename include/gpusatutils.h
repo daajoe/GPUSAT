@@ -4,7 +4,6 @@
 #define alloca __builtin_alloca
 #endif
 
-#include <CL/cl_platform.h>
 #include <queue>
 #include <chrono>
 #include <numeric>

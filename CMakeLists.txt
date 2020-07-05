@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 project(gpusati CXX CUDA)
 
-# cl headers needed until fully ported
 include_directories("$ENV{CUDA_PATH}/include")
 link_directories("$ENV{CUDA_PATH}/lib/x64")
 
@@ -12,7 +11,7 @@ target_compile_options(gpusat_kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode
 
 if (DEBUG)
     # compiler flags
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -O0 -Wno-ignored-attributes")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -O3 -Wno-ignored-attributes")
     SET(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -std=c++17 --expt-relaxed-constexpr")
     # linker flags
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
@@ -36,4 +35,4 @@ set_target_properties(htd_io PROPERTIES IMPORTED_LOCATION ${HTD_IO_LIB})
 
 file(GLOB gpusat_SRC "src/*.cpp" "src/*/*.cpp")
 add_executable(gpusat ${gpusat_SRC})
-target_link_libraries(gpusat OpenCL htd htd_io gpusat_kernel)
+target_link_libraries(gpusat htd htd_io gpusat_kernel)

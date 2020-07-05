@@ -4,7 +4,6 @@
 #define alloca __builtin_alloca
 #endif
 
-#include <CL/cl_platform.h>
 #include <cmath>
 #include <list>
 #include <vector>
@@ -254,7 +253,7 @@ namespace gpusat {
      * @return
      *      true if abs a < b
      */
-    inline bool compVars(const cl_long &a, const cl_long &b) {
+    inline bool compVars(const int64_t &a, const int64_t &b) {
         return std::abs(a) < std::abs(b);
     }
 }

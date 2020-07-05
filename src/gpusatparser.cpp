@@ -12,8 +12,8 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::stringstream ss(formula);
         std::string item;
-        std::unordered_map<cl_long, cl_double> weights;
-        std::vector<cl_long> *clause = new std::vector<cl_long>();
+        std::unordered_map<int64_t, double> weights;
+        std::vector<int64_t> *clause = new std::vector<int64_t>();
         if (clause == NULL || errno == ENOMEM) {
             std::cerr << "\nOut of Memory\n";
             exit(0);
@@ -60,17 +60,17 @@ namespace gpusat {
         }
 
         if (wmc) {
-            ret.variableWeights = new cl_double[(ret.numVars + 1) * 2]();
+            ret.variableWeights = new double[(ret.numVars + 1) * 2]();
             if (ret.variableWeights == NULL || errno == ENOMEM) {
                 std::cerr << "\nOut of Memory\n";
                 exit(0);
             }
             ret.numWeights = (ret.numVars + 1) * 2;
 
-            for (cl_long i = 0; i <= ret.numVars; i++) {
-                std::unordered_map<cl_long, cl_double>::const_iterator elem = weights.find(i);
+            for (int64_t i = 0; i <= ret.numVars; i++) {
+                std::unordered_map<int64_t, double>::const_iterator elem = weights.find(i);
                 if (elem != weights.end()) {
-                    cl_double we = weights[i];
+                    double we = weights[i];
                     if (we < 0.0) {
                         ret.variableWeights[i * 2] = 1;
                         ret.variableWeights[i * 2 + 1] = 1;
@@ -88,11 +88,11 @@ namespace gpusat {
         return ret;
     }
 
-    void CNFParser::parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause) {
+    void CNFParser::parseClauseLine(satformulaType &ret, std::string &item, std::vector<int64_t> *clause) {
         std::stringstream sline(item);
         std::string i;
 
-        cl_long num = 0;
+        int64_t num = 0;
         while (!sline.eof()) {
             getline(sline, i, ' ');
             if (i.size() > 0) {
@@ -128,14 +128,14 @@ namespace gpusat {
         while (i.size() == 0) getline(sline, i, ' ');
     }
 
-    void CNFParser::parseWeightLine(std::string item, std::unordered_map<cl_long, cl_double> &weights) {
+    void CNFParser::parseWeightLine(std::string item, std::unordered_map<int64_t, double> &weights) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //w
         getline(sline, i, ' '); //variable
-        cl_long id = stol(i);
+        int64_t id = stol(i);
         getline(sline, i, ' '); //weight
-        cl_double val = stod(i);
+        double val = stod(i);
         weights[id] = (id < 0) ? -val : val;
     }
 
@@ -184,7 +184,7 @@ namespace gpusat {
         treedecType ret;
         std::stringstream ss(graph);
         std::string item;
-        std::vector<std::vector<cl_long>> edges;
+        std::vector<std::vector<int64_t>> edges;
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 2) {
@@ -208,13 +208,13 @@ namespace gpusat {
             for (long a = 0; a < edges.size(); a++) {
                 std::sort(edges[a].begin(), edges[a].end());
             }
-            std::list<cl_long> backlog;
+            std::list<int64_t> backlog;
             backlog.push_back(0);
             while (backlog.size() > 0) {
-                cl_long id = backlog.front();
+                int64_t id = backlog.front();
                 backlog.pop_front();
 
-                for (cl_long b : edges[id]) {
+                for (int64_t b : edges[id]) {
                     auto &n = edges[b - 1];
                     auto idx = std::find(n.begin(), n.end(), id + 1);
                     n.erase(idx);
@@ -253,18 +253,18 @@ namespace gpusat {
         }
     }
 
-    void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges) {
+    void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //start
-        cl_long start = stoi(i);
+        int64_t start = stoi(i);
         getline(sline, i, ' '); //end
-        cl_long end = stoi(i);
+        int64_t end = stoi(i);
         edges[start - 1].push_back(end);
         edges[end - 1].push_back(start);
     }
 
-    void TDParser::parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges) {
+    void TDParser::parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //s
@@ -287,7 +287,7 @@ namespace gpusat {
         getline(sline, i, ' '); //bag number
         long bnum = stoi(i);
         long a = 0;
-        cl_long match_count = 0;
+        int64_t match_count = 0;
         std::istringstream ss(item);
         std::string word;
         while (ss >> word) {

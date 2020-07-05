@@ -4,7 +4,6 @@
 #define alloca __builtin_alloca
 #endif
 
-#include <CL/cl.hpp>
 #include <types.h>
 
 namespace gpusat {
@@ -16,9 +15,6 @@ namespace gpusat {
      */
     class Solver {
     protected:
-        cl::Context &context;
-        cl::CommandQueue &queue;
-        cl::Program &program;
         int64_t memorySize;
 
     public:
@@ -39,7 +35,7 @@ namespace gpusat {
          * @param memorySize_
          * @param maxMemoryBuffer_
          */
-        Solver(cl::Context &context_, cl::CommandQueue &queue_, cl::Program &program_, int64_t memorySize_, int64_t maxMemoryBuffer_, dataStructure solutionType_, int64_t maxBag_, SolveMode solve_mode_) : context(context_), queue(queue_), program(program_), memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_), maxBag(maxBag_), solve_mode(solve_mode_) {}
+        Solver(int64_t memorySize_, int64_t maxMemoryBuffer_, dataStructure solutionType_, int64_t maxBag_, SolveMode solve_mode_) : memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_), maxBag(maxBag_), solve_mode(solve_mode_) {}
 
         /**
          * function to solve the sat problem

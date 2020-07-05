@@ -7,7 +7,7 @@
 #include <gpusatpreprocessor.h>
 
 namespace gpusat {
-    void Preprocessor::preprocessDecomp(BagType& decomp, cl_long combineWidth) {
+    void Preprocessor::preprocessDecomp(BagType& decomp, int64_t combineWidth) {
 
         bool changed = true;
         // try to merge child nodes
@@ -24,7 +24,7 @@ namespace gpusat {
                              || edge_b.variables.size() == 0
                              ) && decomp.edges.size() > 1) {
 
-                        std::vector<cl_long> v;
+                        std::vector<int64_t> v;
                         std::set_union(
                                 edge_a.variables.begin(), edge_a.variables.end(),
                                 edge_b.variables.begin(), edge_b.variables.end(),
@@ -33,7 +33,7 @@ namespace gpusat {
                         if (v.size() < combineWidth || edge_a.variables.size() == 0 ||
                             edge_b.variables.size() == 0) {
                             changed = true;
-                            cl_long cid = edge_b.id;
+                            int64_t cid = edge_b.id;
                             edge_a.variables.assign(v.begin(), v.end());
 
                             edge_a.edges.insert(
@@ -55,7 +55,7 @@ namespace gpusat {
             while (changed) {
                 changed = false;
                 for (long i = 0; i < decomp.edges.size(); i++) {
-                    std::vector<cl_long> v;
+                    std::vector<int64_t> v;
                     auto& edge_i = decomp.edges[i];
                     std::set_union(
                             decomp.variables.begin(), decomp.variables.end(),
@@ -65,7 +65,7 @@ namespace gpusat {
 
                     if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
                         changed = true;
-                        cl_long cid = edge_i.id;
+                        int64_t cid = edge_i.id;
                         decomp.variables.assign(v.begin(), v.end());
 
                         decomp.edges.insert(
@@ -87,7 +87,7 @@ namespace gpusat {
         //std::sort(decomp.variables.begin(), decomp.variables.end());
 
         for (long i = 0; i < decomp.edges.size(); i++) {
-            std::vector<cl_long> fVars;
+            std::vector<int64_t> fVars;
             auto& edge_i = decomp.edges[i];
             std::set_intersection(
                     decomp.variables.begin(), decomp.variables.end(),
@@ -119,11 +119,11 @@ namespace gpusat {
 
     }
 
-    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, cl_double &defaultWeight) {
-        for (cl_long i = 0; i < formula.facts.size(); i++) {
-            cl_long fact = formula.facts[i];
-            for (cl_long a = 0; a < formula.clauses.size(); a++) {
-                std::vector<cl_long>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
+    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight) {
+        for (int64_t i = 0; i < formula.facts.size(); i++) {
+            int64_t fact = formula.facts[i];
+            for (int64_t a = 0; a < formula.clauses.size(); a++) {
+                std::vector<int64_t>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
                 if (elem != formula.clauses[a].end()) {
                     if (*elem == (fact)) {
                         //remove clause from formula
@@ -174,7 +174,7 @@ namespace gpusat {
     }
 
 
-    void Preprocessor::relabelDecomp(BagType& decomp, cl_long id) {
+    void Preprocessor::relabelDecomp(BagType& decomp, int64_t id) {
         for (long i = 0; i < decomp.variables.size(); i++) {
             if (decomp.variables[i] > id) {
                 decomp.variables[i]--;
@@ -188,7 +188,7 @@ namespace gpusat {
         }
     }
 
-    void Preprocessor::relabelFormula(satformulaType &formula, cl_long id) {
+    void Preprocessor::relabelFormula(satformulaType &formula, int64_t id) {
         for (long i = 0; i < formula.clauses.size(); i++) {
             for (long j = 0; j < formula.clauses[i].size(); ++j) {
                 if (std::abs(formula.clauses[i][j]) > id) {

@@ -52,7 +52,7 @@ namespace gpusat {
          * @param weights
          *      map containing the weights for each literal
          */
-        void parseWeightLine(std::string item, std::unordered_map<cl_long, cl_double> &weights);
+        void parseWeightLine(std::string item, std::unordered_map<int64_t, double> &weights);
 
         /**
          * parses a clause line of the sat formula
@@ -64,7 +64,7 @@ namespace gpusat {
          * @param clause
          *      the clauses
          */
-        void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
+        void parseClauseLine(satformulaType &ret, std::string &item, std::vector<int64_t> *clause);
 
         /**
          * parses a solution line (not present in cnf format but some preprocessors use it)
@@ -89,7 +89,7 @@ namespace gpusat {
          */
         treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
-        cl_double defaultWeight = 1.0;
+        double defaultWeight = 1.0;
 
     private:
 
@@ -101,7 +101,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges);
+        void parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges);
 
         /**
          * parses the start line from the tree decomposition
@@ -113,7 +113,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges);
+        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges);
 
         /**
          * parses a pag from the tree decomposition

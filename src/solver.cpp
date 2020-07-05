@@ -152,7 +152,7 @@ namespace gpusat {
         hash_combine(h, input.correction);
         hash_combine(h, input.exponent);
         hash_combine(h, input.id);
-        for (cl_long var : input.variables) {
+        for (int64_t var : input.variables) {
             hash_combine(h, var);
         }
         for (const BagType& edge : input.edges) {
@@ -323,7 +323,7 @@ namespace gpusat {
                 BagType& edge1 = node.edges[0];
 
                 bool first = false;
-                for (cl_long i = 1; i < node.edges.size(); i++) {
+                for (int64_t i = 1; i < node.edges.size(); i++) {
                     BagType& edge2 = node.edges[i];
                     std::cerr << "\ncombine step SOLVE (" << node.id << ") " << i << " of " << node.edges.size() - 1 << std::endl;
                     std::cerr << bagTypeHash(edge1) << std::endl;
@@ -340,7 +340,7 @@ namespace gpusat {
                     std::cerr << bagTypeHash(node) << std::endl;
 
 
-                    std::vector<cl_long> vt;
+                    std::vector<int64_t> vt;
                     std::set_union(
                             edge1.variables.begin(), edge1.variables.end(),
                             edge2.variables.begin(), edge2.variables.end(),
@@ -391,9 +391,9 @@ namespace gpusat {
 
             double range = table.maxId - table.minId;
             int64_t s = std::ceil(range / (1l << 31));
-            for (cl_long i = 0; i < s; i++) {
+            for (int64_t i = 0; i < s; i++) {
                 int64_t id1 = (1 << 31) * i;
-                int64_t range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                int64_t range = std::min((int64_t) 1 << 31, (int64_t) table.maxId - table.minId - (1 << 31) * i);
                 RunMeta meta = {
                     .minId = id1,
                     .maxId = id1 + range,
@@ -426,7 +426,7 @@ namespace gpusat {
         return t;
     }
 
-    void Solver::combineTree(TreeSolution &t, TreeSolution &old, cl_long numVars) {
+    void Solver::combineTree(TreeSolution &t, TreeSolution &old, int64_t numVars) {
         std::cerr << "combine tree " << treeTypeHash(t, numVars) << " " << treeTypeHash(old, numVars) << std::endl;
         if (old.size > 0) {
 
@@ -507,35 +507,35 @@ namespace gpusat {
         isSat = 0;
         this->numJoin++;
 
-        CudaBuffer<cl_long> buf_solVars(node.variables);
-        CudaBuffer<cl_long> buf_solVars1(edge1.variables);
-        CudaBuffer<cl_long> buf_solVars2(edge2.variables);
+        CudaBuffer<int64_t> buf_solVars(node.variables);
+        CudaBuffer<int64_t> buf_solVars1(edge1.variables);
+        CudaBuffer<int64_t> buf_solVars2(edge2.variables);
 
 
-        std::unique_ptr<CudaBuffer<cl_double>> buf_weights( std::make_unique<CudaBuffer<cl_double>>() );
+        std::unique_ptr<CudaBuffer<double>> buf_weights( std::make_unique<CudaBuffer<double>>() );
         if (formula.variableWeights != nullptr) {
-            buf_weights = std::make_unique<CudaBuffer<cl_double>>(formula.variableWeights, formula.numWeights);
+            buf_weights = std::make_unique<CudaBuffer<double>>(formula.variableWeights, formula.numWeights);
         }
 
-        node.exponent = CL_LONG_MIN;
-        CudaBuffer<cl_long> buf_exponent(&(node.exponent), 1);
+        node.exponent = INT64_MIN;
+        CudaBuffer<int64_t> buf_exponent(&(node.exponent), 1);
 
-        cl_long usedMemory = sizeof(cl_long) * node.variables.size() * 3 + sizeof(cl_long) * edge1.variables.size() + sizeof(cl_long) * edge2.variables.size() + sizeof(cl_double) * formula.numWeights + sizeof(cl_double) * formula.numWeights;
+        int64_t usedMemory = sizeof(int64_t) * node.variables.size() * 3 + sizeof(int64_t) * edge1.variables.size() + sizeof(int64_t) * edge2.variables.size() + sizeof(double) * formula.numWeights + sizeof(double) * formula.numWeights;
 
-        cl_long s = sizeof(cl_long);
-        cl_long bagSizeNode = 1;
+        int64_t s = sizeof(int64_t);
+        int64_t bagSizeNode = 1;
 
         if (maxBag > 0) {
-            bagSizeNode = 1l << (cl_long) std::min(node.variables.size(), (size_t) maxBag);
+            bagSizeNode = 1l << (int64_t) std::min(node.variables.size(), (size_t) maxBag);
         } else {
             if (solutionType == TREE) {
                 if (nextNode == JOIN) {
-                    bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long) * 3), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
+                    bagSizeNode = std::min((int64_t) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(int64_t) * 3), std::min((int64_t) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 3 / s), 1l << node.variables.size()));
                 } else if (nextNode == INTRODUCEFORGET) {
-                    bagSizeNode = std::min((cl_long) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(cl_long) * 3), std::min((cl_long) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
+                    bagSizeNode = std::min((int64_t) (maxMemoryBuffer / s / 2 - node.variables.size() * sizeof(int64_t) * 3), std::min((int64_t) std::min((memorySize - usedMemory - edge1.maxSize * s - edge2.maxSize * s) / s / 2, (memorySize - usedMemory) / 2 / 2 / s), 1l << node.variables.size()));
                 }
             } else if (solutionType == ARRAY) {
-                bagSizeNode = 1l << (cl_long) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(cl_long)), log2(memorySize / sizeof(cl_long) / 3)));
+                bagSizeNode = 1l << (int64_t) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(int64_t)), log2(memorySize / sizeof(int64_t) / 3)));
             }
         }
 
@@ -543,7 +543,7 @@ namespace gpusat {
 
         node.solution.clear();
 
-        for (cl_long _a = 0, run = 0; _a < maxSize; _a++, run++) {
+        for (int64_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
             ArraySolution solution;
             solution.minId = run * bagSizeNode;
             solution.maxId = std::min(run * bagSizeNode + bagSizeNode,
@@ -559,7 +559,7 @@ namespace gpusat {
             CudaBuffer<double> buf_sol(solution.elements, solution.size);
             CudaBuffer<uint64_t> buf_solBag(&(solution.numSolutions), 1);
 
-            for (cl_long b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
+            for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
                 std::optional<std::variant<TreeSolution, ArraySolution>> edge1_sol = std::nullopt;
                 std::unique_ptr<CudaBuffer<uint64_t>> buf_sol1( std::make_unique<CudaBuffer<uint64_t>>() );
@@ -724,13 +724,13 @@ namespace gpusat {
         std::cerr << "  " << bagTypeHash(node) << std::endl;
         std::cerr << "  " << bagTypeHash(cnode) << std::endl;
         isSat = 0;
-        std::vector<cl_long> fVars;
+        std::vector<int64_t> fVars;
         std::set_intersection(
                 node.variables.begin(), node.variables.end(),
                 pnode.variables.begin(), pnode.variables.end(),
         std::back_inserter(fVars));
-        std::vector<cl_long> iVars = node.variables;
-        std::vector<cl_long> eVars = cnode.variables;
+        std::vector<int64_t> iVars = node.variables;
+        std::vector<int64_t> eVars = cnode.variables;
 
         std::cerr << "variables: " << node.variables.size() << std::endl;
         std::cerr << "fvars: " << fVars.size() << std::endl;
@@ -740,66 +740,66 @@ namespace gpusat {
         this->numIntroduceForget++;
 
         // get clauses which only contain iVars
-        std::vector<cl_long> numVarsClause;
-        std::vector<cl_long> clauses;
-        cl_long numClauses = 0;
-        for (cl_long i = 0; i < formula.clauses.size(); i++) {
-            std::vector<cl_long> v;
+        std::vector<int64_t> numVarsClause;
+        std::vector<int64_t> clauses;
+        int64_t numClauses = 0;
+        for (int64_t i = 0; i < formula.clauses.size(); i++) {
+            std::vector<int64_t> v;
             std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), back_inserter(v), compVars);
             if (v.size() == formula.clauses[i].size()) {
                 numClauses++;
                 numVarsClause.push_back(formula.clauses[i].size());
-                for (cl_long a = 0; a < formula.clauses[i].size(); a++) {
+                for (int64_t a = 0; a < formula.clauses[i].size(); a++) {
                     clauses.push_back(formula.clauses[i][a]);
                 }
             }
         }
 
-        node.exponent = CL_LONG_MIN;
+        node.exponent = INT64_MIN;
 
-        CudaBuffer<cl_long> buf_varsE(eVars);
-        CudaBuffer<cl_long> buf_varsI(iVars);
-        CudaBuffer<cl_long> buf_clauses(clauses);
-        CudaBuffer<cl_long> buf_numVarsC(&numVarsClause[0], numClauses);
-        CudaBuffer<cl_double> buf_weights(formula.variableWeights, formula.numWeights);
-        CudaBuffer<cl_long> buf_exponent(&(node.exponent), 1);
+        CudaBuffer<int64_t> buf_varsE(eVars);
+        CudaBuffer<int64_t> buf_varsI(iVars);
+        CudaBuffer<int64_t> buf_clauses(clauses);
+        CudaBuffer<int64_t> buf_numVarsC(&numVarsClause[0], numClauses);
+        CudaBuffer<double> buf_weights(formula.variableWeights, formula.numWeights);
+        CudaBuffer<int64_t> buf_exponent(&(node.exponent), 1);
 
-        size_t usedMemory = sizeof(cl_long) * eVars.size() + sizeof(cl_long) * iVars.size() * 3 + sizeof(cl_long) * (clauses.size()) + sizeof(cl_long) * (numClauses) + sizeof(cl_double) * formula.numWeights + sizeof(cl_long) * fVars.size() + sizeof(cl_double) * formula.numWeights;
-        cl_long bagSizeForget = 1;
-        cl_long s = sizeof(cl_long);
+        size_t usedMemory = sizeof(int64_t) * eVars.size() + sizeof(int64_t) * iVars.size() * 3 + sizeof(int64_t) * (clauses.size()) + sizeof(int64_t) * (numClauses) + sizeof(double) * formula.numWeights + sizeof(int64_t) * fVars.size() + sizeof(double) * formula.numWeights;
+        int64_t bagSizeForget = 1;
+        int64_t s = sizeof(int64_t);
 
         if (maxBag > 0) {
-            bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) maxBag);
+            bagSizeForget = 1l << (int64_t) std::min(node.variables.size(), (size_t) maxBag);
         } else {
             if (solutionType == TREE) {
                 if (nextNode == JOIN) {
                     bagSizeForget = qmin(
-                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long),
+                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(int64_t),
                         (memorySize - usedMemory - cnode.maxSize * s) / s / 2,
                         (memorySize - usedMemory) / 2 / 3 / s,
                         1l << node.variables.size()
                     );
                 } else if (nextNode == INTRODUCEFORGET) {
                     bagSizeForget = qmin(
-                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(cl_long),
+                        maxMemoryBuffer / s / 2 - 3 * node.variables.size() * sizeof(int64_t),
                         (memorySize - usedMemory - cnode.maxSize * s) / s / 2,
                         (memorySize - usedMemory) / 2 / 2 / s,
                         1l << node.variables.size()
                     );
                 }
             } else if (solutionType == ARRAY) {
-                bagSizeForget = 1l << (cl_long) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(cl_long)), log2(memorySize / sizeof(cl_long) / 3)));
+                bagSizeForget = 1l << (int64_t) std::min(node.variables.size(), (size_t) std::min(log2(maxMemoryBuffer / sizeof(int64_t)), log2(memorySize / sizeof(int64_t) / 3)));
             }
         }
 
-        cl_long maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
+        int64_t maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeForget);
         std::cerr << "bag size forget: " << bagSizeForget << std::endl;
         std::cerr << "variables: " << node.variables.size() << std::endl;
         std::cerr << "used memory: " << usedMemory << std::endl;
 
         node.solution.clear();
 
-        for (cl_long _a = 0, run = 0; _a < maxSize; _a++, run++) {
+        for (int64_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
 
             int64_t sol_minId =  run * bagSizeForget;
             int64_t sol_maxId = std::min(run * bagSizeForget + bagSizeForget, 1l << (node.variables.size()));
@@ -937,7 +937,7 @@ namespace gpusat {
         buf_exponent.read(&(node.exponent));
         std::cerr << "exponent: " << node.exponent << std::endl;
         node.correction = cnode.correction + cnode.exponent;
-        cl_long tableSize = 0;
+        int64_t tableSize = 0;
         for (const auto &sol : node.solution) {
             tableSize += dataStructureSize(sol);
         }

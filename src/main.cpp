@@ -39,7 +39,7 @@ boost::multiprecision::cpp_bin_float_100 bag_sum(BagType& bag) {
     for (auto& solution : bag.solution) {
         std::visit(sum_visitor {
             [&](TreeSolution& sol) {
-                for (int64_t i = sol.minId; i < sol.maxId; i++) {
+                for (uint64_t i = sol.minId; i < sol.maxId; i++) {
                     sols = sols + getCount(i, sol.tree, bag.variables.size());
                 }
             },
@@ -186,10 +186,6 @@ int main(int argc, char *argv[]) {
     }
 
     std::cerr << "solve mode: " << solve_mode << std::endl;
-    cl::Context context;
-    std::vector<cl::Device> devices;
-    cl::CommandQueue queue;
-    cl::Program program;
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
@@ -205,80 +201,72 @@ int main(int argc, char *argv[]) {
     }
 
     //cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
-    try {
-        //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
-        // combine small bags
-        std::cerr << "before pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
-        Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
-        std::cerr << "after pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
+    //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
 
-        std::cout.flush();
+    // combine small bags
+    std::cerr << "before pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
+    Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
+    std::cerr << "after pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
 
-        Solver *sol;
-        auto next = BagType();
-        sol = new Solver(context, queue, program, memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode);
+    std::cout.flush();
 
-        next.variables.assign(
-                treeDecomp.bags[0].variables.begin(),
-                treeDecomp.bags[0].variables.begin()
-                    + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t)12));
-        long long int time_solving = getTime();
-        (*sol).solveProblem(satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
-        time_solving = getTime() - time_solving;
+    Solver *sol;
+    auto next = BagType();
+    sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode);
 
-        std::cout << "\n{\n";
-        std::cout << "    \"Num Join\": " << sol->numJoin;
-        std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
-        std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
+    next.variables.assign(
+            treeDecomp.bags[0].variables.begin(),
+            treeDecomp.bags[0].variables.begin()
+                + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t)12));
+    long long int time_solving = getTime();
+    (*sol).solveProblem(satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
+    time_solving = getTime() - time_solving;
 
-        //sum up last node solutions
-        long long int time_model = getTime();
-        boost::multiprecision::cpp_bin_float_100 sols = 0.0;
-        if ((*sol).isSat > 0) {
-            sols += bag_sum(treeDecomp.bags[0]);
-            for (auto& solution : treeDecomp.bags[0].solution) {
-                freeData(solution);
-            }
+    std::cout << "\n{\n";
+    std::cout << "    \"Num Join\": " << sol->numJoin;
+    std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
+    std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
 
-            if (!noExp) {
-                boost::multiprecision::cpp_bin_float_100 base = 2;
-                boost::multiprecision::cpp_bin_float_100 exponent = treeDecomp.bags[0].correction;
-                sols = sols * pow(base, exponent);
-            }
-
-            if (weighted) {
-                sols = sols * tdParser.defaultWeight;
-            }
-
-            char buf[128];
-
-            std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << sols;
-
-        } else {
-            std::cout << "\n    ,\"Model Count\": " << 0;
+    //sum up last node solutions
+    long long int time_model = getTime();
+    boost::multiprecision::cpp_bin_float_100 sols = 0.0;
+    if ((*sol).isSat > 0) {
+        sols += bag_sum(treeDecomp.bags[0]);
+        for (auto& solution : treeDecomp.bags[0].solution) {
+            freeData(solution);
         }
-        time_model = getTime() - time_model;
-        time_total = getTime() - time_total;
-        std::cout.precision(6);
-        std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
-        std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
-        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        std::cout << "\n    }";
-        std::cout << "\n}\n";
-        std::cout.flush();
-        if (sols > 0) {
-            exit(10);
-        } else {
-            exit(20);
+
+        if (!noExp) {
+            boost::multiprecision::cpp_bin_float_100 base = 2;
+            boost::multiprecision::cpp_bin_float_100 exponent = treeDecomp.bags[0].correction;
+            sols = sols * pow(base, exponent);
         }
+
+        if (weighted) {
+            sols = sols * tdParser.defaultWeight;
+        }
+
+        char buf[128];
+
+        std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << sols;
+
+    } else {
+        std::cout << "\n    ,\"Model Count\": " << 0;
     }
-    catch (cl::Error &err) {
-        std::cerr << "\nERROR: " << err.what() << "(" << err.err() << ")" << std::endl;
-        if (err.err() == CL_BUILD_PROGRAM_FAILURE) {
-            std::string str = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]);
-            std::cout << "Program Info: " << str << std::endl;
-        }
+    time_model = getTime() - time_model;
+    time_total = getTime() - time_total;
+    std::cout.precision(6);
+    std::cout << "\n    ,\"Time\":{";
+    std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+    std::cout << "\n        ,\"Solving\": " << ((float) time_solving) / 1000;
+    std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+    std::cout << "\n    }";
+    std::cout << "\n}\n";
+    std::cout.flush();
+    if (sols > 0) {
+        exit(10);
+    } else {
+        exit(20);
     }
 }
 
