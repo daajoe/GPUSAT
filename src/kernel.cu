@@ -10,67 +10,59 @@
 
 namespace gpusat {
 
-__device__ long atomicAdd(long* address, long val)
-{
-    unsigned long long int* address_as_ull =
-                              (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
 
+__device__ uint64_t atomicAdd(uint64_t* address, uint64_t val)
+{
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
+    unsigned long long int old = *address_as_ull, assumed;
     do {
         assumed = old;
         old = atomicCAS(address_as_ull, assumed,
-                        (val +
-                               (long)(assumed)));
+                        (val + (uint64_t)(assumed)));
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
-
     return old;
 }
 
-__device__ long atomicSub(long* address, long val)
+__device__ uint64_t atomicSub(uint64_t* address, uint64_t val)
 {
-    unsigned long long int* address_as_ull =
-                              (unsigned long long int*)address;
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
     unsigned long long int old = *address_as_ull, assumed;
-
     do {
         assumed = old;
         old = atomicCAS(address_as_ull, assumed,
-                        ((long)(assumed) - val));
+                        (val - (uint64_t)(assumed)));
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
-
     return old;
 }
 
-
-__device__ long atomicMax(long* address, long val)
+__device__ int64_t atomicMax(int64_t* address, int64_t val)
 {
-    unsigned long long int* address_as_ull =
-                              (unsigned long long int*)address;
+    unsigned long long int* address_as_ull = (unsigned long long int*)address;
     unsigned long long int old = *address_as_ull, assumed;
-
     do {
         assumed = old;
         old = atomicCAS(address_as_ull, assumed,
-                        max(val,
-                               (long)(assumed)));
+                        (max(val, (int64_t)(assumed))));
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
-
     return old;
 }
-
 
 // FIXME: normal atomicAdd might not be atomic across devices
 
 
-__device__ long get_global_id() {
+__device__ int64_t get_global_id(const RunMeta& meta) {
     // TODO: y and z
-    return blockDim.x * blockIdx.x + threadIdx.x;
+    int64_t id = blockDim.x * blockIdx.x + threadIdx.x + meta.minId;
+    if (id >= meta.maxId) {
+        return -1;
+    }
+    return id;
 }
 
 /**
@@ -85,10 +77,10 @@ __device__ long get_global_id() {
  * @return
  *      the model count
  */
-__host__ __device__ double getCount(long id, const TreeNode *tree, long numVars) {
+__host__ __device__ double getCount(int64_t id, const TreeNode *tree, long numVars) {
     ulong nextId = 0;
     for (ulong i = 0; i < numVars; i++) {
-        nextId = ((uint *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
+        nextId = ((uint32_t *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
         if (nextId == 0) {
             return 0.0;
         }
@@ -110,7 +102,7 @@ __host__ __device__ double getCount(long id, const TreeNode *tree, long numVars)
  * @param value
  *      the new value of the id
  */
-__device__ void setCount(long id, long *tree, long numVars, long *treeSize, double value) {
+__device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* treeSize, double value) {
     ulong nextId = 0;
     ulong val = 0;
     if (numVars == 0) {
@@ -131,7 +123,7 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
         }
         nextId = *lowVal;
     }
-    tree[nextId] = __double_as_longlong(value);
+    tree[nextId].content = value;
 }
 
 /**
@@ -150,15 +142,23 @@ __device__ void setCount(long id, long *tree, long numVars, long *treeSize, doub
  * @param exponent
   *     the max exponent of this run
  */
-__global__ void array2tree(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, long id_offset, long max_id, SolveMode mode) {
-    long id = get_global_id() + id_offset;
-    if (id >= max_id) {
+__global__ void array2tree(
+        size_t numVars, 
+        TreeNode *tree, 
+        const double *solutions_old,
+        uint64_t *treeSize,
+        int64_t startId,
+        int64_t *exponent,
+        const RunMeta meta
+) {
+    int64_t id = get_global_id(meta);
+    if (id < 0) {
         return;
     }
     if (solutions_old[id] > 0) {
         setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
-        if (!(mode & NO_EXP)) {
-            atomicMax(exponent, ilogb(solutions_old[id]));
+        if (!(meta.mode & NO_EXP)) {
+            atomicMax(exponent, (int64_t)ilogb(solutions_old[id]));
         }
     }
 }
@@ -177,12 +177,19 @@ __global__ void array2tree(long numVars, long *tree, double *solutions_old, long
  * @param startId
   *     the start id of the current node
  */
-__global__ void combineTree(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, long id_offset, long max_id) {
-    long id = get_global_id() + id_offset;
-    if (id >= max_id) {
+__global__ void combineTree(
+        uint64_t numVars,
+        TreeNode *tree,
+        const TreeNode *solutions_old,
+        uint64_t *treeSize,
+        int64_t startId,
+        const RunMeta meta
+) {
+    int64_t id = get_global_id(meta);
+    if (id < 0) {
         return;
     }
-    double val = getCount(id + startId, (TreeNode*)solutions_old, numVars);
+    double val = getCount(id + startId, solutions_old, numVars);
     if (val > 0) {
         setCount(id + startId, tree, numVars, treeSize, val);
     }
@@ -213,11 +220,11 @@ __device__ double solveIntroduce_(
         const std::variant<TreeSolution, ArraySolution> &edge,
         GPUVars edgeVariables,
         double *weights,
-        long id,
+        int64_t id,
         SolveMode mode
 ) {
-    long otherId = 0;
-    long a = 0, b = 0;
+    int64_t otherId = 0;
+    int64_t a = 0, b = 0;
     double weight = 1.0;
     for (b = 0; b < edgeVariables.count && a < variables.count; b++) {
         while ((variables.vars[a] != edgeVariables.vars[b])) {
@@ -244,7 +251,7 @@ __device__ double solveIntroduce_(
         if (auto sol = std::get_if<TreeSolution>(&edge)) {
             return getCount(otherId, sol->tree, edgeVariables.count) * weight;
         } else if (auto sol = std::get_if<ArraySolution>(&edge)) {
-            return __longlong_as_double(sol->elements[otherId - sol->minId]) * weight;
+            return sol->elements[otherId - sol->minId] * weight;
         } else {
             return -1.0;
         }
@@ -272,7 +279,7 @@ __device__ double solveIntroduce_(
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-__device__ int checkBag(long *clauses, long *numVarsC, long numclauses, long id, GPUVars variables) {
+__device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t id, GPUVars variables) {
     long i, varNum = 0;
     long satC = 0, a, b;
     // iterate through all clauses
@@ -355,19 +362,17 @@ __global__ void solveJoin(
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
-        long startIDNode,
-        long startIDEdge1,
-        long startIDEdge2,
+        int64_t startIDNode,
+        int64_t startIDEdge1,
+        int64_t startIDEdge2,
         double *weights,
-        long *sols,
+        uint64_t *sols,
         double value,
-        long *exponent,
-        long id_offset,
-        long max_id,
-        SolveMode mode
+        int64_t *exponent,
+        const RunMeta run
 ) {
-    long id = get_global_id() + id_offset;
-    if (id >= max_id) {
+    int64_t id = get_global_id(run);
+    if (id < 0) {
         return;
     }
 
@@ -375,11 +380,11 @@ __global__ void solveJoin(
     double weight = 1;
     if (edge1.has_value()) {
         // get solution count from first edge
-        tmp = solveIntroduce_(variables, edge1.value(), edgeVariables1, weights, id, mode);
+        tmp = solveIntroduce_(variables, edge1.value(), edgeVariables1, weights, id, run.mode);
     }
     if (edge2.has_value()) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(variables, edge2.value(), edgeVariables2, weights, id, mode);
+        tmp_ = solveIntroduce_(variables, edge2.value(), edgeVariables2, weights, id, run.mode);
     }
     // weighted model count
     if (weights != 0) {
@@ -388,12 +393,11 @@ __global__ void solveJoin(
         }
     }
 
-
     if (tmp_ >= 0.0 && tmp >= 0.0) {
         if (tmp_ > 0.0 && tmp > 0.0) {
             atomicAdd(sols, 1);
         }
-        if (!(mode & NO_EXP)) {
+        if (!(run.mode & NO_EXP)) {
             solutions[id - startIDNode] = tmp_ * tmp / value / weight;
         } else {
             solutions[id - startIDNode] = tmp_ * tmp / weight;
@@ -434,14 +438,14 @@ __global__ void solveJoin(
             oldVal = 1.0;
         }
 
-        if (!(mode & NO_EXP)) {
+        if (!(run.mode & NO_EXP)) {
             solutions[id - startIDNode] = tmp_ * oldVal / value;
         } else {
             solutions[id - startIDNode] = tmp_ * oldVal;
         }
     }
-    if (mode & ARRAY_TYPE && !(mode & NO_EXP)) {
-        atomicMax(exponent, ilogb(__longlong_as_double(solutions[id - startIDNode])));
+    if (run.mode & ARRAY_TYPE && !(run.mode & NO_EXP)) {
+        atomicMax(exponent, ilogb(solutions[id - startIDNode]));
     }
 }
 
@@ -551,10 +555,10 @@ __global__ void solveIntroduceForget(
         GPUVars varsForget,
         const std::variant<TreeSolution, ArraySolution> solsE,
         GPUVars lastVars,
-        long combinations,
-        long startIDF,
-        long startIDE,
-        long *sols,
+        uint64_t combinations,
+        int64_t startIDF,
+        int64_t startIDE,
+        uint64_t *sols,
         GPUVars varsIntroduce,
         long *clauses,
         long *numVarsC,
@@ -562,12 +566,10 @@ __global__ void solveIntroduceForget(
         double *weights,
         long *exponent,
         double value,
-        long id_offset,
-        long max_id,
-        SolveMode mode
+        const RunMeta run
 ) {
-    long id = get_global_id() + id_offset;
-    if (id >= max_id) {
+    int64_t id = get_global_id(run);
+    if (id < 0) {
         return;
     }
     if (varsIntroduce.count != varsForget.count) {
@@ -591,67 +593,67 @@ __global__ void solveIntroduceForget(
                     b++;
                 }
             }
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, otherId, mode);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, otherId, run.mode);
         }
         
         if (tmp > 0) {
             if (auto sol = std::get_if<TreeSolution>(&solsF)) {
                 double last = getCount(id, sol->tree, varsForget.count);
-                if (!(mode & NO_EXP))  {
-                    setCount(id, (long*)sol->tree, varsForget.count, sols, (tmp / value + last));
+                if (!(run.mode & NO_EXP))  {
+                    setCount(id, sol->tree, varsForget.count, sols, (tmp / value + last));
                     atomicMax(exponent, ilogb((tmp / value + last)));
                 } else {
-                    setCount(id, (long*)sol->tree, varsForget.count, sols, (tmp + last));
+                    setCount(id, sol->tree, varsForget.count, sols, (tmp + last));
                 }
             } else if (auto sol = std::get_if<ArraySolution>(&solsF)) {
-                double last=__longlong_as_double(sol->elements[id - (startIDF)]);
+                double last=sol->elements[id - (startIDF)];
                 atomicAdd(sols, 1);
                 //*sols += 1;
-                if (!(mode & NO_EXP))  {
-                    sol->elements[id - (startIDF)] = __double_as_longlong(tmp / value + last);
+                if (!(run.mode & NO_EXP))  {
+                    sol->elements[id - (startIDF)] = tmp / value + last;
                     atomicMax(exponent, ilogb(tmp / value + last));
                 } else {
-                    sol->elements[id - (startIDF)] = __double_as_longlong(tmp + last);
+                    sol->elements[id - (startIDF)] = tmp + last;
                 }
             }
         }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id, mode);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id, run.mode);
         if (tmp > 0) {
             if (auto sol = std::get_if<TreeSolution>(&solsF)) {
                 double last = getCount(id, sol->tree, varsForget.count);
-                if (!(mode & NO_EXP))  {
-                    setCount(id, (long*)sol->tree, varsForget.count, sols, (tmp / value + last));
+                if (!(run.mode & NO_EXP))  {
+                    setCount(id, sol->tree, varsForget.count, sols, (tmp / value + last));
                     atomicMax(exponent, ilogb((tmp / value + last)));
                 } else {
-                    setCount(id, (long*)sol->tree, varsForget.count, sols, (tmp + last));
+                    setCount(id, sol->tree, varsForget.count, sols, (tmp + last));
                 }
             } else if (auto sol = std::get_if<ArraySolution>(&solsF)) {
-                double last=__longlong_as_double(sol->elements[id - (startIDF)]);
+                double last=sol->elements[id - (startIDF)];
                 atomicAdd(sols, 1);
                 //*sols += 1;
-                if (!(mode & NO_EXP))  {
-                    sol->elements[id - (startIDF)] = __double_as_longlong(tmp / value + last);
+                if (!(run.mode & NO_EXP))  {
+                    sol->elements[id - (startIDF)] = tmp / value + last;
                     atomicMax(exponent, ilogb(tmp / value + last));
                 } else {
-                    sol->elements[id - (startIDF)] = __double_as_longlong(tmp + last);
+                    sol->elements[id - (startIDF)] = tmp + last;
                 }
             }
         }
-    }
+    } 
 }
 
-
-__global__ void helloWorldKernel(int val)
-{
-    printf("[%d, %d]:\t\tHello, World! Val: %d\n",\
-            blockIdx.y*gridDim.x+blockIdx.x,\
-            threadIdx.z*blockDim.x*blockDim.y+threadIdx.y*blockDim.x+threadIdx.x, val);
-}
-
-void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset) {
+void combineTreeWrapper(
+    uint64_t numVars,
+    TreeNode *tree,
+    const TreeNode *solutions_old,
+    uint64_t *treeSize,
+    int64_t startId,
+    RunMeta meta
+) {
     int threadsPerBlock = 256;
+    int threads = meta.maxId - meta.minId;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
         numVars,
@@ -659,15 +661,23 @@ void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *tre
         solutions_old,
         treeSize,
         startId,
-        id_offset,
-        threads + id_offset
+        meta
     );
     cudaDeviceSynchronize();
 }
 
-void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode) {
+void array2treeWrapper(
+    size_t numVars, 
+    TreeNode *tree, 
+    const double *solutions_old,
+    uint64_t *treeSize,
+    int64_t startId,
+    int64_t *exponent,
+    RunMeta meta
+) {
     
     int threadsPerBlock = 256;
+    int threads = meta.maxId - meta.minId;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     array2tree<<<blocksPerGrid, threadsPerBlock>>>(
         numVars,
@@ -676,114 +686,90 @@ void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *tr
         treeSize,
         startId,
         exponent,
-        id_offset,
-        threads + id_offset,
-        mode
+        meta
     );
     cudaDeviceSynchronize();
 }
 
 void solveJoinWrapper(
-        double *solutions,
-        std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
-        std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
-        GPUVars variables,
-        GPUVars edgeVariables1,
-        GPUVars edgeVariables2,
-        long startIDNode,
-        long startIDEdge1,
-        long startIDEdge2,
-        double *weights,
-        long *sols,
-        double value,
-        long *exponent,
-        size_t threads,
-        long id_offset,
-        SolveMode mode
+    double *solutions,
+    std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
+    std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
+    GPUVars variables,
+    GPUVars edgeVariables1,
+    GPUVars edgeVariables2,
+    int64_t startIDNode,
+    int64_t startIDEdge1,
+    int64_t startIDEdge2,
+    double *weights,
+    uint64_t *sols,
+    double value,
+    int64_t *exponent,
+    RunMeta meta
 ) {
-
     int threadsPerBlock = 256;
+    int threads = meta.maxId - meta.minId;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
-                    solutions,
-                    std::move(edge1),
-                    std::move(edge2),
-                    variables,
-                    edgeVariables1,
-                    edgeVariables2,
-                    startIDNode,
-                    startIDEdge1,
-                    startIDEdge2,
-                    weights,
-                    sols,
-                    value, 
-                    exponent,
-                    id_offset,
-                    threads + id_offset,
-                    mode
+        solutions,
+        std::move(edge1),
+        std::move(edge2),
+        variables,
+        edgeVariables1,
+        edgeVariables2,
+        startIDNode,
+        startIDEdge1,
+        startIDEdge2,
+        weights,
+        sols,
+        value, 
+        exponent,
+        meta
     );
 
     cudaDeviceSynchronize();
 }
 
 void introduceForgetWrapper(
-        std::variant<TreeSolution, ArraySolution> solsF,
-        GPUVars varsForget,
-        std::variant<TreeSolution, ArraySolution> solsE,
-        GPUVars lastVars,
-        long combinations,
-        long startIDF,
-        long startIDE,
-        long *sols,
-        GPUVars varsIntroduce,
-        long *clauses,
-        long *numVarsC,
-        long numclauses,
-        double *weights,
-        long *exponent,
-        double value,
-        size_t threads,
-        long id_offset,
-        SolveMode mode
-    ) {
-
+    std::variant<TreeSolution, ArraySolution> solsF,
+    GPUVars varsForget,
+    std::variant<TreeSolution, ArraySolution> solsE,
+    GPUVars lastVars,
+    uint64_t combinations,
+    int64_t startIDF,
+    int64_t startIDE,
+    uint64_t *sols,
+    GPUVars varsIntroduce,
+    long *clauses,
+    long *numVarsC,
+    long numclauses,
+    double *weights,
+    int64_t *exponent,
+    double value,
+    RunMeta meta
+) {
     int threadsPerBlock = 256;
+    int threads = meta.maxId - meta.minId;
     int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
-                    std::move(solsF),
-                    varsForget,
-                    std::move(solsE),
-                    lastVars,
-                    combinations,
-                    startIDF,
-                    startIDE,
-                    sols,
-                    varsIntroduce,
-                    clauses,
-                    numVarsC,
-                    numclauses,
-                    weights,
-                    exponent, 
-                    value,
-                    id_offset,
-                    threads + id_offset,
-                    mode);
+        std::move(solsF),
+        varsForget,
+        std::move(solsE),
+        lastVars,
+        combinations,
+        startIDF,
+        startIDE,
+        sols,
+        varsIntroduce,
+        clauses,
+        numVarsC,
+        numclauses,
+        weights,
+        exponent, 
+        value,
+        meta
+    );
 
     cudaDeviceSynchronize();
-    /*
-    int *mem;
-    dim3 threads(2, 1);
-    dim3 blocks(1, 1);
-
-    cudaMalloc((void**)&mem, sizeof(int));
-
-    cudaMemcpy(mem, &val, sizeof(int), cudaMemcpyHostToDevice);
-
-    printf("running kernel..\n");
-    helloWorldKernel<<< blocks, threads>>>(mem);
-
-    printf("synchronize: %d\n", cudaDeviceSynchronize());
-    cudaFree(mem);
-    */
 }
 }

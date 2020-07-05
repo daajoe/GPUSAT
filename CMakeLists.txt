@@ -7,6 +7,9 @@ link_directories("$ENV{CUDA_PATH}/lib/x64")
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
+add_library(gpusat_kernel STATIC "src/kernel.cu")
+target_compile_options(gpusat_kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_75,code=sm_75>)
+
 if (DEBUG)
     # compiler flags
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -O0 -Wno-ignored-attributes")
@@ -22,10 +25,6 @@ elseif (UNIX)
     # linker flags
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
 endif ()
-
-
-add_library(gpusat_kernel STATIC "src/kernel.cu")
-target_compile_options(gpusat_kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_75,code=sm_75>)
 
 find_library(HTD_LIB htd)
 add_library(htd STATIC IMPORTED)

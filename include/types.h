@@ -19,7 +19,7 @@ namespace gpusat {
     /// array type for storing the models
     struct ArraySolution {
         double *elements = nullptr;
-        int64_t numSolutions = 0;
+        uint64_t numSolutions = 0;
         size_t size = 0;
         int64_t minId = 0;
         int64_t maxId = 0;
@@ -36,7 +36,7 @@ namespace gpusat {
 
     struct TreeNode {
         union {
-            int64_t empty;
+            uint64_t empty;
             struct {
                 uint32_t lowerIdx;
                 uint32_t upperIdx;
@@ -53,7 +53,7 @@ namespace gpusat {
     /// tree type for storing the models
     struct TreeSolution {
         TreeNode *tree = nullptr;
-        int64_t numSolutions = 0;
+        uint64_t numSolutions = 0;
         size_t size = 0;
         int64_t minId = 0;
         int64_t maxId = 0;
@@ -68,11 +68,11 @@ namespace gpusat {
         TreeSolution& operator=(TreeSolution&& other) = default;
     };
 
-    static_assert(sizeof(TreeNode) == sizeof(int64_t));
+    static_assert(sizeof(TreeNode) == sizeof(uint64_t));
 
     struct GPUVars {
         /// Number of variables.
-        int64_t count;
+        size_t count;
         /// Pointer to GPU memory containing the variable buffer.
         int64_t* vars;
     };
@@ -112,27 +112,27 @@ namespace gpusat {
         );
     }
 
-    GPU_HOST_ATTR inline int64_t numSolutions(const std::variant<TreeSolution, ArraySolution>& solution) {
-        return dataStructureVisit<int64_t>(solution,
+    GPU_HOST_ATTR inline uint64_t numSolutions(const std::variant<TreeSolution, ArraySolution>& solution) {
+        return dataStructureVisit<uint64_t>(solution,
             [](const TreeSolution& sol) { return sol.numSolutions; },
             [](const ArraySolution& sol) { return sol.numSolutions; }
         );
     }
 
-    inline int64_t* numSolutionsPtr(std::variant<TreeSolution, ArraySolution>& solution) {
+    inline uint64_t* numSolutionsPtr(std::variant<TreeSolution, ArraySolution>& solution) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
-            return (int64_t*)&(sol->numSolutions);
+            return (uint64_t*)&(sol->numSolutions);
         } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
-            return (int64_t*)&(sol->numSolutions);
+            return (uint64_t*)&(sol->numSolutions);
         }
         return NULL;
     }
 
-    GPU_HOST_ATTR inline int64_t* dataPtr(std::variant<TreeSolution, ArraySolution>& solution) {
+    GPU_HOST_ATTR inline uint64_t* dataPtr(std::variant<TreeSolution, ArraySolution>& solution) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
-            return (int64_t*)sol->tree;
+            return (uint64_t*)sol->tree;
         } else if (auto sol = std::get_if<ArraySolution>(&solution)) {
-            return (int64_t*)sol->elements;
+            return (uint64_t*)sol->elements;
         }
         return NULL;
     }
@@ -227,6 +227,12 @@ namespace gpusat {
         ARRAY_TYPE = 1 << 0,
         NO_EXP = 1 << 1,
     };
+
+    typedef struct {
+        int64_t minId;
+        int64_t maxId;
+        SolveMode mode;
+    } RunMeta;
 
     GPU_HOST_ATTR inline SolveMode operator|(SolveMode a, SolveMode b)
     {

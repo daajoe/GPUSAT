@@ -35,20 +35,18 @@ namespace gpusat {
         GPUVars varsForget,
         std::variant<TreeSolution, ArraySolution> solsE,
         GPUVars lastVars,
-        long combinations,
-        long startIDF,
-        long startIDE,
-        long *sols,
+        uint64_t combinations,
+        int64_t startIDF,
+        int64_t startIDE,
+        uint64_t *sols,
         GPUVars varsIntroduce,
         long *clauses,
         long *numVarsC,
         long numclauses,
         double *weights,
-        long *exponent,
+        int64_t *exponent,
         double value,
-        size_t threads,
-        long id_offset,
-        SolveMode mode
+        RunMeta meta
     );
 
     extern void solveJoinWrapper(
@@ -58,24 +56,34 @@ namespace gpusat {
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
-        long startIDNode,
-        long startIDEdge1,
-        long startIDEdge2,
+        int64_t startIDNode,
+        int64_t startIDEdge1,
+        int64_t startIDEdge2,
         double *weights,
-        long *sols,
+        uint64_t *sols,
         double value,
-        long *exponent,
-        size_t threads,
-        long id_offset,
-        SolveMode mode
+        int64_t *exponent,
+        RunMeta meta
     );
 
-    extern void array2treeWrapper(long numVars, long *tree, double *solutions_old, long *treeSize, long startId, long *exponent, size_t threads, long id_offset, SolveMode mode);
+    extern void array2treeWrapper(
+        size_t numVars,
+        TreeNode *tree,
+        const double *solutions_old,
+        uint64_t *treeSize,
+        int64_t startId,
+        int64_t *exponent,
+        RunMeta meta
+    );
 
-    extern void combineTreeWrapper(long numVars, long *tree, long *solutions_old, long *treeSize, long startId, size_t threads, long id_offset);
-
-
-
+    extern void combineTreeWrapper(
+        uint64_t numVars,
+        TreeNode *tree,
+        const TreeNode *solutions_old,
+        uint64_t *treeSize,
+        int64_t startId,
+        RunMeta meta
+    );
 
     // taken from boost
     template <class T>
@@ -186,7 +194,7 @@ namespace gpusat {
             ~CudaBuffer();
     };
 
-    std::variant<TreeSolution, ArraySolution> gpuSolutionCopy(const std::variant<TreeSolution, ArraySolution>& solution, long* element_buffer) {
+    std::variant<TreeSolution, ArraySolution> gpuSolutionCopy(const std::variant<TreeSolution, ArraySolution>& solution, uint64_t* element_buffer) {
         if (auto sol = std::get_if<TreeSolution>(&solution)) {
             return TreeSolution {
                 .tree = (TreeNode*)element_buffer,
@@ -376,27 +384,29 @@ namespace gpusat {
             delete [] table.elements;
             table.elements = NULL;
 
-            CudaBuffer<int64_t> buf_sols_new(t.size + 2 * numVars);
+            CudaBuffer<TreeNode> buf_sols_new(t.size + 2 * numVars);
 
-            CudaBuffer<int64_t> buf_num_sol(&(t.numSolutions), 1);
+            CudaBuffer<uint64_t> buf_num_sol(&(t.numSolutions), 1);
             CudaBuffer<int64_t> buf_exp(&(node.exponent), 1);
 
-            cl_long error1 = 0, error2 = 0;
-            cl_double range = table.maxId - table.minId;
-            cl_long s = std::ceil(range / (1l << 31));
+            double range = table.maxId - table.minId;
+            int64_t s = std::ceil(range / (1l << 31));
             for (cl_long i = 0; i < s; i++) {
-                cl_long id1 = (1 << 31) * i;
-                cl_long range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                int64_t id1 = (1 << 31) * i;
+                int64_t range = std::min((cl_long) 1 << 31, (cl_long) table.maxId - table.minId - (1 << 31) * i);
+                RunMeta meta = {
+                    .minId = id1,
+                    .maxId = id1 + range,
+                    .mode = solve_mode
+                };
                 array2treeWrapper(
                     numVars,
-                    (int64_t*)buf_sols_new.device_mem,
+                    buf_sols_new.device_mem,
                     buf_sols_old.device_mem,
                     buf_num_sol.device_mem,
                     table.minId,
                     buf_exp.device_mem,
-                    range,
-                    id1,
-                    solve_mode
+                    meta
                 );
             }
             // actually the tree size
@@ -429,21 +439,25 @@ namespace gpusat {
             free(old.tree);
             old.tree = NULL;
 
-            CudaBuffer<cl_long> buf_num_sol(&t.numSolutions, 1);
+            CudaBuffer<uint64_t> buf_num_sol(&t.numSolutions, 1);
 
-            cl_double range = old.maxId - old.minId;
-            cl_long s = std::ceil(range / (1l << 31));
+            double range = old.maxId - old.minId;
+            int64_t s = std::ceil(range / (1l << 31));
             for (long i = 0; i < s; i++) {
-                cl_long id1 = (1 << 31) * i;
-                cl_long range = std::min((int64_t)1 << 31, old.maxId - old.minId - (1 << 31) * i);
+                int64_t id1 = (1 << 31) * i;
+                int64_t range = std::min((int64_t)1 << 31, old.maxId - old.minId - (1 << 31) * i);
+                RunMeta meta = {
+                    .minId = id1,
+                    .maxId = id1 + range,
+                    .mode = solve_mode
+                };
                 combineTreeWrapper(
                     numVars,
-                    (int64_t*)buf_sols_new.device_mem,
-                    (int64_t*)buf_sols_old.device_mem,
+                    buf_sols_new.device_mem,
+                    buf_sols_old.device_mem,
                     buf_num_sol.device_mem,
                     old.minId,
-                    range,
-                    id1
+                    meta
                 );
             }
             buf_num_sol.read(&t.numSolutions);
@@ -543,14 +557,14 @@ namespace gpusat {
             }
 
             CudaBuffer<double> buf_sol(solution.elements, solution.size);
-            CudaBuffer<int64_t> buf_solBag(&(solution.numSolutions), 1);
+            CudaBuffer<uint64_t> buf_solBag(&(solution.numSolutions), 1);
 
             for (cl_long b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
                 std::optional<std::variant<TreeSolution, ArraySolution>> edge1_sol = std::nullopt;
-                std::unique_ptr<CudaBuffer<int64_t>> buf_sol1( std::make_unique<CudaBuffer<int64_t>>() );
+                std::unique_ptr<CudaBuffer<uint64_t>> buf_sol1( std::make_unique<CudaBuffer<uint64_t>>() );
                 if (b < edge1.solution.size() && dataPtr(edge1.solution[b]) != NULL) {
-                    buf_sol1 = std::make_unique<CudaBuffer<int64_t>>(
+                    buf_sol1 = std::make_unique<CudaBuffer<uint64_t>>(
                         dataPtr(edge1.solution[b]),
                         dataStructureSize(edge1.solution[b])
                     );
@@ -559,9 +573,9 @@ namespace gpusat {
                 }
 
                 std::optional<std::variant<TreeSolution, ArraySolution>> edge2_sol = std::nullopt;
-                std::unique_ptr<CudaBuffer<int64_t>> buf_sol2( std::make_unique<CudaBuffer<int64_t>>() );
+                std::unique_ptr<CudaBuffer<uint64_t>> buf_sol2( std::make_unique<CudaBuffer<uint64_t>>() );
                 if (b < edge2.solution.size() && dataPtr(edge2.solution[b]) != NULL) {
-                    buf_sol2 = std::make_unique<CudaBuffer<int64_t>>(
+                    buf_sol2 = std::make_unique<CudaBuffer<uint64_t>>(
                         dataPtr(edge2.solution[b]),
                         dataStructureSize(edge2.solution[b])
                     );
@@ -569,24 +583,29 @@ namespace gpusat {
                     edge2_sol = std::move(copy);
                 }
 
-                long id_offset = solution.minId;
-                size_t threads = static_cast<size_t>(solution.maxId - solution.minId);
+                int64_t id_offset = solution.minId;
+                int64_t threads = solution.maxId - solution.minId;
                 std::cerr << "thread offset: " << id_offset << " threads " << threads << std::endl;
+                RunMeta meta = {
+                    .minId = id_offset,
+                    .maxId = id_offset + threads,
+                    .mode = solve_mode
+                };
 
                 solveJoinWrapper(
                     buf_sol.device_mem,
                     std::move(edge1_sol),
                     std::move(edge2_sol),
                     GPUVars {
-                        .count = (int64_t)node.variables.size(),
+                        .count = node.variables.size(),
                         .vars = buf_solVars.device_mem
                     },
                     GPUVars {
-                        .count = (int64_t)edge1.variables.size(),
+                        .count = edge1.variables.size(),
                         .vars = buf_solVars1.device_mem
                     },
                     GPUVars {
-                        .count = (int64_t)edge2.variables.size(),
+                        .count = edge2.variables.size(),
                         .vars = buf_solVars2.device_mem
                     },
                     solution.minId,
@@ -596,9 +615,7 @@ namespace gpusat {
                     buf_solBag.device_mem,
                     pow(2, edge1.exponent + edge2.exponent),
                     buf_exponent.device_mem,
-                    threads,
-                    id_offset,
-                    solve_mode
+                    meta
                 );
             }
 
@@ -794,36 +811,40 @@ namespace gpusat {
                 (sol_maxId - sol_minId) * 2 + node.variables.size()
             );
 
-            CudaBuffer<cl_long> buf_solsF(dataPtr(solution), dataStructureSize(solution));
-            CudaBuffer<cl_long> buf_varsF(fVars);
-            CudaBuffer<cl_long> buf_solBag(numSolutionsPtr(solution), 1);
+            CudaBuffer<uint64_t> buf_solsF(dataPtr(solution), dataStructureSize(solution));
+            CudaBuffer<int64_t> buf_varsF(fVars);
+            CudaBuffer<uint64_t> buf_solBag(numSolutionsPtr(solution), 1);
 
             for (auto &csol : cnode.solution) {
                 if (dataPtr(csol) == NULL) {
                     continue;
                 }
 
-                std::unique_ptr<CudaBuffer<int64_t>> buf_solsE( std::make_unique<CudaBuffer<int64_t>>() );
+                std::unique_ptr<CudaBuffer<uint64_t>> buf_solsE( std::make_unique<CudaBuffer<uint64_t>>() );
                 if (!leaf) {
-                    buf_solsE = std::make_unique<CudaBuffer<cl_long>>(dataPtr(csol), dataStructureSize(csol));
+                    buf_solsE = std::make_unique<CudaBuffer<uint64_t>>(dataPtr(csol), dataStructureSize(csol));
                 }
                 auto solsE = gpuSolutionCopy(csol, buf_solsE->device_mem);
 
-                size_t threads = static_cast<size_t>(maxId(solution) - minId(solution));
-                long id_offset = minId(solution);
-
-                int64_t combinations = (int64_t) pow(2, iVars.size() - fVars.size());
+                int64_t threads = maxId(solution) - minId(solution);
+                int64_t id_offset = minId(solution);
+                uint64_t combinations = (uint64_t) pow(2, iVars.size() - fVars.size());
+                RunMeta meta = {
+                    .minId = id_offset,
+                    .maxId = id_offset + threads,
+                    .mode = solve_mode
+                };
 
                 // FIXME: offset onto global id
                 introduceForgetWrapper(
                     std::move(gpuSolutionCopy(solution, buf_solsF.device_mem)),
                     GPUVars {
-                        .count = (int64_t)fVars.size(),
+                        .count = fVars.size(),
                         .vars = buf_varsF.device_mem
                     },
                     std::move(solsE),
                     GPUVars {
-                        .count = (int64_t)eVars.size(),
+                        .count = eVars.size(),
                         .vars = buf_varsE.device_mem
                     },
                     combinations,
@@ -831,7 +852,7 @@ namespace gpusat {
                     minId(csol),
                     buf_solBag.device_mem,
                     GPUVars {
-                        .count = (int64_t)buf_varsI.size(),
+                        .count = buf_varsI.size(),
                         .vars = buf_varsI.device_mem
                     },
                     buf_clauses.device_mem,
@@ -840,9 +861,7 @@ namespace gpusat {
                     buf_weights.device_mem,
                     buf_exponent.device_mem,
                     pow(2, cnode.exponent),
-                    threads,
-                    id_offset,
-                    solve_mode
+                    meta
                 );
             }
             buf_solBag.read(numSolutionsPtr(solution));
@@ -883,7 +902,7 @@ namespace gpusat {
 
                         int64_t nodeCount = sol.numSolutions + last->numSolutions + 2;
                         sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
-                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
+                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost);
 
                         combineTree(sol, *last, node.variables.size());
                         sol.size = sol.numSolutions + 1;
@@ -893,7 +912,7 @@ namespace gpusat {
                         sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
                         sol.size = sol.numSolutions + 1;
 
-                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(int64_t) * nodeCount, cudaMemcpyDeviceToHost);
+                        cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost);
 
                         // replace previous bag if needed
                         if (last != NULL && last->tree == NULL) {
@@ -909,7 +928,7 @@ namespace gpusat {
                     auto& sol = std::get<ArraySolution>(solution);
                     sol.size = bagSizeForget;
 
-                    cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(int64_t) * bagSizeForget, cudaMemcpyDeviceToHost);
+                    cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(double) * bagSizeForget, cudaMemcpyDeviceToHost);
                     node.solution.push_back(std::move(solution));
                 }
             }

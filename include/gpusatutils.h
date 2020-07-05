@@ -23,7 +23,7 @@ namespace gpusat {
      * @return
      *      the model count
      */
-    extern double getCount(long id, const TreeNode *tree, long numVars);
+    extern double getCount(int64_t id, const TreeNode *tree, long numVars);
 
     /**
      * @return the time in millisecons since the epoch
