@@ -319,11 +319,9 @@ namespace gpusat {
                 if (isSat <= 0) {
                     return;
                 }
-                BagType tmp;
-                BagType& edge1 = node.edges[0];
 
-                bool first = false;
                 for (int64_t i = 1; i < node.edges.size(); i++) {
+                    BagType& edge1 = node.edges[0];
                     BagType& edge2 = node.edges[i];
                     std::cerr << "\ncombine step SOLVE (" << node.id << ") " << i << " of " << node.edges.size() - 1 << std::endl;
                     std::cerr << bagTypeHash(edge1) << std::endl;
@@ -345,7 +343,10 @@ namespace gpusat {
                             edge1.variables.begin(), edge1.variables.end(),
                             edge2.variables.begin(), edge2.variables.end(),
                             back_inserter(vt));
+
+                    BagType tmp;
                     tmp.variables = vt;
+                    std::cerr << bagTypeHash(tmp) << std::endl;
 
                     if (i == node.edges.size() - 1) {
                         solveJoin(tmp, edge1, edge2, formula, INTRODUCEFORGET);
@@ -361,11 +362,7 @@ namespace gpusat {
                         solveIntroduceForget(formula, pnode, node, node.edges[0], false, lastNode);
                     } else {
                         solveJoin(tmp, edge1, edge2, formula, JOIN);
-                        if (!first) {
-                            std::move(node.edges[0]);
-                            node.edges[0] = std::move(tmp);
-                            first = true;
-                        }
+                        node.edges[0] = std::move(tmp);
                     }
                 }
             }
