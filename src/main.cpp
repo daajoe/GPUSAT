@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    std::cerr << "solve mode: " << solve_mode << std::endl;
+    //std::cerr << "solve mode: " << solve_mode << std::endl;
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
@@ -196,7 +196,7 @@ int main(int argc, char *argv[]) {
     int64_t maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
     if (combineWidth < 0) {
-	std::cerr << "workgroup size: " << deviceProp.maxThreadsPerBlock << " * " << deviceProp.multiProcessorCount << std::endl;
+	std::cerr << "maximum workgroup size: " << deviceProp.maxThreadsPerBlock << " " << deviceProp.multiProcessorCount << std::endl;
 	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
     }
 
