@@ -32,7 +32,7 @@ __device__ uint64_t atomicSub(uint64_t* address, uint64_t val)
     do {
         assumed = old;
         old = atomicCAS(address_as_ull, assumed,
-                        (val - (uint64_t)(assumed)));
+                        ((uint64_t)(assumed) - val));
 
     // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
     } while (assumed != old);
