@@ -229,7 +229,7 @@ namespace gpusat {
         }
 
         if (!edges.empty()) {
-            auto root = constructTree(0, edges, ret.bags);
+            auto root = constructTree(edges, ret.bags);
             ret.bags.resize(0);
             ret.bags.push_back(std::move(root));
         }
@@ -237,20 +237,41 @@ namespace gpusat {
         return ret;
     }
 
-    BagType TDParser::constructTree(long nodeIndex, std::vector<std::vector<long>>& edges, std::vector<BagType>& bags) {
-        // intermediate node
-        if (edges[nodeIndex].size() > 0) {
-            auto bag = std::move(bags[nodeIndex]);
-            for (auto edgeIndex : edges[nodeIndex]) {
-                // edge indices are 1-based.
-                bag.edges.push_back(std::move(constructTree(edgeIndex - 1, edges, bags)));
+    BagType TDParser::constructTree(std::vector<std::vector<long>>& edges, std::vector<BagType>& bags) {
+
+        std::vector<long> node_stack;
+        std::vector<long> node_order;
+        node_stack.push_back(0);
+        std::vector<std::vector<long>> edge_copy = edges;
+
+        while (!node_stack.empty()) {
+            long nodeIndex = node_stack.back();
+            node_stack.pop_back();
+
+            // still has unordered children
+            if (!edge_copy[nodeIndex].empty()) {
+                long nextChild = edge_copy[nodeIndex].back();
+                edge_copy[nodeIndex].pop_back();
+                node_stack.push_back(nodeIndex);
+                node_stack.push_back(nextChild - 1);
+                continue;
             }
-            sort(bag.edges.begin(), bag.edges.end(), compTreedType);
-            return std::move(bag);
-        // leaf node
-        } else {
-            return std::move(bags[nodeIndex]);
+            node_order.push_back(nodeIndex);
         }
+
+        for (auto node : node_order) {
+            // intermediate node
+            if (edges[node].size() > 0) {
+                auto& bag = bags[node];
+                for (auto edgeIndex : edges[node]) {
+                    // edge indices are 1-based.
+                    bag.edges.push_back(std::move(bags[edgeIndex - 1]));
+                }
+                sort(bag.edges.begin(), bag.edges.end(), compTreedType);
+            }
+            // else: leaf node
+        }
+        return std::move(bags[0]);
     }
 
     void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges) {

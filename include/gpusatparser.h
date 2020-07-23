@@ -125,7 +125,7 @@ namespace gpusat {
          */
         void parseBagLine(treedecType &ret, std::string item);
 
-        BagType constructTree(long nodeIndex, std::vector<std::vector<long>>& edges, std::vector<BagType>& bags);
+        BagType constructTree(std::vector<std::vector<long>>& edges, std::vector<BagType>& bags);
     };
 }
 #endif //GPUSAT_PARSER_H
