@@ -652,9 +652,9 @@ void combineTreeWrapper(
     int64_t startId,
     RunMeta meta
 ) {
-    int threadsPerBlock = 256;
-    int threads = meta.maxId - meta.minId;
-    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    int64_t threadsPerBlock = 512;
+    int64_t threads = meta.maxId - meta.minId;
+    int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
         numVars,
         tree,
@@ -663,7 +663,7 @@ void combineTreeWrapper(
         startId,
         meta
     );
-    cudaDeviceSynchronize();
+    gpuErrchk(cudaDeviceSynchronize());
 }
 
 void array2treeWrapper(
@@ -676,9 +676,9 @@ void array2treeWrapper(
     RunMeta meta
 ) {
     
-    int threadsPerBlock = 256;
-    int threads = meta.maxId - meta.minId;
-    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    int64_t threadsPerBlock = 512;
+    int64_t threads = meta.maxId - meta.minId;
+    int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     array2tree<<<blocksPerGrid, threadsPerBlock>>>(
         numVars,
         tree,
@@ -688,7 +688,7 @@ void array2treeWrapper(
         exponent,
         meta
     );
-    cudaDeviceSynchronize();
+    gpuErrchk(cudaDeviceSynchronize());
 }
 
 void solveJoinWrapper(
@@ -707,9 +707,9 @@ void solveJoinWrapper(
     int64_t *exponent,
     RunMeta meta
 ) {
-    int threadsPerBlock = 256;
-    int threads = meta.maxId - meta.minId;
-    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    int64_t threadsPerBlock = 512;
+    int64_t threads = meta.maxId - meta.minId;
+    int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
         solutions,
         std::move(edge1),
@@ -727,7 +727,7 @@ void solveJoinWrapper(
         meta
     );
 
-    cudaDeviceSynchronize();
+    gpuErrchk(cudaDeviceSynchronize());
 }
 
 void introduceForgetWrapper(
@@ -748,9 +748,9 @@ void introduceForgetWrapper(
     double value,
     RunMeta meta
 ) {
-    int threadsPerBlock = 256;
-    int threads = meta.maxId - meta.minId;
-    int blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
+    int64_t threadsPerBlock = 512;
+    int64_t threads = meta.maxId - meta.minId;
+    int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
         std::move(solsF),
         varsForget,
@@ -770,6 +770,6 @@ void introduceForgetWrapper(
         meta
     );
 
-    cudaDeviceSynchronize();
+    gpuErrchk(cudaDeviceSynchronize());
 }
 }
