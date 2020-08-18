@@ -4,7 +4,9 @@
 #include <cuda.h>
 #include <stdio.h>
 #include <stdint.h>
-#include <types.h>
+
+
+#include "types.h"
 
 
 

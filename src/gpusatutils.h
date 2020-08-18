@@ -7,7 +7,8 @@
 #include <queue>
 #include <chrono>
 #include <numeric>
-#include <types.h>
+
+#include "types.h"
 
 namespace gpusat {
     /**

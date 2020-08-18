@@ -3,8 +3,9 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
-#include <gpusatparser.h>
-#include <gpusatpreprocessor.h>
+
+#include "gpusatparser.h"
+#include "gpusatpreprocessor.h"
 
 namespace gpusat {
     void Preprocessor::preprocessDecomp(BagType& decomp, int64_t combineWidth) {

@@ -3,14 +3,16 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
-#include <solver.h>
 #include <errno.h>
 #include <cuda.h>
 #include <memory>
-#include <types.h>
 #include <cuda_runtime.h>
 #include <signal.h>
 #include <optional>
+
+
+#include "types.h"
+#include "solver.h"
 
 namespace gpusat {
     extern void introduceForgetWrapper(
@@ -109,6 +111,7 @@ namespace gpusat {
     }
 
     size_t treeTypeHash(const TreeSolution& t, int vars) {
+        return 0;
         size_t h = 0;
         hash_combine(h, t.minId);
         hash_combine(h, t.maxId);
@@ -131,6 +134,7 @@ namespace gpusat {
     }
 
     size_t bagTypeHash(const BagType& input) {
+        return 0;
         size_t h = 0;
         hash_combine(h, input.correction);
         hash_combine(h, input.exponent);

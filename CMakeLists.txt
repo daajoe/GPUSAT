@@ -4,7 +4,6 @@ project(gpusati CXX CUDA)
 include_directories("$ENV{CUDA_PATH}/include")
 link_directories("$ENV{CUDA_PATH}/lib/x64")
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_library(gpusat_kernel STATIC "src/kernel.cu")
 target_compile_options(gpusat_kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_75,code=sm_75>)
@@ -33,6 +32,6 @@ find_library(HTD_IO_LIB htd_io)
 add_library(htd_io STATIC IMPORTED)
 set_target_properties(htd_io PROPERTIES IMPORTED_LOCATION ${HTD_IO_LIB})
 
-file(GLOB gpusat_SRC "src/*.cpp" "src/*/*.cpp")
+file(GLOB gpusat_SRC "src/*.cpp")
 add_executable(gpusat ${gpusat_SRC})
 target_link_libraries(gpusat htd htd_io gpusat_kernel)

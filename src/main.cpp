@@ -9,22 +9,23 @@
 #include <regex>
 #include <math.h>
 #include <chrono>
-#include <types.h>
-#include <gpusatparser.h>
-#include <gpusatutils.h>
 #include <sys/stat.h>
 #include <numeric>
-#include <decomposer.h>
-#include <solver.h>
-#include <CLI11.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include <gpusatpreprocessor.h>
-#include <FitnessFunctions/NumJoinFitnessFunction.h>
-#include <FitnessFunctions/JoinSizeFitnessFunction.h>
-#include <FitnessFunctions/WidthCutSetFitnessFunction.h>
-#include <FitnessFunctions/CutSetWidthFitnessFunction.h>
 #include <cuda_runtime.h>
 
+#include "decomposer.h"
+#include "solver.h"
+#include "CLI11.hpp"
+#include "types.h"
+#include "gpusatparser.h"
+#include "gpusatutils.h"
+#include "gpusatpreprocessor.h"
+
+#include "FitnessFunctions/NumJoinFitnessFunction.h"
+#include "FitnessFunctions/JoinSizeFitnessFunction.h"
+#include "FitnessFunctions/WidthCutSetFitnessFunction.h"
+#include "FitnessFunctions/CutSetWidthFitnessFunction.h"
 
 using namespace gpusat;
 

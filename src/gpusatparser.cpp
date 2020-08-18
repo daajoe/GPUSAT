@@ -2,9 +2,10 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
-#include <gpusatparser.h>
 #include <unordered_set>
 #include <iterator>
+
+#include "gpusatparser.h"
 
 namespace gpusat {
 

@@ -4,8 +4,10 @@
 #define GPU_HOST_ATTR
 
 #include <queue>
-#include <types.h>
 #include <unordered_map>
+
+
+#include "types.h"
 
 namespace gpusat {
     class CNFParser {

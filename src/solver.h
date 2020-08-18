@@ -4,7 +4,7 @@
 #define alloca __builtin_alloca
 #endif
 
-#include <types.h>
+#include "types.h"
 
 namespace gpusat {
 

@@ -1,4 +1,3 @@
-#include <decomposer.h>
 #include <sstream>
 #include <htd/TreeDecompositionOptimizationOperation.hpp>
 #include <htd/ITreeDecompositionAlgorithm.hpp>
@@ -6,6 +5,9 @@
 #include <htd/IterativeImprovementTreeDecompositionAlgorithm.hpp>
 #include <htd/GraphPreprocessor.hpp>
 #include <htd_io/TdFormatExporter.hpp>
+
+
+#include "decomposer.h"
 
 namespace gpusat {
     std::string Decomposer::computeDecomposition(std::string formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n) {
