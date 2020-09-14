@@ -79,16 +79,10 @@ __device__ int64_t get_global_id(const RunMeta& meta) {
  * @return
  *      the model count
  */
-__host__ __device__ double getCount(int64_t id, const TreeNode *tree, long numVars) {
-    ulong nextId = 0;
-    for (ulong i = 0; i < numVars; i++) {
-        nextId = ((uint32_t *) &(tree[nextId]))[(id >> (numVars - i - 1)) & 1];
-        if (nextId == 0) {
-            return 0.0;
-        }
-    }
-    return tree[nextId].content;
+/*__host__ __device__ double getCount(int64_t id, const TreeNode *tree, long numVars) {
+    moved to TreeSolution class 
 }
+*/
 
 /**
  * sets the model count which corresponds to the given id
@@ -104,6 +98,7 @@ __host__ __device__ double getCount(int64_t id, const TreeNode *tree, long numVa
  * @param value
  *      the new value of the id
  */
+/*
 __device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* treeSize, double value) {
     ulong nextId = 0;
     ulong val = 0;
@@ -127,6 +122,7 @@ __device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* 
     }
     tree[nextId].content = value;
 }
+*/
 
 /**
  * converts a array structure into a tree
@@ -145,11 +141,8 @@ __device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* 
   *     the max exponent of this run
  */
 __global__ void array2tree(
-        size_t numVars, 
-        TreeNode *tree, 
-        const double *solutions_old,
-        uint64_t *treeSize,
-        int64_t startId,
+        TreeSolution* tree,
+        const ArraySolution* array,
         int64_t *exponent,
         const RunMeta meta
 ) {
@@ -157,10 +150,11 @@ __global__ void array2tree(
     if (id < 0) {
         return;
     }
-    if (solutions_old[id] > 0) {
-        setCount(id + startId, tree, numVars, treeSize, solutions_old[id]);
+    auto solutions = array->solutionCountFor(id);
+    if (solutions > 0) {
+        tree->setCount(id + array->minId(), solutions);
         if (!(meta.mode & NO_EXP)) {
-            atomicMax(exponent, (int64_t)ilogb(solutions_old[id]));
+            atomicMax(exponent, (int64_t)ilogb(solutions));
         }
     }
 }
@@ -180,20 +174,21 @@ __global__ void array2tree(
   *     the start id of the current node
  */
 __global__ void combineTree(
-        uint64_t numVars,
-        TreeNode *tree,
-        const TreeNode *solutions_old,
-        uint64_t *treeSize,
-        int64_t startId,
+        TreeSolution* to,
+        const TreeSolution* from,
+        //TreeNode *tree,
+        //const TreeNode *solutions_old,
+        //uint64_t *treeSize,
+        //int64_t startId,
         const RunMeta meta
 ) {
     int64_t id = get_global_id(meta);
     if (id < 0) {
         return;
     }
-    double val = getCount(id + startId, solutions_old, numVars);
+    double val = from->solutionCountFor(id + from->minId());
     if (val > 0) {
-        setCount(id + startId, tree, numVars, treeSize, val);
+        to->setCount(id + from->minId(), val);
     }
 }
 
@@ -219,7 +214,7 @@ __global__ void combineTree(
  */
 __device__ double solveIntroduce_(
         GPUVars variables,
-        const std::variant<TreeSolution, ArraySolution> &edge,
+        const Solution &edge,
         GPUVars edgeVariables,
         double *weights,
         int64_t id,
@@ -249,17 +244,13 @@ __device__ double solveIntroduce_(
         }
     }
 
-    if (!dataEmpty(edge) && otherId >= minId(edge) && otherId < maxId(edge)) {
-        if (auto sol = std::get_if<TreeSolution>(&edge)) {
-            return getCount(otherId, sol->tree, edgeVariables.count) * weight;
-        } else if (auto sol = std::get_if<ArraySolution>(&edge)) {
-            return sol->elements[otherId - sol->minId] * weight;
-        } else {
-            return -1.0;
-        }
-    } else if (dataEmpty(edge) && otherId >= minId(edge) && otherId < maxId(edge)) {
+    if (edge.hasData() && otherId >= edge.minId() && otherId < edge.maxId()) {
+        return edge.solutionCountFor(otherId) * weight; 
+    } else if (!edge.hasData() && otherId >= edge.minId() && otherId < edge.maxId()) {
         return 0.0;
     } else {
+        // unreachable?
+        assert(0);
         return -1.0;
     }
 }
@@ -358,17 +349,17 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
   *     the max exponent of this run
   */
 __global__ void solveJoin(
-        double* solutions,
-        const std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
-        const std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
+        ArraySolution* solution,
+        const Solution* edge1,
+        const Solution* edge2,
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
-        int64_t startIDNode,
-        int64_t startIDEdge1,
-        int64_t startIDEdge2,
+        //int64_t startIDNode,
+        //int64_t startIDEdge1,
+        //int64_t startIDEdge2,
         double *weights,
-        uint64_t *sols,
+        //uint64_t *sols,
         double value,
         int64_t *exponent,
         const RunMeta run
@@ -380,13 +371,13 @@ __global__ void solveJoin(
 
     double tmp = -1, tmp_ = -1;
     double weight = 1;
-    if (edge1.has_value()) {
+    if (edge1 != nullptr) {
         // get solution count from first edge
-        tmp = solveIntroduce_(variables, edge1.value(), edgeVariables1, weights, id, run.mode);
+        tmp = solveIntroduce_(variables, *edge1, edgeVariables1, weights, id, run.mode);
     }
-    if (edge2.has_value()) {
+    if (edge2 != nullptr) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(variables, edge2.value(), edgeVariables2, weights, id, run.mode);
+        tmp_ = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id, run.mode);
     }
     // weighted model count
     if (weights != 0) {
@@ -397,43 +388,51 @@ __global__ void solveJoin(
 
     if (tmp_ >= 0.0 && tmp >= 0.0) {
         if (tmp_ > 0.0 && tmp > 0.0) {
-            atomicAdd(sols, 1);
+            solution->incSolutions();
+            //atomicAdd(sols, 1);
         }
         if (!(run.mode & NO_EXP)) {
-            solutions[id - startIDNode] = tmp_ * tmp / value / weight;
+            solution->setCount(id, tmp_ * tmp / value / weight);
+            //solutions[id - startIDNode] = ;
         } else {
-            solutions[id - startIDNode] = tmp_ * tmp / weight;
+            solution->setCount(id, tmp_ * tmp / weight);
+            //solutions[id - startIDNode] = tmp_ * tmp / weight;
         }
     }
 
         // we have some solutions in edge1
     else if (tmp >= 0.0) {
-        double oldVal = solutions[id - startIDNode];
+        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp > 0) {
-                atomicAdd(sols, 1);
+                solution->incSolutions();
+                //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp == 0) {
-                atomicSub(sols, 1);
+                solution->decSolutions();
+                //atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solutions[id - startIDNode] = tmp * oldVal / weight;
+        solution->setCount(id, tmp * oldVal / weight);
+        //solutions[id - startIDNode] = tmp * oldVal / weight;
     }
 
         // we have some solutions in edge2
     else if (tmp_ >= 0.0) {
-        double oldVal = solutions[id - startIDNode];
+        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp_ > 0) {
-                atomicAdd(sols, 1);
+                solution->incSolutions();
+                //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp_ == 0) {
-                atomicSub(sols, 1);
+                solution->decSolutions();
+                //atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
@@ -441,13 +440,15 @@ __global__ void solveJoin(
         }
 
         if (!(run.mode & NO_EXP)) {
-            solutions[id - startIDNode] = tmp_ * oldVal / value;
+            solution->setCount(id, tmp_ * oldVal / value);
+            //solutions[id - startIDNode] = tmp_ * oldVal / value;
         } else {
-            solutions[id - startIDNode] = tmp_ * oldVal;
+            solution->setCount(id, tmp_ * oldVal);
+            //solutions[id - startIDNode] = tmp_ * oldVal;
         }
     }
     if (run.mode & ARRAY_TYPE && !(run.mode & NO_EXP)) {
-        atomicMax(exponent, ilogb(solutions[id - startIDNode]));
+        atomicMax(exponent, ilogb(solution->solutionCountFor(id))); //solutions[id - startIDNode]));
     }
 }
 
@@ -482,14 +483,14 @@ __device__ double solveIntroduceF(
         long *numVarsC,
         long numclauses,
         GPUVars variables,
-        const std::variant<TreeSolution, ArraySolution> &edge,
+        const Solution& edge,
         GPUVars edgeVariables,
         double *weights,
         long id,
         SolveMode mode
 ) {
     double tmp;
-    if (!dataEmpty(edge)) {
+    if (edge.hasData()) {
         // get solutions count edge
         tmp = solveIntroduce_(variables, edge, edgeVariables, weights, id, mode);
     } else {
@@ -553,14 +554,11 @@ __device__ double solveIntroduceF(
   *     correction value for the exponents
  */
 __global__ void solveIntroduceForget(
-        const std::variant<TreeSolution, ArraySolution> solsF,
+        Solution* solsF,
         GPUVars varsForget,
-        const std::variant<TreeSolution, ArraySolution> solsE,
+        const Solution* solsE,
         GPUVars lastVars,
         uint64_t combinations,
-        int64_t startIDF,
-        int64_t startIDE,
-        uint64_t *sols,
         GPUVars varsIntroduce,
         long *clauses,
         long *numVarsC,
@@ -595,85 +593,65 @@ __global__ void solveIntroduceForget(
                     b++;
                 }
             }
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, otherId, run.mode);
+            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, *solsE, lastVars, weights, otherId, run.mode);
         }
         
         if (tmp > 0) {
-            if (auto sol = std::get_if<TreeSolution>(&solsF)) {
-                double last = getCount(id, sol->tree, varsForget.count);
-                if (!(run.mode & NO_EXP))  {
-                    setCount(id, sol->tree, varsForget.count, sols, (tmp / value + last));
-                    atomicMax(exponent, ilogb((tmp / value + last)));
-                } else {
-                    setCount(id, sol->tree, varsForget.count, sols, (tmp + last));
-                }
-            } else if (auto sol = std::get_if<ArraySolution>(&solsF)) {
-                double last=sol->elements[id - (startIDF)];
-                atomicAdd(sols, 1);
-                //*sols += 1;
-                if (!(run.mode & NO_EXP))  {
-                    sol->elements[id - (startIDF)] = tmp / value + last;
-                    atomicMax(exponent, ilogb(tmp / value + last));
-                } else {
-                    sol->elements[id - (startIDF)] = tmp + last;
-                }
+            double last = solsF->solutionCountFor(id);
+            if (!(run.mode & NO_EXP))  {
+                solsF->setCount(id, (tmp / value + last));
+                atomicMax(exponent, ilogb((tmp / value + last)));
+            } else {
+                solsF->setCount(id, (tmp + last));
             }
+            //if (auto array = std::get_if<ArraySolution>(&solsF)) {
+            // count solution (no-op except for ArraySolution)
+            solsF->incSolutions();
+            //}
         }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id, run.mode);
+        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, *solsE, lastVars, weights, id, run.mode);
         if (tmp > 0) {
-            if (auto sol = std::get_if<TreeSolution>(&solsF)) {
-                double last = getCount(id, sol->tree, varsForget.count);
-                if (!(run.mode & NO_EXP))  {
-                    setCount(id, sol->tree, varsForget.count, sols, (tmp / value + last));
-                    atomicMax(exponent, ilogb((tmp / value + last)));
-                } else {
-                    setCount(id, sol->tree, varsForget.count, sols, (tmp + last));
-                }
-            } else if (auto sol = std::get_if<ArraySolution>(&solsF)) {
-                double last=sol->elements[id - (startIDF)];
-                atomicAdd(sols, 1);
-                //*sols += 1;
-                if (!(run.mode & NO_EXP))  {
-                    sol->elements[id - (startIDF)] = tmp / value + last;
-                    atomicMax(exponent, ilogb(tmp / value + last));
-                } else {
-                    sol->elements[id - (startIDF)] = tmp + last;
-                }
+            //auto& solsf = *toSolution(solsF);
+            double last = solsF->solutionCountFor(id);
+            if (!(run.mode & NO_EXP))  {
+                solsF->setCount(id, (tmp / value + last));
+                atomicMax(exponent, ilogb((tmp / value + last)));
+            } else {
+                solsF->setCount(id, (tmp + last));
             }
+            //if (auto array = std::get_if<ArraySolution>(&solsF)) {
+            // count solution (no-op except for ArraySolution)
+            solsF->incSolutions();
+            //}
         }
     } 
 }
 
 void combineTreeWrapper(
-    uint64_t numVars,
-    TreeNode *tree,
-    const TreeNode *solutions_old,
-    uint64_t *treeSize,
-    int64_t startId,
+    TreeSolution* to,
+    const TreeSolution* from,
+    // TreeNode *tree,
+    // const TreeNode *solutions_old,
+    // uint64_t *treeSize,
+    // int64_t startId,
     RunMeta meta
 ) {
     int64_t threadsPerBlock = 512;
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
-        numVars,
-        tree,
-        solutions_old,
-        treeSize,
-        startId,
+        to,
+        from,
         meta
     );
     gpuErrchk(cudaDeviceSynchronize());
 }
 
 void array2treeWrapper(
-    size_t numVars, 
-    TreeNode *tree, 
-    const double *solutions_old,
-    uint64_t *treeSize,
-    int64_t startId,
+    TreeSolution *tree, 
+    const ArraySolution* array,
     int64_t *exponent,
     RunMeta meta
 ) {
@@ -682,11 +660,8 @@ void array2treeWrapper(
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     array2tree<<<blocksPerGrid, threadsPerBlock>>>(
-        numVars,
         tree,
-        solutions_old,
-        treeSize,
-        startId,
+        array,
         exponent,
         meta
     );
@@ -694,17 +669,13 @@ void array2treeWrapper(
 }
 
 void solveJoinWrapper(
-    double *solutions,
-    std::optional<std::variant<TreeSolution, ArraySolution>> edge1,
-    std::optional<std::variant<TreeSolution, ArraySolution>> edge2,
+    ArraySolution *solution,
+    const Solution* edge1,
+    const Solution* edge2,
     GPUVars variables,
     GPUVars edgeVariables1,
     GPUVars edgeVariables2,
-    int64_t startIDNode,
-    int64_t startIDEdge1,
-    int64_t startIDEdge2,
     double *weights,
-    uint64_t *sols,
     double value,
     int64_t *exponent,
     RunMeta meta
@@ -713,17 +684,13 @@ void solveJoinWrapper(
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
-        solutions,
-        std::move(edge1),
-        std::move(edge2),
+        solution,
+        edge1,
+        edge2,
         variables,
         edgeVariables1,
         edgeVariables2,
-        startIDNode,
-        startIDEdge1,
-        startIDEdge2,
         weights,
-        sols,
         value, 
         exponent,
         meta
@@ -733,15 +700,12 @@ void solveJoinWrapper(
 }
 
 void introduceForgetWrapper(
-    std::variant<TreeSolution, ArraySolution> solsF,
+    Solution* solsF,
     GPUVars varsForget,
-    std::variant<TreeSolution, ArraySolution> solsE,
+    const Solution* solsE,
     GPUVars lastVars,
-    uint64_t combinations,
-    int64_t startIDF,
-    int64_t startIDE,
-    uint64_t *sols,
     GPUVars varsIntroduce,
+    // FIXME: Move this static information to GPU once.
     long *clauses,
     long *numVarsC,
     long numclauses,
@@ -754,14 +718,12 @@ void introduceForgetWrapper(
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
-        std::move(solsF),
+        solsF,
         varsForget,
-        std::move(solsE),
+        solsE,
         lastVars,
-        combinations,
-        startIDF,
-        startIDE,
-        sols,
+        // combinations
+        (uint64_t) pow(2, varsIntroduce.count - varsForget.count),
         varsIntroduce,
         clauses,
         numVarsC,

@@ -32,6 +32,6 @@ find_library(HTD_IO_LIB htd_io)
 add_library(htd_io STATIC IMPORTED)
 set_target_properties(htd_io PROPERTIES IMPORTED_LOCATION ${HTD_IO_LIB})
 
-file(GLOB gpusat_SRC "src/*.cpp")
+file(GLOB gpusat_SRC "src/*.cpp" "src/*.h")
 add_executable(gpusat ${gpusat_SRC})
 target_link_libraries(gpusat htd htd_io gpusat_kernel)

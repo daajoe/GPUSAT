@@ -9,7 +9,6 @@
 namespace gpusat {
 
 
-    size_t bagTypeHash(const BagType&);
     /**
      *
      */
@@ -84,7 +83,7 @@ namespace gpusat {
          * @param from
          * @param numVars
          */
-        void combineTree(TreeSolution &to, TreeSolution &from, int64_t numVars);
+        TreeSolution combineTree(TreeSolution &t1, TreeSolution &t2);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

@@ -38,18 +38,11 @@ template<class... Ts> sum_visitor(Ts...) -> sum_visitor<Ts...>;
 boost::multiprecision::cpp_bin_float_100 bag_sum(BagType& bag) {
     boost::multiprecision::cpp_bin_float_100 sols = 0.0;
     for (auto& solution : bag.solution) {
-        std::visit(sum_visitor {
-            [&](TreeSolution& sol) {
-                for (uint64_t i = sol.minId; i < sol.maxId; i++) {
-                    sols = sols + getCount(i, sol.tree, bag.variables.size());
-                }
-            },
-            [&](ArraySolution& sol) {
-                for (int64_t i = sol.minId; i < sol.maxId; i++) {
-                    sols = sols + sol.elements[i - sol.minId];
-                }
-            },
-        }, solution);
+        auto sol = toSolution(solution);
+
+        for (int64_t i = sol->minId(); i < sol->maxId(); i++) {
+            sols = sols + sol->solutionCountFor(i);
+        }
     }
     return sols;
 }
@@ -205,9 +198,9 @@ int main(int argc, char *argv[]) {
     //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
 
     // combine small bags
-    std::cerr << "before pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
+    std::cerr << "before pp: " << treeDecomp.bags[0].hash() << std::endl;
     Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
-    std::cerr << "after pp: " << bagTypeHash(treeDecomp.bags[0]) << std::endl;
+    std::cerr << "after pp: " << treeDecomp.bags[0].hash() << std::endl;
 
     std::cout.flush();
 
@@ -234,7 +227,7 @@ int main(int argc, char *argv[]) {
     if ((*sol).isSat > 0) {
         sols += bag_sum(treeDecomp.bags[0]);
         for (auto& solution : treeDecomp.bags[0].solution) {
-            freeData(solution);
+            toSolution(solution)->freeData();
         }
 
         if (!noExp) {
