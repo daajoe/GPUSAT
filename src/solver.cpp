@@ -289,7 +289,7 @@ namespace gpusat {
                 );
             }
             // make sure we allocate enough space for the next solution container
-            size_t reserveNodes = nextSize + 1;
+            size_t reserveNodes = nextSize;
             TreeSolution t = TreeSolution::fromGPU(gpu_tree, reserveNodes);
 
             gpuErrchk(cudaFree(gpu_tree));
@@ -297,7 +297,7 @@ namespace gpusat {
 
             // actually the tree size
             //buf_num_sol.read(&(t.numSolutions));
-            std::cerr << "clean tree num solutions (tree size): " << t.currentTreeSize() << ")" << std::endl;
+            std::cerr << "clean tree num solutions: " << t.currentTreeSize() << std::endl;
             buf_exp.read(&(node.exponent));
 
             //int64_t nodeCount = t.treeSize + 1 + nextSize;
@@ -307,6 +307,7 @@ namespace gpusat {
             t.setMinId(std::min(table.minId(), t.minId()));
             t.setMaxId(std::max(table.maxId(), t.maxId()));
             std::cerr << "tree output hash: " << t.hash() << std::endl;
+            return std::move(t);
         } else {
             std::cerr << "tree output hash: empty" << std::endl;
             return TreeSolution(1 + nextSize, table.minId(), table.maxId(), numVars);
@@ -764,7 +765,7 @@ namespace gpusat {
 
             // number of additional tree nodes to reserve
             auto reserveCount = 0;
-            if (solutionType == TREE) {
+            if (solutionType == TREE && !node.solution.empty()) {
                 if (auto last = std::get_if<TreeSolution>(&node.solution.back())) {
                     if (last->hasData()) reserveCount = last->currentTreeSize() + 2;
                 };
@@ -804,7 +805,10 @@ namespace gpusat {
 
 
                     if (node.variables.size() == 0) {
-                        assert(sol.currentTreeSize() == 0);
+                        // This seems to be a weird hack in the original code
+                        // because of the confusion of solution count and tree size.
+                        // we'll preserve the tree size
+                        //assert(sol.currentTreeSize() == 0);
                         //sol.numSolutions--;
                     }
 
@@ -838,7 +842,14 @@ namespace gpusat {
                         }
                     }
                     node.maxSize = std::max(node.maxSize,
-                        (int64_t)toSolution(node.solution.back())->dataStructureSize());
+                        (int64_t)toSolution(node.solution.back())->dataStructureSize()
+                        // FIXME:
+                        // on nodes with 0 variables, this treeSize indicates satisfiability.
+                        // otherwise, it is the index of the last node.
+                        // TreeSize is then carried to dataStructureSize.
+                        // This mismatch should be solved.
+
+                         - (node.variables.size() == 0));
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution>(solution);
                     // the inital calculated size might overshoot, thus limit

@@ -393,6 +393,10 @@ namespace gpusat {
                 return sizeof(TreeNode);
             }
 
+            /**
+             * FIXME: This is the *INDEX* of the largest element
+             * -> make this more clear and get rid of magic +1s
+             */
             size_t currentTreeSize() const {
                 return members->treeSize;
             }
@@ -417,8 +421,23 @@ namespace gpusat {
                 return members->tree[nextId].content;
             }
 
+            /**
+             * FIXME: for now, this is not thread-safe on the CPU!
+             */
             __device__ void setCount(int64_t id, double value) {
-                #if defined(__CUDACC__)
+#ifndef __CUDACC__
+                auto atomicAdd = [](uint64_t* address, uint64_t val) -> uint64_t {
+                    auto old = *address;
+                    *address += val;
+                    return old;
+                };
+                auto atomicCAS = [](uint* address, ulong compare, ulong val) -> ulong {
+                    auto old = *address;
+                    *address = (old == compare ? val : old);
+                    return old;
+                };
+#endif
+
                 ulong nextId = 0;
                 ulong val = 0;
                 if (members->variableCount == 0) {
@@ -440,10 +459,6 @@ namespace gpusat {
                     nextId = *lowVal;
                 }
                 members->tree[nextId].content = value;
-                #else
-                    fprintf(stderr, "this may not be called from CPU (yet)!");
-                    assert(false);
-                #endif
             }
 
 
@@ -451,7 +466,11 @@ namespace gpusat {
                 size_t h = 0;
                 hash_combine(h, minId());
                 hash_combine(h, maxId());
-                hash_combine(h, currentTreeSize());
+                // FIXME:
+                // on nodes with 0 variables, this treeSize indicates satisfiability.
+                // otherwise, it is the index of the last node.
+                // This mismatch should be solved.
+                hash_combine(h, currentTreeSize() - (members->variableCount == 0));
                 if (members->tree == NULL) {
                     return h;
                 }
@@ -476,7 +495,8 @@ namespace gpusat {
             static TreeSolution fromGPU(const TreeSolutionData* gpu, size_t reserveNodes) {
                 TreeSolutionData tmp;
                 gpuErrchk(cudaMemcpy(&tmp, gpu, sizeof(TreeSolutionData), cudaMemcpyDeviceToHost));
-                auto size = tmp.treeSize + reserveNodes;
+                // +1, because treeSize is INDEX of the last node
+                auto size = tmp.treeSize + reserveNodes + 1;
                 auto solution = TreeSolution(
                         size,
                         tmp.minId,
@@ -485,8 +505,8 @@ namespace gpusat {
                 );
                 solution.members->treeSize = tmp.treeSize;
                 // FIXME: only memset elements that are not copied over
-                memset(solution.members->tree, 0, solution.elementSize() * size);
-                gpuErrchk(cudaMemcpy(solution.members->tree, tmp.tree, solution.elementSize() * solution.currentTreeSize(), cudaMemcpyDeviceToHost));
+                //memset(solution.members->tree, 0, solution.elementSize() * size);
+                gpuErrchk(cudaMemcpy(solution.members->tree, tmp.tree, solution.elementSize() * size, cudaMemcpyDeviceToHost));
                 return std::move(solution);
             }
 
@@ -595,11 +615,13 @@ namespace gpusat {
      *         Currently only used by TreeSolution.
      */
     inline std::variant<TreeSolution, ArraySolution> fromGPU(const std::variant<TreeSolutionData*,ArraySolutionData*>& gpu_data, size_t reserveElements) {
-        if (auto ptr = *std::get_if<ArraySolutionData*>(&gpu_data)) {
+        if (std::holds_alternative<ArraySolutionData*>(gpu_data)) {
+            auto ptr = std::get<ArraySolutionData*>(gpu_data);
             // we cannot cast normally here, since `gpu` is only valid on the GPU.
             ArraySolution solution = ArraySolution::fromGPU(ptr);
             return std::variant<TreeSolution, ArraySolution>(std::move(solution));
-        } else if (auto ptr = *std::get_if<TreeSolutionData*>(&gpu_data)) {
+        } else if (std::holds_alternative<TreeSolutionData*>(gpu_data)) {
+            auto ptr = std::get<TreeSolutionData*>(gpu_data);
             TreeSolution solution = TreeSolution::fromGPU(ptr, reserveElements);
             return std::variant<TreeSolution, ArraySolution>(std::move(solution));
         }

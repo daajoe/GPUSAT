@@ -321,7 +321,6 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
 __device__ Solution* solutionFromData(std::variant<TreeSolutionData*, ArraySolutionData*>& data) {
     // FIXME: std::get produces wrong results! Why?
     if (std::holds_alternative<TreeSolutionData*>(data)) {
-        printf("constructed tree!");
         return new TreeSolution(std::get<TreeSolutionData*>(data));
     } else if (std::holds_alternative<ArraySolutionData*>(data)) {
         return new ArraySolution(std::get<ArraySolutionData*>(data));
