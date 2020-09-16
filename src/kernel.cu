@@ -141,18 +141,21 @@ __device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* 
   *     the max exponent of this run
  */
 __global__ void array2tree(
-        TreeSolution* tree,
-        const ArraySolution* array,
+        TreeSolutionData* tree_data,
+        const ArraySolutionData* array_data,
         int64_t *exponent,
         const RunMeta meta
 ) {
+    TreeSolution tree = TreeSolution(tree_data);
+    const ArraySolution array = ArraySolution((ArraySolutionData*)array_data);
+
     int64_t id = get_global_id(meta);
     if (id < 0) {
         return;
     }
-    auto solutions = array->solutionCountFor(id);
+    auto solutions = array.solutionCountFor(id);
     if (solutions > 0) {
-        tree->setCount(id + array->minId(), solutions);
+        tree.setCount(id + array.minId(), solutions);
         if (!(meta.mode & NO_EXP)) {
             atomicMax(exponent, (int64_t)ilogb(solutions));
         }
@@ -174,21 +177,24 @@ __global__ void array2tree(
   *     the start id of the current node
  */
 __global__ void combineTree(
-        TreeSolution* to,
-        const TreeSolution* from,
+        TreeSolutionData* to_data,
+        const TreeSolutionData* from_data,
         //TreeNode *tree,
         //const TreeNode *solutions_old,
         //uint64_t *treeSize,
         //int64_t startId,
         const RunMeta meta
 ) {
+    TreeSolution to = TreeSolution(to_data);
+    const TreeSolution from = TreeSolution((TreeSolutionData*)from_data);
+
     int64_t id = get_global_id(meta);
     if (id < 0) {
         return;
     }
-    double val = from->solutionCountFor(id + from->minId());
+    double val = from.solutionCountFor(id + from.minId());
     if (val > 0) {
-        to->setCount(id + from->minId(), val);
+        to.setCount(id + from.minId(), val);
     }
 }
 
@@ -312,6 +318,17 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
     return 1;
 }
 
+__device__ Solution* solutionFromData(std::variant<TreeSolutionData*, ArraySolutionData*>& data) {
+    // FIXME: std::get produces wrong results! Why?
+    if (std::holds_alternative<TreeSolutionData*>(data)) {
+        printf("constructed tree!");
+        return new TreeSolution(std::get<TreeSolutionData*>(data));
+    } else if (std::holds_alternative<ArraySolutionData*>(data)) {
+        return new ArraySolution(std::get<ArraySolutionData*>(data));
+    }
+    assert(false);
+}
+
 /**
  * Operation to solve a Join node in the decomposition.
  *
@@ -349,9 +366,9 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
   *     the max exponent of this run
   */
 __global__ void solveJoin(
-        ArraySolution* solution,
-        const Solution* edge1,
-        const Solution* edge2,
+        ArraySolutionData* solution_data,
+        std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1_data,
+        std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2_data,
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
@@ -369,15 +386,21 @@ __global__ void solveJoin(
         return;
     }
 
+    ArraySolution solution = ArraySolution(solution_data);
+
     double tmp = -1, tmp_ = -1;
     double weight = 1;
-    if (edge1 != nullptr) {
+    if (edge1_data.has_value()) {
+        const auto edge1 = solutionFromData(edge1_data.value());
         // get solution count from first edge
         tmp = solveIntroduce_(variables, *edge1, edgeVariables1, weights, id, run.mode);
+        delete edge1;
     }
-    if (edge2 != nullptr) {
+    if (edge2_data.has_value()) {
+        const auto edge2 = solutionFromData(edge2_data.value());
         // get solution count from second edge
         tmp_ = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id, run.mode);
+        delete edge2;
     }
     // weighted model count
     if (weights != 0) {
@@ -388,50 +411,50 @@ __global__ void solveJoin(
 
     if (tmp_ >= 0.0 && tmp >= 0.0) {
         if (tmp_ > 0.0 && tmp > 0.0) {
-            solution->incSolutions();
+            solution.incSolutions();
             //atomicAdd(sols, 1);
         }
         if (!(run.mode & NO_EXP)) {
-            solution->setCount(id, tmp_ * tmp / value / weight);
+            solution.setCount(id, tmp_ * tmp / value / weight);
             //solutions[id - startIDNode] = ;
         } else {
-            solution->setCount(id, tmp_ * tmp / weight);
+            solution.setCount(id, tmp_ * tmp / weight);
             //solutions[id - startIDNode] = tmp_ * tmp / weight;
         }
     }
 
         // we have some solutions in edge1
     else if (tmp >= 0.0) {
-        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
+        double oldVal = solution.solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp > 0) {
-                solution->incSolutions();
+                solution.incSolutions();
                 //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp == 0) {
-                solution->decSolutions();
+                solution.decSolutions();
                 //atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solution->setCount(id, tmp * oldVal / weight);
+        solution.setCount(id, tmp * oldVal / weight);
         //solutions[id - startIDNode] = tmp * oldVal / weight;
     }
 
         // we have some solutions in edge2
     else if (tmp_ >= 0.0) {
-        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
+        double oldVal = solution.solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp_ > 0) {
-                solution->incSolutions();
+                solution.incSolutions();
                 //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp_ == 0) {
-                solution->decSolutions();
+                solution.decSolutions();
                 //atomicSub(sols, 1);
             }
         }
@@ -440,15 +463,15 @@ __global__ void solveJoin(
         }
 
         if (!(run.mode & NO_EXP)) {
-            solution->setCount(id, tmp_ * oldVal / value);
+            solution.setCount(id, tmp_ * oldVal / value);
             //solutions[id - startIDNode] = tmp_ * oldVal / value;
         } else {
-            solution->setCount(id, tmp_ * oldVal);
+            solution.setCount(id, tmp_ * oldVal);
             //solutions[id - startIDNode] = tmp_ * oldVal;
         }
     }
     if (run.mode & ARRAY_TYPE && !(run.mode & NO_EXP)) {
-        atomicMax(exponent, ilogb(solution->solutionCountFor(id))); //solutions[id - startIDNode]));
+        atomicMax(exponent, ilogb(solution.solutionCountFor(id))); //solutions[id - startIDNode]));
     }
 }
 
@@ -554,9 +577,9 @@ __device__ double solveIntroduceF(
   *     correction value for the exponents
  */
 __global__ void solveIntroduceForget(
-        Solution* solsF,
+        std::variant<TreeSolutionData*, ArraySolutionData*> solsF_data,
         GPUVars varsForget,
-        const Solution* solsE,
+        std::variant<TreeSolutionData*, ArraySolutionData*> solsE_data,
         GPUVars lastVars,
         uint64_t combinations,
         GPUVars varsIntroduce,
@@ -572,6 +595,8 @@ __global__ void solveIntroduceForget(
     if (id < 0) {
         return;
     }
+    auto solsF = solutionFromData(solsF_data);
+    const auto solsE = solutionFromData(solsE_data);
     if (varsIntroduce.count != varsForget.count) {
         double tmp = 0;
         long templateId = 0;
@@ -627,11 +652,13 @@ __global__ void solveIntroduceForget(
             //}
         }
     } 
+    delete solsF;
+    delete solsE;
 }
 
 void combineTreeWrapper(
-    TreeSolution* to,
-    const TreeSolution* from,
+    TreeSolutionData* to_data,
+    const TreeSolutionData* from_data,
     // TreeNode *tree,
     // const TreeNode *solutions_old,
     // uint64_t *treeSize,
@@ -642,16 +669,16 @@ void combineTreeWrapper(
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
-        to,
-        from,
+        to_data,
+        from_data,
         meta
     );
     gpuErrchk(cudaDeviceSynchronize());
 }
 
 void array2treeWrapper(
-    TreeSolution *tree, 
-    const ArraySolution* array,
+    TreeSolutionData *tree, 
+    const ArraySolutionData* array,
     int64_t *exponent,
     RunMeta meta
 ) {
@@ -669,9 +696,9 @@ void array2treeWrapper(
 }
 
 void solveJoinWrapper(
-    ArraySolution *solution,
-    const Solution* edge1,
-    const Solution* edge2,
+    ArraySolutionData *solution,
+    const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1_data,
+    const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2_data,
     GPUVars variables,
     GPUVars edgeVariables1,
     GPUVars edgeVariables2,
@@ -685,8 +712,8 @@ void solveJoinWrapper(
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
         solution,
-        edge1,
-        edge2,
+        edge1_data,
+        edge2_data,
         variables,
         edgeVariables1,
         edgeVariables2,
@@ -700,9 +727,9 @@ void solveJoinWrapper(
 }
 
 void introduceForgetWrapper(
-    Solution* solsF,
+    std::variant<TreeSolutionData*, ArraySolutionData*> solsF_data,
     GPUVars varsForget,
-    const Solution* solsE,
+    std::variant<TreeSolutionData*, ArraySolutionData*> solsE_data,
     GPUVars lastVars,
     GPUVars varsIntroduce,
     // FIXME: Move this static information to GPU once.
@@ -718,9 +745,9 @@ void introduceForgetWrapper(
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
-        solsF,
+        solsF_data,
         varsForget,
-        solsE,
+        solsE_data,
         lastVars,
         // combinations
         (uint64_t) pow(2, varsIntroduce.count - varsForget.count),

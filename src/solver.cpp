@@ -16,9 +16,9 @@
 
 namespace gpusat {
     extern void introduceForgetWrapper(
-        Solution* solsF,
+        std::variant<TreeSolutionData*, ArraySolutionData*> solsF_data,
         GPUVars varsForget,
-        const Solution* solsE,
+        std::variant<TreeSolutionData*, ArraySolutionData*> solsE_data,
         GPUVars lastVars,
         GPUVars varsIntroduce,
         long *clauses,
@@ -31,9 +31,9 @@ namespace gpusat {
     );
 
     extern void solveJoinWrapper(
-        ArraySolution *solution,
-        const Solution* edge1,
-        const Solution* edge2,
+        ArraySolutionData *solution,
+        const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1_data,
+        const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2_data,
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
@@ -44,15 +44,15 @@ namespace gpusat {
     );
 
     extern void array2treeWrapper(
-        TreeSolution *tree,
-        const ArraySolution* array,
+        TreeSolutionData *tree,
+        const ArraySolutionData* array,
         int64_t *exponent,
         RunMeta meta
     );
 
     extern void combineTreeWrapper(
-        TreeSolution* to,
-        const TreeSolution* from,
+        TreeSolutionData* to_data,
+        const TreeSolutionData* from_data,
         const RunMeta meta
     );
 
@@ -159,21 +159,25 @@ namespace gpusat {
 
                 // create initial solution container
                 if (solutionType == dataStructure::TREE) {
-                    TreeSolution sol = TreeSolution(1, 0, 1, cNode.variables.size());
+                    TreeSolution sol(1, 0, 1, cNode.variables.size());
+                    sol.setCount(0, val);
                     /*sol.tree = (TreeNode*)malloc(sizeof(TreeNode));
                     sol.tree[0].content = val;
                     sol.maxId = 1,
                     sol.size = 1;
                     */
-                    cNode.solution.push_back(std::move(sol));
+                    std::variant<TreeSolution, ArraySolution> variant(std::move(sol));
+                    cNode.solution.push_back(std::move(variant));
                 } else if (solutionType == dataStructure::ARRAY) {
-                    ArraySolution sol = ArraySolution(1, 0, 1);
+                    ArraySolution sol(1, 0, 1);
+                    sol.setCount(0, val);
                     /*sol.elements = (double*)malloc(sizeof(double));
                     sol.elements[0] = val;
                     sol.maxId = 1,
                     sol.size = 1;
                     */
-                    cNode.solution.push_back(std::move(sol));
+                    std::variant<TreeSolution, ArraySolution> variant(std::move(sol));
+                    cNode.solution.push_back(std::move(variant));
                 } else {
                     std::cerr << "unknown data structure" << std::endl;
                     exit(1);
@@ -440,7 +444,7 @@ namespace gpusat {
 
             for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
-                Solution* edge1_sol = nullptr;
+                std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1_sol = std::nullopt;
                 std::unique_ptr<CudaBuffer<uint64_t>> buf_sol1( std::make_unique<CudaBuffer<uint64_t>>() );
                 if (b < edge1.solution.size() && toSolution(edge1.solution[b])->hasData()) {
                     buf_sol1 = std::make_unique<CudaBuffer<uint64_t>>(
@@ -452,7 +456,7 @@ namespace gpusat {
                     //edge1_sol = std::move(copy);
                 }
 
-                Solution* edge2_sol = nullptr;
+                std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2_sol = std::nullopt;
                 std::unique_ptr<CudaBuffer<uint64_t>> buf_sol2( std::make_unique<CudaBuffer<uint64_t>>() );
                 if (b < edge2.solution.size() && toSolution(edge2.solution[b])->hasData()) {
                     buf_sol2 = std::make_unique<CudaBuffer<uint64_t>>(
@@ -495,8 +499,8 @@ namespace gpusat {
                     meta
                 );
 
-                if (edge1_sol != nullptr) gpuErrchk(cudaFree(edge1_sol));
-                if (edge2_sol != nullptr) gpuErrchk(cudaFree(edge2_sol));
+                if (edge1_sol.has_value()) freeGPUDataVariant(edge1_sol.value());
+                if (edge2_sol.has_value()) freeGPUDataVariant(edge2_sol.value());
             }
 
             ArraySolution solution = ArraySolution::fromGPU(solution_gpu);
@@ -572,8 +576,9 @@ namespace gpusat {
                     node.maxSize = std::max(node.maxSize,
                         (int64_t)toSolution(node.solution.back())->dataStructureSize());
                 } else if (solutionType == ARRAY) {
-                    //FIXME: check if already fulfilled by construction
-                    //solution.size = bagSizeNode;
+                    // the inital calculated size might overshoot, thus limit
+                    // to the solutions IDs we have actually considered.
+                    solution.setDataStructureSize((size_t)bagSizeNode);
                     node.maxSize = std::max(node.maxSize, (int64_t)solution.dataStructureSize());
                     node.solution.push_back(std::move(solution));
                 }
@@ -698,7 +703,7 @@ namespace gpusat {
             );
 
             CudaBuffer<uint64_t> buf_solsF(
-                    (uint64_t*)toSolution(solution_tmp)->data(),
+                    //(uint64_t*)toSolution(solution_tmp)->data(),
                     toSolution(solution_tmp)->dataStructureSize()
             );
             CudaBuffer<int64_t> buf_varsF(fVars);
@@ -754,7 +759,7 @@ namespace gpusat {
                     pow(2, cnode.exponent),
                     meta
                 );
-                gpuErrchk(cudaFree(edge_gpu));
+                freeGPUDataVariant(edge_gpu);
             }
 
             // number of additional tree nodes to reserve
@@ -765,8 +770,8 @@ namespace gpusat {
                 };
             }
 
-            auto solution = fromGPU(solution_gpu, solutionType, reserveCount);
-            gpuErrchk(cudaFree(solution_gpu));
+            auto solution = fromGPU(solution_gpu, reserveCount);
+            freeGPUDataVariant(solution_gpu);
 
             auto num_entries = dataStructureVisit<uint64_t>(solution,
                 [](const TreeSolution& sol) { return (uint64_t)sol.currentTreeSize(); },
@@ -835,8 +840,10 @@ namespace gpusat {
                     node.maxSize = std::max(node.maxSize,
                         (int64_t)toSolution(node.solution.back())->dataStructureSize());
                 } else if (solutionType == ARRAY) {
-                    //auto& sol = std::get<ArraySolution>(solution);
-                    //sol.size = bagSizeForget;
+                    auto& sol = std::get<ArraySolution>(solution);
+                    // the inital calculated size might overshoot, thus limit
+                    // to the solutions IDs we have actually considered.
+                    sol.setDataStructureSize((size_t)bagSizeForget);
 
                     //cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(double) * bagSizeForget, cudaMemcpyDeviceToHost);
                     node.solution.push_back(std::move(solution));

@@ -55,6 +55,13 @@ namespace gpusat {
     extern __device__ uint64_t atomicSub(uint64_t* address, uint64_t val);
 #endif
 
+    // internal data of the solution class
+    struct SolutionData {
+        size_t size = 0;
+        int64_t minId = 0;
+        int64_t maxId = 0;
+    };
+
     class Solution {
         public:
             /**
@@ -77,16 +84,12 @@ namespace gpusat {
             /**
              * Minimal solution ID of this container.
              */
-            GPU_HOST_ATTR virtual int64_t minId() const {
-                return minId_;
-            }
+            GPU_HOST_ATTR virtual int64_t minId() const = 0;
 
             /**
              * Maximal solution ID of this container.
              */
-            GPU_HOST_ATTR virtual int64_t maxId() const {
-                return maxId_;
-            }
+            GPU_HOST_ATTR virtual int64_t maxId() const = 0;
 
             /**
              * increase the solution counter by one.
@@ -98,16 +101,12 @@ namespace gpusat {
             /**
              * Set minimal solution ID of this container.
              */
-            virtual void setMinId(int64_t id) {
-                minId_ = id;
-            }
+            GPU_HOST_ATTR virtual void setMinId(int64_t id) = 0;
 
             /**
              * Set maximal solution ID of this container.
              */
-            virtual void setMaxId(int64_t id) {
-                maxId_ = id;
-            }
+            GPU_HOST_ATTR virtual void setMaxId(int64_t id) = 0;
 
             /**
              * Get the stored model count for some solution id.
@@ -122,9 +121,7 @@ namespace gpusat {
             /**
              * Size of the container data structure in elements.
              */
-            virtual size_t dataStructureSize() const {
-                return size_;
-            }
+            GPU_HOST_ATTR virtual size_t dataStructureSize() const = 0;
 
             /**
              * Size of one container element in bytes.
@@ -138,30 +135,82 @@ namespace gpusat {
              */
             virtual size_t hash() const = 0;
 
-            Solution(size_t size, int64_t minId, int64_t maxId) :
-                size_(size), minId_(minId), maxId_(maxId) {};
+            Solution() = default;
 
             Solution(const Solution&) = delete;
             Solution& operator=(Solution& other) = delete;
 
+            // force operator override in derived classes
             // move constructor to ovoid copying solutions
-            Solution(Solution&& other) = default;
+            Solution(Solution&& other) = delete;
             // move assignment
-            Solution& operator=(Solution&& other) = default;
-        protected:
-            size_t size_ = 0;
-            int64_t minId_ = 0;
-            int64_t maxId_ = 0;
+            Solution& operator=(Solution&& other) = delete;
+    };
+
+    struct ArraySolutionData : public SolutionData {
+        double* elements = nullptr;
+        uint64_t numSolutions = 0;
     };
 
     class ArraySolution: public Solution {
         public:
             ArraySolution(size_t size, int64_t minId, int64_t maxId) :
-                Solution(size, minId, maxId)
+                owns_members(true)
             {
-                elements = (double*)malloc(size_ * elementSize());
-                assert(elements != nullptr);
-                memset(elements, 0, size_ * elementSize());
+                members = new ArraySolutionData();
+                members->size = size;
+                members->minId = minId;
+                members->maxId = maxId;
+                members->elements = (double*)malloc(members->size * elementSize());
+                assert(members->elements != nullptr);
+                memset(members->elements, 0, members->size * elementSize());
+            }
+
+            GPU_HOST_ATTR ArraySolution(ArraySolutionData* members_) : owns_members(false), members(members_) {}
+
+            GPU_HOST_ATTR ~ArraySolution() {
+                if (owns_members) {
+                    delete members;
+                }
+            }
+
+            GPU_HOST_ATTR int64_t maxId() const {
+                return members->maxId;
+            }
+
+            GPU_HOST_ATTR int64_t minId() const {
+                return members->minId;
+            }
+
+            GPU_HOST_ATTR void setMinId(int64_t id) {
+                members->minId = id;
+            }
+
+            GPU_HOST_ATTR void setMaxId(int64_t id) {
+                members->maxId = id;
+            }
+
+            GPU_HOST_ATTR size_t dataStructureSize() const {
+                return members->size;
+            }
+
+            void setDataStructureSize(size_t size) {
+                members->size = size;
+            }
+
+            ArraySolution(const ArraySolution&) = delete;
+            ArraySolution& operator=(ArraySolution& other) = delete;
+
+            // move constructor to ovoid copying solutions
+            ArraySolution(ArraySolution&& other) : members(other.members), owns_members(other.owns_members) {
+                other.owns_members = false;
+            };
+            // move assignment
+            ArraySolution& operator=(ArraySolution&& other) {
+                members = other.members;
+                owns_members = other.owns_members;
+                other.owns_members = false;
+                return *this;
             }
 
             size_t elementSize() const {
@@ -169,30 +218,31 @@ namespace gpusat {
             }
 
             void freeData() {
-                free(elements);
-                elements = nullptr;
+                free(members->elements);
+                members->elements = nullptr;
             }
 
-            ArraySolution* gpuCopyWithData(uint64_t* element_buffer) const {
+            ArraySolutionData* gpuCopyWithData(uint64_t* element_buffer) const {
 
-                ArraySolution* gpu = nullptr;
-                ArraySolution* cpu = (ArraySolution*)malloc(sizeof(ArraySolution));
-                assert(cpu != nullptr);
-                memcpy(cpu, this, sizeof(ArraySolution));
-                cpu->elements = (double*)element_buffer;
-                gpuErrchk(cudaMalloc(&gpu, elementSize() * dataStructureSize()));
-                gpuErrchk(cudaMemcpy(gpu, cpu, sizeof(ArraySolution), cudaMemcpyDeviceToHost));
-                free(cpu);
+                ArraySolutionData cpu = *members;
+                cpu.elements = (double*)element_buffer;
+                ArraySolutionData* gpu = nullptr;
+                gpuErrchk(cudaMalloc(&gpu, sizeof(ArraySolutionData)));
+                assert(gpu != nullptr);
+                gpuErrchk(cudaMemcpy(gpu, &cpu, sizeof(ArraySolutionData), cudaMemcpyHostToDevice));
                 return gpu;
             };
 
-            static ArraySolution fromGPU(const ArraySolution* gpu) {
-                ArraySolution* cpu = (ArraySolution*)malloc(sizeof(ArraySolution));
-                assert(cpu != nullptr);
-                gpuErrchk(cudaMemcpy(cpu, gpu, sizeof(ArraySolution), cudaMemcpyDeviceToHost));
-                auto solution = ArraySolution(cpu->size_, cpu->minId(), cpu->maxId());
-                solution.numSolutions = cpu->solutions();
-                gpuErrchk(cudaMemcpy(solution.elements, cpu->elements, solution.elementSize() * solution.dataStructureSize(), cudaMemcpyDeviceToHost));
+            static ArraySolution fromGPU(const ArraySolutionData* gpu) {
+                ArraySolutionData tmp;
+                gpuErrchk(cudaMemcpy(&tmp, gpu, sizeof(ArraySolutionData), cudaMemcpyDeviceToHost));
+                auto solution = ArraySolution(
+                    tmp.size,
+                    tmp.minId,
+                    tmp.maxId
+                );
+                solution.members->numSolutions = tmp.numSolutions;
+                gpuErrchk(cudaMemcpy(solution.members->elements, tmp.elements, solution.elementSize() * solution.dataStructureSize(), cudaMemcpyDeviceToHost));
                 return std::move(solution);
             }
 
@@ -201,17 +251,17 @@ namespace gpusat {
                 hash_combine(h, minId());
                 hash_combine(h, maxId());
                 hash_combine(h, solutions());
-                if (elements == NULL) {
+                if (members->elements == NULL) {
                     return h;
                 }
                 for (int i=0; i < dataStructureSize(); i++) {
-                    hash_combine(h, *reinterpret_cast<uint64_t*>(&elements[i]));
+                    hash_combine(h, *reinterpret_cast<uint64_t*>(&members->elements[i]));
                 }
                 return h;
             }
 
             GPU_HOST_ATTR double solutionCountFor(int64_t id) const {
-                return elements[id - minId_];
+                return members->elements[id - members->minId];
             }
 
             /**
@@ -219,7 +269,7 @@ namespace gpusat {
              */
             __device__ void incSolutions()  {
 #if defined(__CUDACC__)
-                atomicAdd(&numSolutions, 1);
+                atomicAdd(&(members->numSolutions), 1);
 #else
                 fprintf(stderr, "this may not be called from CPU (yet)!");
                 assert(false);
@@ -228,7 +278,7 @@ namespace gpusat {
 
             __device__ void decSolutions()  {
 #if defined(__CUDACC__)
-                atomicSub(&numSolutions, 1);
+                atomicSub(&(members->numSolutions), 1);
 #else
                 fprintf(stderr, "this may not be called from CPU (yet)!");
                 assert(false);
@@ -239,23 +289,21 @@ namespace gpusat {
              * Number of solutions in this container.
              */
             uint64_t solutions() const {
-                return numSolutions;
+                return members->numSolutions;
             }
 
             __device__ void setCount(int64_t id, double val) {
-                elements[id - minId_] = val;
+                members->elements[id - members->minId] = val;
             }
 
             GPU_HOST_ATTR void* data() const {
-                return elements;
+                return members->elements;
             }
         protected:
-            ArraySolution(size_t size, int64_t minId, int64_t maxId, uint64_t numSolutions_, double* elements_) :
-                Solution(size, minId, maxId), elements(elements_) {
-                numSolutions = numSolutions_;
-            };
-            double* elements = nullptr;
-            uint64_t numSolutions = 0;
+            ArraySolutionData* members;
+            // FIXME: if this is const, the default move assignment cannot
+            // be derived
+            bool owns_members;
     };
 
     struct TreeNode {
@@ -276,14 +324,69 @@ namespace gpusat {
 
     static_assert(sizeof(TreeNode) == sizeof(uint64_t));
 
+    struct TreeSolutionData : public SolutionData {
+        TreeNode* tree = nullptr;
+        size_t treeSize = 0;
+        size_t variableCount = 0;
+    };
+
     class TreeSolution: public Solution {
         public:
             TreeSolution(size_t size_, int64_t minId_, int64_t maxId_, int64_t variableCount_) :
-                Solution(size_, minId_, maxId_), variableCount(variableCount_)
+                owns_members(true)
             {
-                tree = (TreeNode*)malloc(size_ * elementSize());
-                assert(tree != nullptr);
-                memset(tree, 0, size_ * elementSize());
+                members = new TreeSolutionData();
+                members->size = size_;
+                members->minId = minId_;
+                members->maxId = maxId_;
+                members->variableCount = variableCount_;
+                members->tree = (TreeNode*)malloc(members->size * elementSize());
+                assert(members->tree != nullptr);
+                memset(members->tree, 0, members->size * elementSize());
+                members->treeSize = 0;
+            }
+
+            TreeSolution(const TreeSolution&) = delete;
+            TreeSolution& operator=(TreeSolution& other) = delete;
+
+            // move constructor to ovoid copying solutions
+            TreeSolution(TreeSolution&& other) : members(other.members), owns_members(other.owns_members) {
+                other.owns_members = false;
+            };
+            // move assignment
+            TreeSolution& operator=(TreeSolution&& other) {
+                members = other.members;
+                owns_members = other.owns_members;
+                other.owns_members = false;
+                return *this;
+            }
+
+            GPU_HOST_ATTR TreeSolution(TreeSolutionData* members_) : owns_members(false), members(members_) {}
+
+            GPU_HOST_ATTR ~TreeSolution() {
+                if (owns_members) {
+                    delete members;
+                }
+            }
+
+            GPU_HOST_ATTR int64_t maxId() const {
+                return members->maxId;
+            }
+
+            GPU_HOST_ATTR int64_t minId() const {
+                return members->minId;
+            }
+
+            GPU_HOST_ATTR void setMinId(int64_t id) {
+                members->minId = id;
+            }
+
+            GPU_HOST_ATTR void setMaxId(int64_t id) {
+                members->maxId = id;
+            }
+
+            GPU_HOST_ATTR size_t dataStructureSize() const {
+                return members->size;
             }
 
             size_t elementSize() const {
@@ -291,52 +394,52 @@ namespace gpusat {
             }
 
             size_t currentTreeSize() const {
-                return treeSize;
+                return members->treeSize;
             }
 
             size_t variables() const {
-                return variableCount;
+                return members->variableCount;
             }
 
             void freeData() {
-                free(tree);
-                tree = nullptr;
+                free(members->tree);
+                members->tree = nullptr;
             }
 
             GPU_HOST_ATTR double solutionCountFor(int64_t id) const {
                 ulong nextId = 0;
-                for (ulong i = 0; i < variableCount; i++) {
-                    nextId = ((uint32_t *) &(tree[nextId]))[(id >> (variableCount - i - 1)) & 1];
+                for (ulong i = 0; i < members->variableCount; i++) {
+                    nextId = ((uint32_t *) &(members->tree[nextId]))[(id >> (members->variableCount - i - 1)) & 1];
                     if (nextId == 0) {
                         return 0.0;
                     }
                 }
-                return tree[nextId].content;
+                return members->tree[nextId].content;
             }
 
             __device__ void setCount(int64_t id, double value) {
                 #if defined(__CUDACC__)
                 ulong nextId = 0;
                 ulong val = 0;
-                if (variableCount == 0) {
-                    atomicAdd(&treeSize, 1);
+                if (members->variableCount == 0) {
+                    atomicAdd(&members->treeSize, 1);
                 }
-                for (ulong i = 0; i < variableCount; i++) {
+                for (ulong i = 0; i < members->variableCount; i++) {
                     // lower or upper 32bit, depending on if bit of variable i is set in id
-                    uint * lowVal = &((uint *) &(tree[nextId]))[(id >> (variableCount - i - 1)) & 1];
+                    uint * lowVal = &((uint *) &(members->tree[nextId]))[(id >> (members->variableCount - i - 1)) & 1];
                     // secure our slot by incrementing treeSize
                     if (val == 0 && *lowVal == 0) {
-                        val = atomicAdd(&treeSize, 1) + 1;
+                        val = atomicAdd(&members->treeSize, 1) + 1;
                     }
                     atomicCAS(lowVal, 0, val);
                     if (*lowVal == val) {
-                        if (i < (variableCount - 1)) {
-                            val = atomicAdd(&treeSize, 1) + 1;
+                        if (i < (members->variableCount - 1)) {
+                            val = atomicAdd(&members->treeSize, 1) + 1;
                         }
                     }
                     nextId = *lowVal;
                 }
-                tree[nextId].content = value;
+                members->tree[nextId].content = value;
                 #else
                     fprintf(stderr, "this may not be called from CPU (yet)!");
                     assert(false);
@@ -349,22 +452,20 @@ namespace gpusat {
                 hash_combine(h, minId());
                 hash_combine(h, maxId());
                 hash_combine(h, currentTreeSize());
-                if (tree == NULL) {
+                if (members->tree == NULL) {
                     return h;
                 }
-                hash_combine(h, hashSubtree(tree[0], variableCount));
+                hash_combine(h, hashSubtree(members->tree[0], members->variableCount));
                 return h;
             }
 
-            TreeSolution* gpuCopyWithData(uint64_t* element_buffer) const {
-                TreeSolution* gpu = nullptr;
-                TreeSolution* cpu = (TreeSolution*)malloc(sizeof(TreeSolution));
-                assert(cpu != nullptr);
-                memcpy(cpu, this, sizeof(TreeSolution));
-                cpu->tree = (TreeNode*)element_buffer;
-                gpuErrchk(cudaMalloc(&gpu, elementSize() * dataStructureSize()));
-                gpuErrchk(cudaMemcpy(gpu, cpu, sizeof(TreeSolution), cudaMemcpyDeviceToHost));
-                free(cpu);
+            TreeSolutionData* gpuCopyWithData(uint64_t* element_buffer) const {
+                TreeSolutionData* gpu = nullptr;
+                TreeSolutionData cpu = *members;
+                cpu.tree = (TreeNode*)element_buffer;
+                gpuErrchk(cudaMalloc(&gpu, sizeof(TreeSolutionData)));
+                assert(gpu != nullptr);
+                gpuErrchk(cudaMemcpy(gpu, &cpu, sizeof(TreeSolutionData), cudaMemcpyHostToDevice));
                 return gpu;
             };
 
@@ -372,27 +473,29 @@ namespace gpusat {
              * Copy a solution back from the GPU.
              * Reserve `reserveNodes` additional nodes in the new solution tree.
              */
-            static TreeSolution fromGPU(const TreeSolution* gpu, size_t reserveNodes) {
-                TreeSolution* cpu = (TreeSolution*)malloc(sizeof(TreeSolution));
-                assert(cpu != nullptr);
-                gpuErrchk(cudaMemcpy(cpu, gpu, sizeof(TreeSolution), cudaMemcpyDeviceToHost));
-                auto size = cpu->treeSize + reserveNodes;
-                auto solution = TreeSolution(size, cpu->minId(), cpu->maxId(), cpu->variableCount);
-                solution.treeSize = cpu->treeSize;
-                memset(solution.tree, 0, solution.elementSize() * size);
-                gpuErrchk(cudaMemcpy(solution.tree, cpu->tree, solution.elementSize() * solution.treeSize, cudaMemcpyDeviceToHost));
+            static TreeSolution fromGPU(const TreeSolutionData* gpu, size_t reserveNodes) {
+                TreeSolutionData tmp;
+                gpuErrchk(cudaMemcpy(&tmp, gpu, sizeof(TreeSolutionData), cudaMemcpyDeviceToHost));
+                auto size = tmp.treeSize + reserveNodes;
+                auto solution = TreeSolution(
+                        size,
+                        tmp.minId,
+                        tmp.maxId,
+                        tmp.variableCount
+                );
+                solution.members->treeSize = tmp.treeSize;
+                // FIXME: only memset elements that are not copied over
+                memset(solution.members->tree, 0, solution.elementSize() * size);
+                gpuErrchk(cudaMemcpy(solution.members->tree, tmp.tree, solution.elementSize() * solution.currentTreeSize(), cudaMemcpyDeviceToHost));
                 return std::move(solution);
             }
 
             __device__ void incSolutions() {};
 
             GPU_HOST_ATTR void* data() const {
-                return tree;
+                return members->tree;
             }
         protected:
-            TreeSolution(size_t size_, int64_t minId_, int64_t maxId_, int64_t variableCount_, int64_t treeSize_, TreeNode* tree_) :
-                Solution(size_, minId_, maxId_), variableCount(variableCount_), treeSize(treeSize_), tree(tree_) {};
-
             size_t hashSubtree(const TreeNode& current, int variables) const {
                 if (current.empty == 0) return 0;
                 // index cell
@@ -400,11 +503,11 @@ namespace gpusat {
                     size_t hash = 0;
                     if (current.lowerIdx) {
                         hash_combine(hash, 1);
-                        hash_combine(hash, hashSubtree(tree[current.lowerIdx], variables - 1));
+                        hash_combine(hash, hashSubtree(members->tree[current.lowerIdx], variables - 1));
                     }
                     if (current.upperIdx) {
                         hash_combine(hash, 2);
-                        hash_combine(hash, hashSubtree(tree[current.upperIdx], variables - 1));
+                        hash_combine(hash, hashSubtree(members->tree[current.upperIdx], variables - 1));
                     }
                     return hash;
                 } else {
@@ -412,9 +515,10 @@ namespace gpusat {
                 }
             }
 
-            TreeNode* tree = nullptr;
-            size_t treeSize = 0;
-            size_t variableCount = 0;
+            TreeSolutionData* members;
+            // FIXME: if this is const, the default move assignment cannot
+            // be derived
+            bool owns_members;
     };
 
 
@@ -465,13 +569,24 @@ namespace gpusat {
      * FIXME: This is a temporary workaround for real
      * resource management.
      */
-    inline Solution* gpuCopyWithData(const std::variant<TreeSolution, ArraySolution>& solution, uint64_t* element_buffer) {
+    inline std::variant<TreeSolutionData*,ArraySolutionData*> gpuCopyWithData(const std::variant<TreeSolution, ArraySolution>& solution, uint64_t* element_buffer) {
         if (const auto sol = std::get_if<ArraySolution>(&solution)) {
-                return sol->gpuCopyWithData(element_buffer);
+            return std::variant<TreeSolutionData*,ArraySolutionData*>(sol->gpuCopyWithData(element_buffer));
         } else if (const auto sol = std::get_if<TreeSolution>(&solution)) {
-                return sol->gpuCopyWithData(element_buffer);
+            return std::variant<TreeSolutionData*,ArraySolutionData*>(sol->gpuCopyWithData(element_buffer));
         };
         __builtin_unreachable();
+    }
+
+    inline void freeGPUDataVariant(std::variant<TreeSolutionData*,ArraySolutionData*>& data) {
+        if (std::holds_alternative<TreeSolutionData*>(data)) {
+            gpuErrchk(cudaFree(std::get<TreeSolutionData*>(data)));
+            return;
+        } else if (std::holds_alternative<ArraySolutionData*>(data)) {
+            gpuErrchk(cudaFree(std::get<ArraySolutionData*>(data)));
+            return;
+        }
+        assert(false);
     }
 
     /***
@@ -479,12 +594,14 @@ namespace gpusat {
      * @param: reserveElements reserve some elements in case the solution grows.
      *         Currently only used by TreeSolution.
      */
-    inline std::variant<TreeSolution, ArraySolution> fromGPU(const Solution* gpu, dataStructure ds, size_t reserveElements) {
-        if (ds == ARRAY) {
+    inline std::variant<TreeSolution, ArraySolution> fromGPU(const std::variant<TreeSolutionData*,ArraySolutionData*>& gpu_data, size_t reserveElements) {
+        if (auto ptr = *std::get_if<ArraySolutionData*>(&gpu_data)) {
             // we cannot cast normally here, since `gpu` is only valid on the GPU.
-            return std::variant<TreeSolution, ArraySolution>(ArraySolution::fromGPU((ArraySolution*)gpu));
-        } else if (ds == TREE) {
-            return std::variant<TreeSolution, ArraySolution>(TreeSolution::fromGPU((TreeSolution*)gpu, reserveElements));
+            ArraySolution solution = ArraySolution::fromGPU(ptr);
+            return std::variant<TreeSolution, ArraySolution>(std::move(solution));
+        } else if (auto ptr = *std::get_if<TreeSolutionData*>(&gpu_data)) {
+            TreeSolution solution = TreeSolution::fromGPU(ptr, reserveElements);
+            return std::variant<TreeSolution, ArraySolution>(std::move(solution));
         }
         __builtin_unreachable();
     }

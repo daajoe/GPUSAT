@@ -10,8 +10,8 @@ target_compile_options(gpusat_kernel PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:-gencode
 
 if (DEBUG)
     # compiler flags
-    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -O3 -Wno-ignored-attributes")
-    SET(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -std=c++17 --expt-relaxed-constexpr")
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17 -g -O0 -Wno-ignored-attributes -fkeep-inline-functions")
+    SET(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -std=c++17 -g -G --expt-relaxed-constexpr")
     # linker flags
     SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS}")
     add_definitions(-DDEBUG)
