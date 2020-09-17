@@ -171,15 +171,12 @@ namespace gpusat {
 
             GPU_HOST_ATTR ArraySolution(ArraySolutionData* members_) noexcept : owns_members(false), members(members_) {}
 
-// FIXME: hack in order to allow variants to be trivially
-// destructible and thus run on the GPU
-#ifndef __CUDACC__
             GPU_HOST_ATTR ~ArraySolution() {
                 if (owns_members) {
+                    freeData();
                     delete members;
                 }
             }
-#endif
 
             GPU_HOST_ATTR int64_t maxId() const {
                 return members->maxId;
@@ -370,15 +367,12 @@ namespace gpusat {
 
             GPU_HOST_ATTR TreeSolution(TreeSolutionData* members_) noexcept : owns_members(false), members(members_) {}
 
-// FIXME: hack in order to allow variants to be trivially
-// destructible and thus run on the GPU
-#ifndef __CUDACC__
             GPU_HOST_ATTR ~TreeSolution() {
                 if (owns_members) {
+                    freeData();
                     delete members;
                 }
             }
-#endif
 
             GPU_HOST_ATTR int64_t maxId() const {
                 return members->maxId;
