@@ -163,16 +163,23 @@ namespace gpusat {
                 members->maxId = maxId;
                 members->elements = (double*)malloc(members->size * elementSize());
                 assert(members->elements != nullptr);
-                memset(members->elements, 0, members->size * elementSize());
+                for (size_t i=0; i < size; i++) {
+                    members->elements[i] = -1.0;
+                }
+                //memset(members->elements, 0, members->size * elementSize());
             }
 
-            GPU_HOST_ATTR ArraySolution(ArraySolutionData* members_) : owns_members(false), members(members_) {}
+            GPU_HOST_ATTR ArraySolution(ArraySolutionData* members_) noexcept : owns_members(false), members(members_) {}
 
+// FIXME: hack in order to allow variants to be trivially
+// destructible and thus run on the GPU
+#ifndef __CUDACC__
             GPU_HOST_ATTR ~ArraySolution() {
                 if (owns_members) {
                     delete members;
                 }
             }
+#endif
 
             GPU_HOST_ATTR int64_t maxId() const {
                 return members->maxId;
@@ -361,13 +368,17 @@ namespace gpusat {
                 return *this;
             }
 
-            GPU_HOST_ATTR TreeSolution(TreeSolutionData* members_) : owns_members(false), members(members_) {}
+            GPU_HOST_ATTR TreeSolution(TreeSolutionData* members_) noexcept : owns_members(false), members(members_) {}
 
+// FIXME: hack in order to allow variants to be trivially
+// destructible and thus run on the GPU
+#ifndef __CUDACC__
             GPU_HOST_ATTR ~TreeSolution() {
                 if (owns_members) {
                     delete members;
                 }
             }
+#endif
 
             GPU_HOST_ATTR int64_t maxId() const {
                 return members->maxId;
@@ -553,7 +564,10 @@ namespace gpusat {
         } else if (std::holds_alternative<ArraySolution>(solution)) {
             return arrayFunc(std::get<ArraySolution>(solution));
         }
+        assert(0);
+#ifndef __CUDACC__
         __builtin_unreachable();
+#endif
     }
 
     template <class T>
@@ -567,7 +581,10 @@ namespace gpusat {
         } else if (std::holds_alternative<ArraySolution>(solution)) {
             return arrayFunc(std::get<ArraySolution>(solution));
         }
+        assert(0);
+#ifndef __CUDACC__
         __builtin_unreachable();
+#endif
     }
 
     GPU_HOST_ATTR inline Solution* toSolution(std::variant<TreeSolution, ArraySolution>& solution) {
