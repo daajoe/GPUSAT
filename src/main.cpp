@@ -35,14 +35,19 @@ template<class... Ts> struct sum_visitor : Ts... { using Ts::operator()...; };
 template<class... Ts> free_visitor(Ts...) -> free_visitor<Ts...>;
 template<class... Ts> sum_visitor(Ts...) -> sum_visitor<Ts...>;
 
+template<class T>
+boost::multiprecision::cpp_bin_float_100 solutionSum(T& sol) {
+    boost::multiprecision::cpp_bin_float_100 sols = 0.0;
+    for (int64_t i = sol.minId(); i < sol.maxId(); i++) {
+        sols = sols + sol.solutionCountFor(i);
+    }
+    return sols;
+}
+
 boost::multiprecision::cpp_bin_float_100 bag_sum(BagType& bag) {
     boost::multiprecision::cpp_bin_float_100 sols = 0.0;
     for (auto& solution : bag.solution) {
-        auto sol = toSolution(solution);
-
-        for (int64_t i = sol->minId(); i < sol->maxId(); i++) {
-            sols = sols + sol->solutionCountFor(i);
-        }
+        sols = sols + std::visit([](auto& sol) { return solutionSum(sol); }, solution);
     }
     return sols;
 }
@@ -227,7 +232,7 @@ int main(int argc, char *argv[]) {
     if ((*sol).isSat > 0) {
         sols += bag_sum(treeDecomp.bags[0]);
         for (auto& solution : treeDecomp.bags[0].solution) {
-            toSolution(solution)->freeData();
+            std::visit([](auto& sol) {sol.freeData(); }, solution);
         }
 
         if (!noExp) {

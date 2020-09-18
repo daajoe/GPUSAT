@@ -57,18 +57,31 @@ namespace gpusat {
         const RunMeta meta
     );
 
+
+    template <typename T>
+    struct CudaDeleter {
+        void operator()(T* ptr) const {
+            gpuErrchk(cudaFree(ptr));
+        }
+    };
+
     template <typename T>
     class CudaBuffer {
         private:
             size_t buf_size;
-
-            // prevent c++ from copy assignment.
-            // learned this the hard way...
-            CudaBuffer(const CudaBuffer& other);
-            CudaBuffer& operator=(const CudaBuffer& other);
-
+            std::unique_ptr<T, CudaDeleter<T>> device_mem;
         public:
-            T* device_mem;
+            // prevent c++ from copy assignment.
+            CudaBuffer(const CudaBuffer& other) = delete;
+            CudaBuffer& operator=(const CudaBuffer& other) = delete;
+
+            CudaBuffer(CudaBuffer&&) = default;
+            CudaBuffer& operator=(CudaBuffer&& other) = default;
+
+            T* data() {
+                return device_mem.get();
+            }
+
             // creates a buffer with size 0.
             CudaBuffer();
             /// Create an on-device array of T with given length.
@@ -83,7 +96,6 @@ namespace gpusat {
             /// Length of the buffer
             size_t size();
 
-            ~CudaBuffer();
     };
 
     template <typename T>
@@ -96,7 +108,7 @@ namespace gpusat {
             gpuErrchk(cudaMemcpy(mem, from, sizeof(T) * length, cudaMemcpyHostToDevice));
             this->buf_size = length;
         }
-        this->device_mem = mem;
+        this->device_mem = std::unique_ptr<T, CudaDeleter<T>>(mem);
     }
 
     template <typename T>
@@ -105,7 +117,7 @@ namespace gpusat {
         gpuErrchk(cudaMalloc((void**)&mem, sizeof(T) * length));
         gpuErrchk(cudaMemset(mem, 0, sizeof(T) * length));
         this->buf_size = length;
-        this->device_mem = mem;
+        this->device_mem = std::unique_ptr<T, CudaDeleter<T>>(mem);
     }
 
     template <typename T>
@@ -118,7 +130,7 @@ namespace gpusat {
         } else {
             this->buf_size = 0;
         }
-        this->device_mem = mem;
+        this->device_mem = std::unique_ptr<T, CudaDeleter<T>>(mem);
     }
 
     template <typename T>
@@ -134,15 +146,7 @@ namespace gpusat {
 
     template <typename T>
     void CudaBuffer<T>::read(T* to) {
-        gpuErrchk(cudaMemcpy(to, this->device_mem, sizeof(T) * this->size(), cudaMemcpyDeviceToHost));
-    }
-
-    template <typename T>
-    CudaBuffer<T>::~CudaBuffer() {
-        if (this->device_mem) {
-            gpuErrchk(cudaFree(this->device_mem));
-        }
-        this->device_mem = NULL;
+        gpuErrchk(cudaMemcpy(to, this->device_mem.get(), sizeof(T) * this->size(), cudaMemcpyDeviceToHost));
     }
 
 
@@ -271,10 +275,10 @@ namespace gpusat {
 
             double range = table.maxId() - table.minId();
 
-            auto gpu_array = table.gpuCopyWithData((uint64_t*)buf_sols_old.device_mem);
+            auto gpu_array = table.gpuCopyWithData(buf_sols_old.data());
 
             TreeSolution tmp(max_tree_size, table.minId(), table.maxId(), numVars);
-            const auto gpu_tree = tmp.gpuCopyWithData((uint64_t*)buf_sols_new.device_mem);
+            const auto gpu_tree = tmp.gpuCopyWithData(buf_sols_new.data());
             tmp.freeData();
 
             int64_t s = std::ceil(range / (1l << 31));
@@ -289,7 +293,7 @@ namespace gpusat {
                 array2treeWrapper(
                     gpu_tree,
                     gpu_array,
-                    buf_exp.device_mem,
+                    buf_exp.data(),
                     meta
                 );
             }
@@ -332,9 +336,9 @@ namespace gpusat {
             auto new_size = t1.currentTreeSize() + t2.currentTreeSize() + 2;
             CudaBuffer<TreeNode> buf_sols_new(new_size);
             //gpuErrchk(cudaMemset(buf_sols_new.device_mem, 0, buf_sols_new.size() * sizeof(TreeNode)));
-            gpuErrchk(cudaMemcpy(buf_sols_new.device_mem, (TreeNode*)t1.data(), sizeof(TreeNode) * new_size, cudaMemcpyHostToDevice));
+            gpuErrchk(cudaMemcpy(buf_sols_new.data(), t1.data(), sizeof(TreeNode) * new_size, cudaMemcpyHostToDevice));
 
-            CudaBuffer<TreeNode> buf_sols_old((TreeNode*)t2.data(), t2.currentTreeSize() + 1);
+            CudaBuffer<TreeNode> buf_sols_old(t2.data(), t2.currentTreeSize() + 1);
 
             t2.freeData();
 
@@ -346,8 +350,8 @@ namespace gpusat {
 
             //CudaBuffer<uint64_t> buf_num_sol(&t.numSolutions, 1);
 
-            auto gpu_to = t1.gpuCopyWithData((uint64_t*)buf_sols_new.device_mem);
-            const auto gpu_from = t2.gpuCopyWithData((uint64_t*)buf_sols_old.device_mem);
+            auto gpu_to = t1.gpuCopyWithData(buf_sols_new.data());
+            const auto gpu_from = t2.gpuCopyWithData(buf_sols_old.data());
 
             double range = t2.maxId() - t2.minId();
             int64_t s = std::ceil(range / (1l << 31));
@@ -417,9 +421,9 @@ namespace gpusat {
         CudaBuffer<int64_t> buf_solVars2(edge2.variables);
 
 
-        std::unique_ptr<CudaBuffer<double>> buf_weights( std::make_unique<CudaBuffer<double>>() );
+        CudaBuffer<double> buf_weights;
         if (formula.variableWeights != nullptr) {
-            buf_weights = std::make_unique<CudaBuffer<double>>(formula.variableWeights, formula.numWeights);
+            buf_weights = CudaBuffer<double>(formula.variableWeights, formula.numWeights);
         }
 
         node.exponent = INT64_MIN;
@@ -460,31 +464,35 @@ namespace gpusat {
 
             std::cout << "run: " << run << " " << tmp_solution.minId() << " " << tmp_solution.maxId() << std::endl;
 
-            CudaBuffer<double> buf_sol((double*)tmp_solution.data(), tmp_solution.dataStructureSize());
-            auto solution_gpu = tmp_solution.gpuCopyWithData((uint64_t*)buf_sol.device_mem);
+            CudaBuffer<double> buf_sol(tmp_solution.data(), tmp_solution.dataStructureSize());
+            auto solution_gpu = tmp_solution.gpuCopyWithData(buf_sol.data());
 
             for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
                 std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1_sol = std::nullopt;
-                std::unique_ptr<CudaBuffer<uint64_t>> buf_sol1( std::make_unique<CudaBuffer<uint64_t>>() );
-                if (b < edge1.solution.size() && toSolution(edge1.solution[b])->hasData()) {
-                    buf_sol1 = std::make_unique<CudaBuffer<uint64_t>>(
-                        (uint64_t*)toSolution(edge1.solution[b])->data(),
-                        toSolution(edge1.solution[b])->dataStructureSize()
-                    );
-                    edge1_sol = gpuCopyWithData(edge1.solution[b], buf_sol1->device_mem);
+                std::optional<CudaBuffer<uint64_t>> buf_sol1 = std::nullopt;
+
+                if (b < edge1.solution.size()) {
+                    std::visit([&](auto& edge) {
+                        if (edge.hasData()) {
+                            buf_sol1 = CudaBuffer((uint64_t*)edge.data(), edge.dataStructureSize());
+                            edge1_sol = std::variant<TreeSolutionData*, ArraySolutionData*>(edge.gpuCopyWithData(buf_sol1.value().data()));
+                        }
+                    }, edge1.solution[b]);
+
                     //auto copy = gpuSolutionCopy(edge1.solution[b], buf_sol1->device_mem);
                     //edge1_sol = std::move(copy);
                 }
 
                 std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2_sol = std::nullopt;
-                std::unique_ptr<CudaBuffer<uint64_t>> buf_sol2( std::make_unique<CudaBuffer<uint64_t>>() );
-                if (b < edge2.solution.size() && toSolution(edge2.solution[b])->hasData()) {
-                    buf_sol2 = std::make_unique<CudaBuffer<uint64_t>>(
-                        (uint64_t*)toSolution(edge2.solution[b])->data(),
-                        toSolution(edge2.solution[b])->dataStructureSize()
-                    );
-                    edge2_sol = gpuCopyWithData(edge2.solution[b], buf_sol2->device_mem);
+                std::optional<CudaBuffer<uint64_t>> buf_sol2 = std::nullopt;
+                if (b < edge2.solution.size()) {
+                    std::visit([&](auto& edge) {
+                        if (edge.hasData()) {
+                            buf_sol2 = CudaBuffer((uint64_t*)edge.data(), edge.dataStructureSize());
+                            edge2_sol = std::variant<TreeSolutionData*, ArraySolutionData*>(edge.gpuCopyWithData(buf_sol2.value().data()));
+                        }
+                    }, edge2.solution[b]);
                     //auto copy = gpuSolutionCopy(edge2.solution[b], buf_sol2->device_mem);
                     //edge2_sol = std::move(copy);
                 }
@@ -504,19 +512,19 @@ namespace gpusat {
                     edge2_sol,
                     GPUVars {
                         .count = node.variables.size(),
-                        .vars = buf_solVars.device_mem
+                        .vars = buf_solVars.data()
                     },
                     GPUVars {
                         .count = edge1.variables.size(),
-                        .vars = buf_solVars1.device_mem
+                        .vars = buf_solVars1.data()
                     },
                     GPUVars {
                         .count = edge2.variables.size(),
-                        .vars = buf_solVars2.device_mem
+                        .vars = buf_solVars2.data()
                     },
-                    buf_weights->device_mem,
+                    buf_weights.data(),
                     pow(2, edge1.exponent + edge2.exponent),
-                    buf_exponent.device_mem,
+                    buf_exponent.data(),
                     meta
                 );
 
@@ -601,8 +609,7 @@ namespace gpusat {
                         //tree.size = tree.numSolutions + 1;
                         node.solution.push_back(std::move(tree));
                     }
-                    node.maxSize = std::max(node.maxSize,
-                        (int64_t)toSolution(node.solution.back())->dataStructureSize());
+                    node.maxSize = std::max(node.maxSize, dataStructureSize(node.solution.back()));
                 } else if (solutionType == ARRAY) {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
@@ -618,15 +625,15 @@ namespace gpusat {
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
         int64_t tableSize = 0;
         for (const auto &sol : node.solution) {
-            tableSize += toSolution(sol)->dataStructureSize();
+            tableSize += dataStructureSize(sol);
         }
         std::cout << "table size: " << tableSize << std::endl;
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (auto &sol : edge1.solution) {
-            toSolution(sol)->freeData();
+            freeData(sol);
         }
         for (auto &sol : edge2.solution) {
-            toSolution(sol)->freeData();
+            freeData(sol);
         }
         std::cerr << "JOIN output hash: " << node.hash() << std::endl;
     }
@@ -730,28 +737,28 @@ namespace gpusat {
                 node.variables.size()
             );
 
-            CudaBuffer<uint64_t> buf_solsF(
-                    //(uint64_t*)toSolution(solution_tmp)->data(),
-                    toSolution(solution_tmp)->dataStructureSize()
-            );
+            CudaBuffer<uint64_t> buf_solsF(dataStructureSize(solution_tmp));
             CudaBuffer<int64_t> buf_varsF(fVars);
 
-            auto solution_gpu = gpuCopyWithData(solution_tmp, buf_solsF.device_mem);
+            auto solution_gpu = gpuCopyWithData(solution_tmp, buf_solsF.data());
 
             for (auto &csol : cnode.solution) {
-                if (!toSolution(csol)->hasData()) {
+                bool has_data = std::visit([](auto &s) -> bool { return s.hasData(); }, csol);
+                if (!has_data) {
                     continue;
                 }
 
-                std::unique_ptr<CudaBuffer<uint64_t>> buf_solsE( std::make_unique<CudaBuffer<uint64_t>>() );
+                CudaBuffer<uint64_t> buf_solsE;
                 if (!leaf) {
-                    buf_solsE = std::make_unique<CudaBuffer<uint64_t>>(
-                        (uint64_t*)toSolution(csol)->data(),
-                        toSolution(csol)->dataStructureSize()
-                    );
+                    std::visit([&](auto& edge) {
+                        buf_solsE = CudaBuffer(
+                            (uint64_t*)edge.data(),
+                            edge.dataStructureSize()
+                        );
+                    }, csol);
                 }
 
-                auto edge_gpu = gpuCopyWithData(csol, buf_solsE->device_mem);
+                auto edge_gpu = gpuCopyWithData(csol, buf_solsE.data());
 
                 int64_t threads = sol_maxId - sol_minId;
                 int64_t id_offset = sol_minId;
@@ -768,22 +775,22 @@ namespace gpusat {
                     solution_gpu,
                     GPUVars {
                         .count = fVars.size(),
-                        .vars = buf_varsF.device_mem
+                        .vars = buf_varsF.data()
                     },
                     edge_gpu,
                     GPUVars {
                         .count = eVars.size(),
-                        .vars = buf_varsE.device_mem
+                        .vars = buf_varsE.data()
                     },
                     GPUVars {
                         .count = buf_varsI.size(),
-                        .vars = buf_varsI.device_mem
+                        .vars = buf_varsI.data()
                     },
-                    buf_clauses.device_mem,
-                    buf_numVarsC.device_mem,
+                    buf_clauses.data(),
+                    buf_numVarsC.data(),
                     numClauses,
-                    buf_weights.device_mem,
-                    buf_exponent.device_mem,
+                    buf_weights.data(),
+                    buf_exponent.data(),
                     pow(2, cnode.exponent),
                     meta
                 );
@@ -808,12 +815,17 @@ namespace gpusat {
 
             std::cerr << "num solutions: " << num_entries << std::endl;
             if (num_entries == 0) {
-                toSolution(solution)->freeData();
+
+                freeData(solution);
 
                 if (solutionType == TREE) {
                     if (node.solution.size() > 0) {
                         auto& last = std::get<TreeSolution>(node.solution.back());
-                        last.setMaxId(toSolution(solution)->maxId());
+                        auto new_max_id = std::visit(
+                            [](auto &s) -> int64_t { return s.maxId(); },
+                            solution
+                        );
+                        last.setMaxId(new_max_id);
                     } else {
                         node.solution.push_back(std::move(solution));
                     }
@@ -869,14 +881,14 @@ namespace gpusat {
                         }
                     }
                     node.maxSize = std::max(node.maxSize,
-                        (int64_t)toSolution(node.solution.back())->dataStructureSize()
+                        dataStructureSize(node.solution.back())
                         // FIXME:
                         // on nodes with 0 variables, this treeSize indicates satisfiability.
                         // otherwise, it is the index of the last node.
                         // TreeSize is then carried to dataStructureSize.
                         // This mismatch should be solved.
-
                          - (node.variables.size() == 0));
+
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution>(solution);
                     // the inital calculated size might overshoot, thus limit
@@ -894,14 +906,14 @@ namespace gpusat {
         node.correction = cnode.correction + cnode.exponent;
         int64_t tableSize = 0;
         for (const auto &sol : node.solution) {
-            tableSize += toSolution(sol)->dataStructureSize();
+            tableSize += dataStructureSize(sol);
         }
         std::cout << "table size: " << tableSize << std::endl;
         std::cerr << "IF output hash: " << node.hash() << std::endl;
 
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (auto &csol : cnode.solution) {
-            toSolution(csol)->freeData();
+            freeData(csol);
         }
     }
 }

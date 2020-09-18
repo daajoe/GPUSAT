@@ -220,9 +220,10 @@ __global__ void combineTree(
  * @return
  *      the model count
  */
+template<class T>
 __device__ double solveIntroduce_(
         GPUVars variables,
-        const Solution &edge,
+        const T& edge,
         GPUVars edgeVariables,
         double *weights,
         int64_t id,
@@ -736,8 +737,8 @@ void solveJoinWrapper(
     } else if (((edge1.has_value() && std::holds_alternative<ArraySolutionData*>(edge1.value()))
             || (edge2.has_value() && std::holds_alternative<ArraySolutionData*>(edge2.value())))) {
 
-        assert(std::holds_alternative<TreeSolutionData*>(edge1.value()));
-        assert(std::holds_alternative<TreeSolutionData*>(edge2.value()));
+        assert(std::holds_alternative<ArraySolutionData*>(edge1.value()));
+        assert(std::holds_alternative<ArraySolutionData*>(edge2.value()));
 
         solveJoin<ArraySolution, ArraySolutionData><<<blocksPerGrid, threadsPerBlock>>>(
             solution,
