@@ -570,6 +570,8 @@ namespace gpusat {
                         last = &std::get<TreeSolution>(node.solution.back());
                     }
 
+                    size_t new_max_size = 0;
+
                     // previous bag is not empty, combine if there is still space.
                     if (last != NULL && last->hasData() && (solution.solutions() + last->currentTreeSize() + 2) < solution.dataStructureSize()) {
                         std::cerr << "first branch" << std::endl;
@@ -581,6 +583,7 @@ namespace gpusat {
                             last->currentTreeSize() + 1
                         );
                         auto new_tree = combineTree(tree, *last);
+                        new_max_size = new_tree.currentTreeSize() + 1;
                         //tree.size = tree.numSolutions + 1;
                         node.solution.back() = std::move(new_tree);
                     // previous back is empty, replace it
@@ -594,6 +597,7 @@ namespace gpusat {
                             0
                         );
                         tree.setMinId(last->minId());
+                        new_max_size = tree.currentTreeSize() + 1;
                         //tree.size = tree.numSolutions + 1;
                         node.solution.back() = std::move(tree);
                     } else {
@@ -605,11 +609,12 @@ namespace gpusat {
                             node,
                             0
                         );
+                        new_max_size = tree.currentTreeSize() + 1;
                         // size?
                         //tree.size = tree.numSolutions + 1;
                         node.solution.push_back(std::move(tree));
                     }
-                    node.maxSize = std::max(node.maxSize, dataStructureSize(node.solution.back()));
+                    node.maxSize = std::max(node.maxSize, (int64_t)new_max_size);
                 } else if (solutionType == ARRAY) {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
@@ -843,11 +848,15 @@ namespace gpusat {
                     }
 
 
+                    size_t new_max_size = sol.currentTreeSize() + 1;
                     if (node.variables.size() == 0) {
-                        // This seems to be a weird hack in the original code
-                        // because of the confusion of solution count and tree size.
-                        // we'll preserve the tree size
-                        //assert(sol.currentTreeSize() == 0);
+                        // FIXME:
+                        // on nodes with 0 variables, this treeSize indicates satisfiability.
+                        // otherwise, it is the index of the last node.
+                        // TreeSize is then carried to dataStructureSize.
+                        // This mismatch should be solved.
+                        // But with 0 variables, we only need one node.
+                        new_max_size = 1;
                         //sol.numSolutions--;
                     }
 
@@ -864,6 +873,7 @@ namespace gpusat {
                         // additional nodes where reserved through `reserveCount`.
                         combineTree(sol, *last);
                         //sol.size = sol.numSolutions + 1;
+                        new_max_size = sol.currentTreeSize() + 1;
                         node.solution.back() = std::move(sol);
                     } else {
                         //int64_t nodeCount = sol.numSolutions + 1;
@@ -880,14 +890,7 @@ namespace gpusat {
                             node.solution.push_back(std::move(sol));
                         }
                     }
-                    node.maxSize = std::max(node.maxSize,
-                        dataStructureSize(node.solution.back())
-                        // FIXME:
-                        // on nodes with 0 variables, this treeSize indicates satisfiability.
-                        // otherwise, it is the index of the last node.
-                        // TreeSize is then carried to dataStructureSize.
-                        // This mismatch should be solved.
-                         - (node.variables.size() == 0));
+                    node.maxSize = std::max(node.maxSize, (int64_t)new_max_size);
 
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution>(solution);
