@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(gpusati CXX CUDA)
 
-include_directories("$ENV{CUDA_PATH}/include")
+message("Thrust: ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+include_directories("$ENV{CUDA_PATH}/include" ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 link_directories("$ENV{CUDA_PATH}/lib/x64")
 
 

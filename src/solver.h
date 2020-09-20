@@ -75,7 +75,7 @@ namespace gpusat {
          * @param numVars
          * @param node
          */
-        TreeSolution arrayToTree(ArraySolution &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize);
+        TreeSolution<CpuMem> arrayToTree(ArraySolution<CpuMem> &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize);
 
         /**
          *
@@ -83,7 +83,7 @@ namespace gpusat {
          * @param from
          * @param numVars
          */
-        TreeSolution combineTree(TreeSolution &t1, TreeSolution &t2);
+        TreeSolution<CpuMem> combineTree(TreeSolution<CpuMem> &t1, TreeSolution<CpuMem> &t2);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

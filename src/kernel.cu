@@ -5,10 +5,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
-
 #include "types.h"
+#include "kernel.h"
 
 
+// TODO: get rid of RunMeta
 
 namespace gpusat {
 
@@ -58,10 +59,10 @@ __device__ int64_t atomicMax(int64_t* address, int64_t val)
 // FIXME: normal atomicAdd might not be atomic across devices
 
 
-__device__ int64_t get_global_id(const RunMeta& meta) {
+__device__ int64_t get_global_id(uint64_t minId, uint64_t maxId) {
     // TODO: y and z
-    int64_t id = blockDim.x * blockIdx.x + threadIdx.x + meta.minId;
-    if (id >= meta.maxId) {
+    int64_t id = blockDim.x * blockIdx.x + threadIdx.x + minId;
+    if (id >= maxId) {
         return -1;
     }
     return id;
@@ -141,23 +142,22 @@ __device__ void setCount(uint64_t id, TreeNode *tree, size_t numVars, uint64_t* 
   *     the max exponent of this run
  */
 __global__ void array2tree(
-        TreeSolutionData* tree_data,
-        const ArraySolutionData* array_data,
+        TreeSolution<GpuOnly>* tree,
+        const ArraySolution<GpuOnly>* array,
         int64_t *exponent,
         const RunMeta meta
 ) {
-    TreeSolution tree = TreeSolution(tree_data);
-    const ArraySolution array = ArraySolution((ArraySolutionData*)array_data);
-
-    assert(tree.minId() == array.minId());
-    assert(tree.maxId() == array.maxId());
-    int64_t id = get_global_id(meta);
+    assert(tree != nullptr);
+    assert(array != nullptr);
+    assert(tree->minId() == array->minId());
+    assert(tree->maxId() == array->maxId());
+    int64_t id = get_global_id(array->minId(), array->maxId());
     if (id < 0) {
         return;
     }
-    auto solutions = array.solutionCountFor(id);
+    auto solutions = array->solutionCountFor(id);
     if (solutions > 0) {
-        tree.setCount(id, solutions);
+        tree->setCount(id, solutions);
         if (!(meta.mode & NO_EXP)) {
             atomicMax(exponent, (int64_t)ilogb(solutions));
         }
@@ -179,24 +179,18 @@ __global__ void array2tree(
   *     the start id of the current node
  */
 __global__ void combineTree(
-        TreeSolutionData* to_data,
-        const TreeSolutionData* from_data,
-        //TreeNode *tree,
-        //const TreeNode *solutions_old,
-        //uint64_t *treeSize,
-        //int64_t startId,
+        TreeSolution<GpuOnly>* to,
+        const TreeSolution<GpuOnly>* from,
         const RunMeta meta
 ) {
-    TreeSolution to = TreeSolution(to_data);
-    const TreeSolution from = TreeSolution((TreeSolutionData*)from_data);
     // this is is relative to the <from>-tree
-    int64_t id = get_global_id(meta);
+    int64_t id = get_global_id(from->minId(), from->maxId());
     if (id < 0) {
         return;
     }
-    double val = from.solutionCountFor(id);
+    double val = from->solutionCountFor(id);
     if (val > 0) {
-        to.setCount(id, val);
+        to->setCount(id, val);
     }
 }
 
@@ -357,11 +351,11 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
   *     the max exponent of this run
   */
 
-template <class T, class D>
+template <class E1, class E2>
 __global__ void solveJoin(
-        ArraySolutionData* solution_data,
-        std::optional<D*> edge1_data,
-        std::optional<D*> edge2_data,
+        ArraySolution<GpuOnly>* solution,
+        E1* edge1,
+        E2* edge2,
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
@@ -374,24 +368,20 @@ __global__ void solveJoin(
         int64_t *exponent,
         const RunMeta run
 ) {
-    int64_t id = get_global_id(run);
+    int64_t id = get_global_id(solution->minId(), solution->maxId());
     if (id < 0) {
         return;
     }
 
-    ArraySolution solution = ArraySolution(solution_data);
-
     double tmp = -1, tmp_ = -1;
     double weight = 1;
-    if (edge1_data.has_value()) {
-        const auto edge1 = T(edge1_data.value());
+    if (edge1 != nullptr) {
         // get solution count from first edge
-        tmp = solveIntroduce_(variables, edge1, edgeVariables1, weights, id, run.mode);
+        tmp = solveIntroduce_(variables, *edge1, edgeVariables1, weights, id, run.mode);
     }
-    if (edge2_data.has_value()) {
-        const auto edge2 = T(edge2_data.value());
+    if (edge2 != nullptr) {
         // get solution count from second edge
-        tmp_ = solveIntroduce_(variables, edge2, edgeVariables2, weights, id, run.mode);
+        tmp_ = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id, run.mode);
     }
     // weighted model count
     if (weights != 0) {
@@ -402,50 +392,50 @@ __global__ void solveJoin(
 
     if (tmp_ >= 0.0 && tmp >= 0.0) {
         if (tmp_ > 0.0 && tmp > 0.0) {
-            solution.incSolutions();
+            solution->incSolutions();
             //atomicAdd(sols, 1);
         }
         if (!(run.mode & NO_EXP)) {
-            solution.setCount(id, tmp_ * tmp / value / weight);
+            solution->setCount(id, tmp_ * tmp / value / weight);
             //solutions[id - startIDNode] = ;
         } else {
-            solution.setCount(id, tmp_ * tmp / weight);
+            solution->setCount(id, tmp_ * tmp / weight);
             //solutions[id - startIDNode] = tmp_ * tmp / weight;
         }
     }
 
         // we have some solutions in edge1
     else if (tmp >= 0.0) {
-        double oldVal = solution.solutionCountFor(id); //solutions[id - startIDNode];
+        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp > 0) {
-                solution.incSolutions();
+                solution->incSolutions();
                 //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp == 0) {
-                solution.decSolutions();
+                solution->decSolutions();
                 //atomicSub(sols, 1);
             }
         }
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solution.setCount(id, tmp * oldVal / weight);
+        solution->setCount(id, tmp * oldVal / weight);
         //solutions[id - startIDNode] = tmp * oldVal / weight;
     }
 
         // we have some solutions in edge2
     else if (tmp_ >= 0.0) {
-        double oldVal = solution.solutionCountFor(id); //solutions[id - startIDNode];
+        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
         if (oldVal < 0) {
             if (tmp_ > 0) {
-                solution.incSolutions();
+                solution->incSolutions();
                 //atomicAdd(sols, 1);
             }
         } else if (oldVal > 0) {
             if (tmp_ == 0) {
-                solution.decSolutions();
+                solution->decSolutions();
                 //atomicSub(sols, 1);
             }
         }
@@ -454,15 +444,15 @@ __global__ void solveJoin(
         }
 
         if (!(run.mode & NO_EXP)) {
-            solution.setCount(id, tmp_ * oldVal / value);
+            solution->setCount(id, tmp_ * oldVal / value);
             //solutions[id - startIDNode] = tmp_ * oldVal / value;
         } else {
-            solution.setCount(id, tmp_ * oldVal);
+            solution->setCount(id, tmp_ * oldVal);
             //solutions[id - startIDNode] = tmp_ * oldVal;
         }
     }
     if (run.mode & ARRAY_TYPE && !(run.mode & NO_EXP)) {
-        atomicMax(exponent, ilogb(solution.solutionCountFor(id))); //solutions[id - startIDNode]));
+        atomicMax(exponent, ilogb(solution->solutionCountFor(id))); //solutions[id - startIDNode]));
     }
 }
 
@@ -499,16 +489,16 @@ __device__ double solveIntroduceF(
         long *numVarsC,
         long numclauses,
         GPUVars variables,
-        const T& edge,
+        const T* edge,
         GPUVars edgeVariables,
         double *weights,
         long id,
         SolveMode mode
 ) {
     double tmp;
-    if (edge.hasData()) {
+    if (edge != nullptr && edge->hasData()) {
         // get solutions count edge
-        tmp = solveIntroduce_(variables, edge, edgeVariables, weights, id, mode);
+        tmp = solveIntroduce_(variables, *edge, edgeVariables, weights, id, mode);
     } else {
         // no edge - solve leaf
         tmp = 1.0;
@@ -569,11 +559,11 @@ __device__ double solveIntroduceF(
  * @param value
   *     correction value for the exponents
  */
-template <class T, class D>
+template <class T, class E>
 __global__ void solveIntroduceForget(
-        D* solsF_data,
+        T* solsF,
         GPUVars varsForget,
-        D* solsE_data,
+        const E* solsE,
         GPUVars lastVars,
         uint64_t combinations,
         GPUVars varsIntroduce,
@@ -585,12 +575,10 @@ __global__ void solveIntroduceForget(
         double value,
         const RunMeta run
 ) {
-    int64_t id = get_global_id(run);
+    int64_t id = get_global_id(solsF->minId(), solsF->maxId());
     if (id < 0) {
         return;
     }
-    auto solsF = T(solsF_data);
-    const auto solsE = T(solsE_data);
 
     if (varsIntroduce.count != varsForget.count) {
         double tmp = 0;
@@ -617,91 +605,119 @@ __global__ void solveIntroduceForget(
         }
         
         if (tmp > 0) {
-            double last = solsF.solutionCountFor(id);
+            double last = solsF->solutionCountFor(id);
             if (!(run.mode & NO_EXP))  {
-                solsF.setCount(id, (tmp / value + last));
+                solsF->setCount(id, (tmp / value + last));
                 atomicMax(exponent, ilogb((tmp / value + last)));
+                assert(*exponent != FP_ILOGB0);
             } else {
-                solsF.setCount(id, (tmp + last));
+                solsF->setCount(id, (tmp + last));
             }
             //if (auto array = std::get_if<ArraySolution>(&solsF)) {
             // count solution (no-op except for ArraySolution)
-            solsF.incSolutions();
+            solsF->incSolutions();
             //}
         }
     } else {
         // no forget variables, only introduce
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id, run.mode);
         if (tmp > 0) {
-            //auto& solsf = *toSolution(solsF);
-            double last = solsF.solutionCountFor(id);
+            double last = solsF->solutionCountFor(id);
             if (!(run.mode & NO_EXP))  {
-                solsF.setCount(id, (tmp / value + last));
+                solsF->setCount(id, (tmp / value + last));
                 atomicMax(exponent, ilogb((tmp / value + last)));
+                assert(*exponent != FP_ILOGB0);
             } else {
-                solsF.setCount(id, (tmp + last));
+                solsF->setCount(id, (tmp + last));
             }
             //if (auto array = std::get_if<ArraySolution>(&solsF)) {
             // count solution (no-op except for ArraySolution)
-            solsF.incSolutions();
+            solsF->incSolutions();
             //}
         }
     } 
 }
 
-void combineTreeWrapper(
-    TreeSolutionData* to_data,
-    const TreeSolutionData* from_data,
-    // TreeNode *tree,
-    // const TreeNode *solutions_old,
-    // uint64_t *treeSize,
-    // int64_t startId,
+/**
+ * Clones a solution bag to the GPU,
+ * this clone uses the data of the <CudaMem> bag it was cloned from
+ * and does not own it.
+ */
+
+template <template<typename> typename T>
+std::unique_ptr<T<GpuOnly>, CudaMem> gpuClone(T<CudaMem>& owner) {
+    static_assert(sizeof(T<CudaMem>) == sizeof(T<GpuOnly>));
+    
+    // Note that since clone is malloc'ed here,
+    // its destructor will not be called. 
+    T<GpuOnly>* clone = nullptr;
+    gpuErrchk(cudaMalloc(&clone, sizeof(T<GpuOnly>)));
+    assert(clone != nullptr);
+    gpuErrchk(cudaMemcpy(clone, &owner, sizeof(T<GpuOnly>), cudaMemcpyHostToDevice));
+    return std::unique_ptr<T<GpuOnly>, CudaMem>(clone);
+}
+
+TreeSolution<CudaMem> combineTreeWrapper(
+    TreeSolution<CpuMem>& to,
+    const TreeSolution<CpuMem>& from,
     RunMeta meta
 ) {
+    // copy to-tree and reserve additional space for the from-tree + connecting nodes
+    auto to_owner = gpuOwner(to, from.currentTreeSize() + 2);
+    auto from_owner = gpuOwner(from);
+
+    auto to_gpu = gpuClone(to_owner);
+    auto from_gpu = gpuClone(from_owner);
+
     int64_t threadsPerBlock = 512;
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     combineTree<<<blocksPerGrid, threadsPerBlock>>>(
-        to_data,
-        from_data,
+        to_gpu.get(),
+        from_gpu.get(),
         meta
     );
     gpuErrchk(cudaDeviceSynchronize());
+    update(to_owner, to_gpu);
+    return std::move(to_owner);
 }
 
-void array2treeWrapper(
-    TreeSolutionData *tree, 
-    const ArraySolutionData* array,
+TreeSolution<CudaMem> array2treeWrapper(
+    const ArraySolution<CpuMem>& array,
     int64_t *exponent,
+    /// Number of variables in the resulting tree
+    size_t tree_variables,
     RunMeta meta
 ) {
     
+    // FIXME: better upper bound
+    auto max_tree_size = 1l << tree_variables;
+    TreeSolution<CpuMem> tmp(max_tree_size, array.minId(), array.maxId(), tree_variables);
+
+    auto tree_owner = gpuOwner(tmp);
+    auto array_owner = gpuOwner(array);
+
+    auto tree_gpu = gpuClone(tree_owner);
+    auto array_gpu = gpuClone(array_owner);
+
     int64_t threadsPerBlock = 512;
     int64_t threads = meta.maxId - meta.minId;
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     array2tree<<<blocksPerGrid, threadsPerBlock>>>(
-        tree,
-        array,
+        tree_gpu.get(),
+        array_gpu.get(),
         exponent,
         meta
     );
     gpuErrchk(cudaDeviceSynchronize());
-}
-
-
-template <class D>
-const std::optional<D*> unpack(const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>>& data) {
-    if (data.has_value()) {
-        return std::get<D*>(data.value());
-    } else {
-        return std::nullopt;
-    }
+    update(tree_owner, tree_gpu);
+    return std::move(tree_owner);
 }
 
 void solveJoinWrapper(
-    ArraySolutionData *solution,
-    const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge1,
-    const std::optional<std::variant<TreeSolutionData*, ArraySolutionData*>> edge2,
+    ArraySolution<CudaMem> &solution,
+    const std::optional<SolutionVariant*> edge1,
+    const std::optional<SolutionVariant*> edge2,
     GPUVars variables,
     GPUVars edgeVariables1,
     GPUVars edgeVariables2,
@@ -716,51 +732,74 @@ void solveJoinWrapper(
 
     assert(edge1.has_value() || edge2.has_value());
 
-    if ((edge1.has_value() && std::holds_alternative<TreeSolutionData*>(edge1.value()))
-            || (edge2.has_value() && std::holds_alternative<TreeSolutionData*>(edge2.value()))) {
 
-        assert(std::holds_alternative<TreeSolutionData*>(edge1.value()));
-        assert(std::holds_alternative<TreeSolutionData*>(edge2.value()));
+    auto solution_gpu = gpuClone(solution);
 
-        solveJoin<TreeSolution, TreeSolutionData><<<blocksPerGrid, threadsPerBlock>>>(
-            solution,
-            unpack<TreeSolutionData>(edge1),
-            unpack<TreeSolutionData>(edge2),
-            variables,
-            edgeVariables1,
-            edgeVariables2,
-            weights,
-            value, 
-            exponent,
-            meta
-        );
-    } else if (((edge1.has_value() && std::holds_alternative<ArraySolutionData*>(edge1.value()))
-            || (edge2.has_value() && std::holds_alternative<ArraySolutionData*>(edge2.value())))) {
+    auto single_edge_join = [&](SolutionVariant* edge) {
+        assert(edge != nullptr);
+        std::visit([&](auto &sol) {
+            auto edge_owner = gpuOwner(sol);
+            auto edge_gpu = gpuClone(edge_owner);
 
-        assert(std::holds_alternative<ArraySolutionData*>(edge1.value()));
-        assert(std::holds_alternative<ArraySolutionData*>(edge2.value()));
+            solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
+                solution_gpu.get(),
+                edge_gpu.get(),
+                (decltype(edge_owner)*)nullptr,
+                variables,
+                edgeVariables1,
+                edgeVariables2,
+                weights,
+                value, 
+                exponent,
+                meta
+            );
+        }, *edge);
+        gpuErrchk(cudaDeviceSynchronize());
+    };
 
-        solveJoin<ArraySolution, ArraySolutionData><<<blocksPerGrid, threadsPerBlock>>>(
-            solution,
-            unpack<ArraySolutionData>(edge1),
-            unpack<ArraySolutionData>(edge2),
-            variables,
-            edgeVariables1,
-            edgeVariables2,
-            weights,
-            value, 
-            exponent,
-            meta
-        );
+    auto double_edge_join = [&](SolutionVariant* e1, SolutionVariant* e2) {
+        assert(e1 != nullptr);
+        assert(e2 != nullptr);
+        std::visit([&](auto &sol1) {
+            auto e1_owner = gpuOwner(sol1);
+            auto e1_gpu = gpuClone(e1_owner);
+
+            std::visit([&](auto &sol2) {
+                auto e2_owner = gpuOwner(sol2);
+                auto e2_gpu = gpuClone(e2_owner);
+
+                solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
+                    solution_gpu.get(),
+                    e1_gpu.get(),
+                    e2_gpu.get(),
+                    variables,
+                    edgeVariables1,
+                    edgeVariables2,
+                    weights,
+                    value, 
+                    exponent,
+                    meta
+                );
+            }, *e2);
+        }, *e1);
+        gpuErrchk(cudaDeviceSynchronize());
+    };
+
+    if (edge1.has_value() && !edge2.has_value()) {
+        single_edge_join(edge1.value());
+    } else if (!edge1.has_value() && edge2.has_value()) {
+        single_edge_join(edge2.value());
+    } else {
+        assert(edge1.has_value() && edge2.has_value());
+        double_edge_join(edge1.value(), edge2.value());
     }
-
-    gpuErrchk(cudaDeviceSynchronize());
+    update(solution, solution_gpu);
 }
 
 void introduceForgetWrapper(
-    std::variant<TreeSolutionData*, ArraySolutionData*> solsF_data,
+    std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>& solution_owner,
     GPUVars varsForget,
-    std::variant<TreeSolutionData*, ArraySolutionData*> solsE_data,
+    const std::optional<SolutionVariant*> edge,
     GPUVars lastVars,
     GPUVars varsIntroduce,
     // FIXME: Move this static information to GPU once.
@@ -769,7 +808,7 @@ void introduceForgetWrapper(
     long numclauses,
     double *weights,
     int64_t *exponent,
-    double value,
+    double previous_value,
     RunMeta meta
 ) {
     int64_t threadsPerBlock = 512;
@@ -777,48 +816,90 @@ void introduceForgetWrapper(
     int64_t blocksPerGrid = (threads + threadsPerBlock - 1) / threadsPerBlock;
     uint64_t combinations = (uint64_t) pow(2, varsIntroduce.count - varsForget.count);
 
-    if (std::holds_alternative<TreeSolutionData*>(solsF_data)) {
-        assert(std::holds_alternative<TreeSolutionData*>(solsE_data));
-
-        solveIntroduceForget<TreeSolution, TreeSolutionData><<<blocksPerGrid, threadsPerBlock>>>(
-            std::get<TreeSolutionData*>(solsF_data),
-            varsForget,
-            std::get<TreeSolutionData*>(solsE_data),
-            lastVars,
-            // combinations
-            combinations,
-            varsIntroduce,
-            clauses,
-            numVarsC,
-            numclauses,
-            weights,
-            exponent, 
-            value,
-            meta
-        );
-    } else if (std::holds_alternative<ArraySolutionData*>(solsF_data)) {
-        assert(std::holds_alternative<ArraySolutionData*>(solsE_data));
-
-        solveIntroduceForget<ArraySolution, ArraySolutionData><<<blocksPerGrid, threadsPerBlock>>>(
-            std::get<ArraySolutionData*>(solsF_data),
-            varsForget,
-            std::get<ArraySolutionData*>(solsE_data),
-            lastVars,
-            // combinations
-            combinations,
-            varsIntroduce,
-            clauses,
-            numVarsC,
-            numclauses,
-            weights,
-            exponent, 
-            value,
-            meta
-        );
-    } else {
-        assert(false);
-    }
-
-    gpuErrchk(cudaDeviceSynchronize());
+    std::visit([&](auto& solsF) {
+        auto solution_gpu = gpuClone(solsF);
+        
+        // leaf node
+        if (!edge.has_value()) {
+            solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
+                solution_gpu.get(),
+                varsForget,
+                (decltype(solution_gpu.get()))nullptr,
+                lastVars,
+                combinations,
+                varsIntroduce,
+                clauses,
+                numVarsC,
+                numclauses,
+                weights,
+                exponent, 
+                previous_value,
+                meta
+            );
+        } else {
+            assert(edge.value() != nullptr);
+            std::visit([&](auto& solsE) {
+                auto edge_owner = gpuOwner(solsE);
+                auto edge_gpu = gpuClone(edge_owner);
+ 
+                solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
+                    solution_gpu.get(),
+                    varsForget,
+                    edge_gpu.get(),
+                    lastVars,
+                    combinations,
+                    varsIntroduce,
+                    clauses,
+                    numVarsC,
+                    numclauses,
+                    weights,
+                    exponent, 
+                    previous_value,
+                    meta
+                );
+            }, *edge.value());
+        }
+        gpuErrchk(cudaDeviceSynchronize());
+        update(solsF, solution_gpu);
+    }, solution_owner);
 }
+
+/**
+ * Returns a solution bag that lives on the CPU
+ * but owns GPU data copied from the input bag.
+ */
+template <template<typename> typename T>
+T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
+    // copy parameters
+    T<CudaMem> gpu(orig, nullptr);
+
+    gpu.setDataStructureSize(gpu.dataStructureSize() + reserve);
+
+    // allocate GPU memory
+    gpu.allocate();
+
+    if (orig.hasData()) {
+        // copy data structure
+        gpuErrchk(cudaMemcpy(
+            gpu.data(),
+            orig.data(),
+            orig.dataStructureSize() * orig.elementSize(),
+            cudaMemcpyHostToDevice
+        ));
+        // reserve additional elements if desired
+        if (reserve) {
+            auto start = thrust::device_ptr<decltype(orig.initializer())>(gpu.data());
+            thrust::fill(
+                start + orig.dataStructureSize(),
+                start + gpu.dataStructureSize(),
+                orig.initializer()
+            );
+        }
+    } else {
+        auto start = thrust::device_ptr<decltype(orig.initializer())>(gpu.data());
+        thrust::fill(start, start + gpu.dataStructureSize(), orig.initializer());
+    }
+    return std::move(gpu);
+}
+
 }
