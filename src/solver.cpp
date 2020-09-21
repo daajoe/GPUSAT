@@ -219,7 +219,6 @@ namespace gpusat {
             size_t reserveNodes = nextSize;
             TreeSolution tree = cpuCopy(tree_gpu, reserveNodes);
 
-            std::cerr << "clean tree num solutions: " << tree.currentTreeSize() << std::endl;
             buf_exp.read(&(node.exponent));
 
             std::cerr << "tree output hash: " << tree.hash() << std::endl;
@@ -244,8 +243,8 @@ namespace gpusat {
             t2.setMaxId(std::max(t2.maxId(), t1.maxId()));
 
             // ensure we do not allocate too much space.
-            t1.setDataStructureSize(t1.currentTreeSize() + 1);
-            t2.setDataStructureSize(t2.currentTreeSize() + 1);
+            t1.setDataStructureSize(t1.currentTreeSize());
+            t2.setDataStructureSize(t2.currentTreeSize());
 
             RunMeta meta = {
                 .minId = t2.minId(),
@@ -259,7 +258,7 @@ namespace gpusat {
 
             TreeSolution<CpuMem> result = cpuCopy(result_gpu);
 
-            std::cerr << "combine tree solutions: " << result.currentTreeSize() << std::endl;
+            std::cerr << "combine tree size: " << result.currentTreeSize() << std::endl;
             result.setMinId(std::min(t2.minId(), t1.minId()));
             result.setMaxId(std::max(t2.maxId(), t1.maxId()));
             std::cerr << "combine tree output hash: " << result.hash() << std::endl;
@@ -427,29 +426,25 @@ namespace gpusat {
                         last = &std::get<TreeSolution<CpuMem>>(node.solution.back());
                     }
 
-                    size_t new_max_size = 0;
-
                     // previous bag is not empty, combine if there is still space.
-                    if (last != NULL && last->hasData() && (sol.currentTreeSize() + last->currentTreeSize() + 2) < sol.dataStructureSize()) {
+                    if (last != NULL && last->hasData() && (sol.currentTreeSize() + last->currentTreeSize() + 1) < sol.dataStructureSize()) {
                         std::cerr << "first branch" << std::endl;
                         std::cerr << "tree output hash: " << sol.hash() << std::endl;
                         auto new_tree = combineTree(sol, *last);
-                        new_max_size = new_tree.currentTreeSize() + 1;
                         node.solution.back() = std::move(new_tree);
                     // previous back is empty, replace it
                     } else if (last != NULL && !last->hasData()) {
                         std::cerr << "second branch" << std::endl;
                         std::cerr << "tree output hash: " << sol.hash() << std::endl;
                         sol.setMinId(last->minId());
-                        new_max_size = sol.currentTreeSize() + 1;
                         node.solution.back() = std::move(sol);
                     } else {
                         std::cerr << "simple clean tree" << std::endl;
                         std::cerr << "tree output hash: " << sol.hash() << std::endl;
-                        new_max_size = sol.currentTreeSize() + 1;
                         node.solution.push_back(std::move(sol));
                     }
-                    node.maxSize = std::max(node.maxSize, (int64_t)new_max_size);
+                    auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
+                    node.maxSize = std::max(node.maxSize, (int64_t)max_tree_size);
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution<CpuMem>>(solution);
                     // the inital calculated size might overshoot, thus limit
@@ -658,25 +653,9 @@ namespace gpusat {
                         last = &std::get<TreeSolution<CpuMem>>(node.solution.back());
                     }
 
-
-                    size_t new_max_size = sol.currentTreeSize() + 1;
-                    if (node.variables.size() == 0) {
-                        // FIXME:
-                        // on nodes with 0 variables, this treeSize indicates satisfiability.
-                        // otherwise, it is the index of the last node.
-                        // TreeSize is then carried to dataStructureSize.
-                        // This mismatch should be solved.
-                        // But with 0 variables, we only need one node.
-                        new_max_size = 1;
-                    }
-
-                    //free(sol.tree);
-                    //sol.tree = NULL;
-
                     if (last != NULL && last->hasData()
-                        && (sol.currentTreeSize() + last->currentTreeSize() + 2) < sol.dataStructureSize()) {
+                        && (sol.currentTreeSize() + last->currentTreeSize() + 1) < sol.dataStructureSize()) {
                         combineTree(sol, *last);
-                        new_max_size = sol.currentTreeSize() + 1;
                         node.solution.back() = std::move(sol);
                     } else {
                         // replace previous bag if needed
@@ -687,7 +666,9 @@ namespace gpusat {
                             node.solution.push_back(std::move(sol));
                         }
                     }
-                    node.maxSize = std::max(node.maxSize, (int64_t)new_max_size);
+
+                    auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
+                    node.maxSize = std::max(node.maxSize, (int64_t)max_tree_size);
 
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution<CpuMem>>(solution);

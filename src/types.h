@@ -246,14 +246,14 @@ namespace gpusat {
             TreeSolution(size_t size_, int64_t minId, int64_t maxId, int64_t variableCount_) :
                 size(size_), minId_(minId), maxId_(maxId),
                 variableCount(variableCount_),
-                tree(nullptr), treeSize(0), satisfiable(false) {};
+                tree(nullptr), lastNodeIndex(0), satisfiable(false) {};
 
             template<typename M2>
             TreeSolution(const TreeSolution<M2>& other, TreeNode* gpu_data) {
                 size = other.dataStructureSize();
                 minId_ = other.minId();
                 maxId_ = other.maxId();
-                treeSize = other.currentTreeSize();
+                lastNodeIndex = other.currentTreeSize() - 1;
                 variableCount = other.variables();
                 satisfiable = other.isSatisfiable();
                 tree = SolutionDataPtr<TreeNode, M>(gpu_data);
@@ -321,12 +321,8 @@ namespace gpusat {
                 return sizeof(TreeNode);
             }
 
-            /**
-             * FIXME: This is the *INDEX* of the largest element
-             * -> make this more clear and get rid of magic +1s
-             */
             size_t currentTreeSize() const {
-                return treeSize;
+                return lastNodeIndex + 1;
             }
 
             GPU_HOST_ATTR size_t variables() const {
@@ -373,14 +369,14 @@ namespace gpusat {
                 for (ulong i = 0; i < variables(); i++) {
                     // lower or upper 32bit, depending on if bit of variable i is set in id
                     uint * lowVal = &((uint *) &(data()[nextId]))[(id >> (variables() - i - 1)) & 1];
-                    // secure our slot by incrementing treeSize
+                    // secure our slot by incrementing lastNodeIndex
                     if (val == 0 && *lowVal == 0) {
-                        val = atomicAdd(&treeSize, 1) + 1;
+                        val = atomicAdd(&lastNodeIndex, 1) + 1;
                     }
                     atomicCAS(lowVal, 0, val);
                     if (*lowVal == val) {
                         if (i < (variables() - 1)) {
-                            val = atomicAdd(&treeSize, 1) + 1;
+                            val = atomicAdd(&lastNodeIndex, 1) + 1;
                         }
                     }
                     nextId = *lowVal;
@@ -432,7 +428,7 @@ namespace gpusat {
             uint64_t minId_;
             uint64_t maxId_;
             SolutionDataPtr<TreeNode, M> tree;
-            size_t treeSize;
+            size_t lastNodeIndex;
             size_t variableCount;
             bool satisfiable;
     };

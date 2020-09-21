@@ -645,8 +645,8 @@ TreeSolution<CudaMem> combineTreeWrapper(
     const TreeSolution<CpuMem>& from,
     RunMeta meta
 ) {
-    // copy to-tree and reserve additional space for the from-tree + connecting nodes
-    auto to_owner = gpuOwner(to, from.currentTreeSize() + 2);
+    // copy to-tree and reserve additional space for the from-tree + connecting node
+    auto to_owner = gpuOwner(to, from.currentTreeSize() + 1);
     auto from_owner = gpuOwner(from);
 
     auto to_gpu = gpuClone(to_owner);
