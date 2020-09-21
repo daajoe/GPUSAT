@@ -13,9 +13,12 @@ space +=
 
 $(info args: $(CHECK_ARGS))
 .SECONDEXPANSION:
-run/%: /$$(subst $$(space),/,$$(wordlist 3,1000,$$(subst /, ,$$*))) $(if $(CHECK_ARGS),,guard)
-	echo "$(notdir $@)"
-	$(GPUSAT_NEW) $(CHECK_ARGS) < $< 2> $(CHECK_DIR)/$(subst $<,,$*)/$(notdir $*) || echo 'failed!'
+run/orig/%: /$$(subst $$(space),/,$$(wordlist 2,1000,$$(subst /, ,$$*))) $(if $(CHECK_ARGS),,guard)
+	echo "orig: $(notdir $@)"
+	$(GPUSAT_ORIG) $(CHECK_ARGS) < $< 2> $(CHECK_DIR)/orig/$(subst $<,,$*)/$(notdir $*) || echo 'failed!'
+run/new/%: /$$(subst $$(space),/,$$(wordlist 2,1000,$$(subst /, ,$$*))) $(if $(CHECK_ARGS),,guard)
+	echo "new: $(notdir $@)"
+	$(GPUSAT_NEW) $(CHECK_ARGS) < $< 2> $(CHECK_DIR)/new/$(subst $<,,$*)/$(notdir $*) || echo 'failed!'
 
 tree/%: %
 	CHECK_ARGS='--dataStructure tree $(if $(subst .wcnf,,$(suffix $*)),,--weighted)' $(MAKE) run/new/tree/$*
