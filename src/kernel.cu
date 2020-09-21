@@ -373,16 +373,17 @@ __global__ void solveJoin(
         return;
     }
 
-    double tmp = -1, tmp_ = -1;
-    double weight = 1;
+    double edge1_solutions = -1.0;
+    double edge2_solutions = -1.0;
+    double weight = 1.0;
+
     if (edge1 != nullptr) {
-        // get solution count from first edge
-        tmp = solveIntroduce_(variables, *edge1, edgeVariables1, weights, id, run.mode);
+        edge1_solutions = solveIntroduce_(variables, *edge1, edgeVariables1, weights, id, run.mode);
     }
     if (edge2 != nullptr) {
-        // get solution count from second edge
-        tmp_ = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id, run.mode);
+        edge2_solutions = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id, run.mode);
     }
+
     // weighted model count
     if (weights != 0) {
         for (long a = 0; a < variables.count; a++) {
@@ -391,73 +392,59 @@ __global__ void solveJoin(
     }
 
     double solution_value = -1.0;
-    if (tmp_ >= 0.0 && tmp >= 0.0) {
-        if (tmp_ > 0.0 && tmp > 0.0) {
-            solution->incSolutions();
-
-            //atomicAdd(sols, 1);
-            if (!(run.mode & NO_EXP)) {
-                solution_value = tmp_ * tmp / value / weight;
-                //solutions[id - startIDNode] = ;
-            } else {
-                solution_value = tmp_ * tmp / weight;
-                //solutions[id - startIDNode] = tmp_ * tmp / weight;
-            }
-        }
-    }
-
-        // we have some solutions in edge1
-    else if (tmp >= 0.0) {
-        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
-        if (oldVal < 0) {
-            if (tmp > 0) {
+    auto only_one_edge_has_solution = [&](double edge_value, double oldVal) {
+        // no solutions stored yet, but some present in edge
+        if (oldVal < 0.0) {
+            if (edge_value > 0.0) {
                 solution->incSolutions();
-                //atomicAdd(sols, 1);
             }
-        } else if (oldVal > 0) {
-            if (tmp == 0) {
+        // no solution present in edge, but some solution was stored
+        } else if (oldVal > 0.0) {
+            if (edge_value == 0.0) {
                 solution->decSolutions();
-                //atomicSub(sols, 1);
             }
         }
-        if (oldVal < 0) {
-            oldVal = 1.0;
-        }
-        // FIXME: Why not respect value / exponent ?
-        solution_value = tmp * oldVal / weight;
-        //solutions[id - startIDNode] = tmp * oldVal / weight;
-    }
 
-        // we have some solutions in edge2
-    else if (tmp_ >= 0.0) {
-        double oldVal = solution->solutionCountFor(id); //solutions[id - startIDNode];
-        if (oldVal < 0) {
-            if (tmp_ > 0) {
-                solution->incSolutions();
-                //atomicAdd(sols, 1);
-            }
-        } else if (oldVal > 0) {
-            if (tmp_ == 0) {
-                solution->decSolutions();
-                //atomicSub(sols, 1);
-            }
-        }
-        if (oldVal < 0) {
+        // if the solution was not present before, multiply with one.
+        if (oldVal < 0.0) {
             oldVal = 1.0;
         }
 
+        solution_value = edge_value * oldVal / weight;
         if (!(run.mode & NO_EXP)) {
-            solution_value = tmp_ * oldVal / value;
-            //solutions[id - startIDNode] = tmp_ * oldVal / value;
-        } else {
-            solution_value = tmp_ * oldVal;
-            //solutions[id - startIDNode] = tmp_ * oldVal;
+            solution_value /= value;
+        }
+    };
+
+    if (edge1_solutions > 0.0 && edge2_solutions > 0.0) {
+        solution->incSolutions();
+
+        // we do not need to consider the old solution
+        // count in this bag, because each id can only occur
+        // in an edge node once, and here the id occurs for both edges.
+
+        solution_value = edge1_solutions * edge2_solutions / weight;
+        //atomicAdd(sols, 1);
+        if (!(run.mode & NO_EXP)) {
+            solution_value /= value;
+        }
+    // we need to consider individual edges and maybe look
+    // at we have already stored for the current id.
+    } else {
+        double oldVal = solution->solutionCountFor(id); 
+        // only one edge has a solution, the other has none.
+        if (edge1_solutions >= 0.0 && edge2_solutions < 0.0) {
+            only_one_edge_has_solution(edge1_solutions, oldVal);
+        } else if (edge1_solutions < 0.0 && edge2_solutions >= 0.0) {
+            only_one_edge_has_solution(edge2_solutions, oldVal);
         }
     }
+
+    // if we found solutions, store them
     if (solution_value > 0.0) {
         solution->setCount(id, solution_value);
         if (!(run.mode & NO_EXP)) {
-            atomicMax(exponent, ilogb(solution_value)); //solutions[id - startIDNode]));
+            atomicMax(exponent, ilogb(solution_value));
         }
     }
 }
