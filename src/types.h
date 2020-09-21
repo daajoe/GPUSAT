@@ -185,7 +185,7 @@ namespace gpusat {
             }
 
             constexpr double initializer() const {
-                return 0.0;
+                return -1.0;
             }
 
             size_t hash() const {
@@ -197,11 +197,19 @@ namespace gpusat {
                     return h;
                 }
                 for (int i=0; i < dataStructureSize(); i++) {
-                    hash_combine(h, *reinterpret_cast<uint64_t*>(&data()[i]));
+                    // regard empty entries as 0.0, for compatibility
+                    // with original implementation
+                    auto value = std::max(0.0, data()[i]);
+                    hash_combine(h, *reinterpret_cast<uint64_t*>(&value));
                 }
                 return h;
             }
 
+            /**
+             * Returns the solution count for a given id.
+             * Returns -1.0 if there is no entry for this id.
+             * (if initialized correctly)
+             */
             GPU_HOST_ATTR double solutionCountFor(int64_t id) const {
                 return data()[id - minId_];
             }
@@ -338,12 +346,24 @@ namespace gpusat {
                 return variableCount;
             }
 
+
+            /**
+             * Dummy functions to be interface-compatible
+             * with ArraySolution.
+             */
+            __device__ void incSolutions() {};
+            __device__ void decSolutions() {};
+
+            /**
+             * Returns the solution count for a given id.
+             * Returns -1.0 if there is no entry for this id.
+             */
             GPU_HOST_ATTR double solutionCountFor(int64_t id) const {
                 ulong nextId = 0;
                 for (ulong i = 0; i < variables(); i++) {
                     nextId = ((uint32_t *) &(data()[nextId]))[(id >> (variables() - i - 1)) & 1];
                     if (nextId == 0) {
-                        return 0.0;
+                        return -1.0;
                     }
                 }
                 return data()[nextId].content;
@@ -406,8 +426,6 @@ namespace gpusat {
                 hash_combine(h, hashSubtree(data()[0], variables()));
                 return h;
             }
-
-            __device__ void incSolutions() {};
 
             GPU_HOST_ATTR TreeNode* data() const {
                 return tree.get();
@@ -502,6 +520,7 @@ namespace gpusat {
 
 
     typedef std::variant<TreeSolution<CpuMem>, ArraySolution<CpuMem>> SolutionVariant;
+    typedef std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>> CudaSolutionVariant;
 
     inline int64_t dataStructureSize(const SolutionVariant& solution) {
         return std::visit([](const auto& sol) -> int64_t { return sol.dataStructureSize(); }, solution);

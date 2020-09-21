@@ -23,7 +23,7 @@ namespace gpusat {
     );
 
     void solveJoinWrapper(
-        ArraySolution<CudaMem> &solution,
+        CudaSolutionVariant& solution,
         const std::optional<SolutionVariant*> edge1,
         const std::optional<SolutionVariant*> edge2,
         GPUVars variables,
@@ -36,7 +36,7 @@ namespace gpusat {
     );
 
     void introduceForgetWrapper(
-        std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>& solution_owner,
+        CudaSolutionVariant& solution_owner,
         GPUVars varsForget,
         const std::optional<SolutionVariant*> edge,
         GPUVars lastVars,
@@ -102,6 +102,8 @@ namespace gpusat {
      */
     template <template<typename> typename T>
     T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve = 0);
-}
 
+    CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve = 0);
+
+}
 #endif // KERNEL_H

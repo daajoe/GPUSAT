@@ -248,7 +248,7 @@ __device__ double solveIntroduce_(
     }
 
     if (edge.hasData() && otherId >= edge.minId() && otherId < edge.maxId()) {
-        return edge.solutionCountFor(otherId) * weight; 
+        return max(edge.solutionCountFor(otherId) * weight, 0.0); 
     } else if (!edge.hasData() && otherId >= edge.minId() && otherId < edge.maxId()) {
         return 0.0;
     } else {
@@ -351,9 +351,9 @@ __device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t 
   *     the max exponent of this run
   */
 
-template <class E1, class E2>
+template <class T, class E1, class E2>
 __global__ void solveJoin(
-        ArraySolution<GpuOnly>* solution,
+        T* solution,
         E1* edge1,
         E2* edge2,
         GPUVars variables,
@@ -390,17 +390,19 @@ __global__ void solveJoin(
         }
     }
 
+    double solution_value = -1.0;
     if (tmp_ >= 0.0 && tmp >= 0.0) {
         if (tmp_ > 0.0 && tmp > 0.0) {
             solution->incSolutions();
+
             //atomicAdd(sols, 1);
-        }
-        if (!(run.mode & NO_EXP)) {
-            solution->setCount(id, tmp_ * tmp / value / weight);
-            //solutions[id - startIDNode] = ;
-        } else {
-            solution->setCount(id, tmp_ * tmp / weight);
-            //solutions[id - startIDNode] = tmp_ * tmp / weight;
+            if (!(run.mode & NO_EXP)) {
+                solution_value = tmp_ * tmp / value / weight;
+                //solutions[id - startIDNode] = ;
+            } else {
+                solution_value = tmp_ * tmp / weight;
+                //solutions[id - startIDNode] = tmp_ * tmp / weight;
+            }
         }
     }
 
@@ -421,7 +423,8 @@ __global__ void solveJoin(
         if (oldVal < 0) {
             oldVal = 1.0;
         }
-        solution->setCount(id, tmp * oldVal / weight);
+        // FIXME: Why not respect value / exponent ?
+        solution_value = tmp * oldVal / weight;
         //solutions[id - startIDNode] = tmp * oldVal / weight;
     }
 
@@ -444,15 +447,18 @@ __global__ void solveJoin(
         }
 
         if (!(run.mode & NO_EXP)) {
-            solution->setCount(id, tmp_ * oldVal / value);
+            solution_value = tmp_ * oldVal / value;
             //solutions[id - startIDNode] = tmp_ * oldVal / value;
         } else {
-            solution->setCount(id, tmp_ * oldVal);
+            solution_value = tmp_ * oldVal;
             //solutions[id - startIDNode] = tmp_ * oldVal;
         }
     }
-    if (run.mode & ARRAY_TYPE && !(run.mode & NO_EXP)) {
-        atomicMax(exponent, ilogb(solution->solutionCountFor(id))); //solutions[id - startIDNode]));
+    if (solution_value > 0.0) {
+        solution->setCount(id, solution_value);
+        if (!(run.mode & NO_EXP)) {
+            atomicMax(exponent, ilogb(solution_value)); //solutions[id - startIDNode]));
+        }
     }
 }
 
@@ -606,6 +612,7 @@ __global__ void solveIntroduceForget(
         
         if (tmp > 0) {
             double last = solsF->solutionCountFor(id);
+            last = max(last, 0.0);
             if (!(run.mode & NO_EXP))  {
                 solsF->setCount(id, (tmp / value + last));
                 atomicMax(exponent, ilogb((tmp / value + last)));
@@ -622,6 +629,7 @@ __global__ void solveIntroduceForget(
         double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id, run.mode);
         if (tmp > 0) {
             double last = solsF->solutionCountFor(id);
+            last = max(last, 0.0);
             if (!(run.mode & NO_EXP))  {
                 solsF->setCount(id, (tmp / value + last));
                 atomicMax(exponent, ilogb((tmp / value + last)));
@@ -712,8 +720,8 @@ TreeSolution<CudaMem> array2treeWrapper(
     return std::move(tree_owner);
 }
 
-void solveJoinWrapper(
-    ArraySolution<CudaMem> &solution,
+void solveJoinWrapper( 
+    CudaSolutionVariant& solution_variant,
     const std::optional<SolutionVariant*> edge1,
     const std::optional<SolutionVariant*> edge2,
     GPUVars variables,
@@ -730,46 +738,19 @@ void solveJoinWrapper(
 
     assert(edge1.has_value() || edge2.has_value());
 
+    std::visit([&](auto& solution) {
+        auto solution_gpu = gpuClone(solution);
 
-    auto solution_gpu = gpuClone(solution);
-
-    auto single_edge_join = [&](SolutionVariant* edge) {
-        assert(edge != nullptr);
-        std::visit([&](auto &sol) {
-            auto edge_owner = gpuOwner(sol);
-            auto edge_gpu = gpuClone(edge_owner);
-
-            solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
-                solution_gpu.get(),
-                edge_gpu.get(),
-                (decltype(edge_owner)*)nullptr,
-                variables,
-                edgeVariables1,
-                edgeVariables2,
-                weights,
-                value, 
-                exponent,
-                meta
-            );
-        }, *edge);
-        gpuErrchk(cudaDeviceSynchronize());
-    };
-
-    auto double_edge_join = [&](SolutionVariant* e1, SolutionVariant* e2) {
-        assert(e1 != nullptr);
-        assert(e2 != nullptr);
-        std::visit([&](auto &sol1) {
-            auto e1_owner = gpuOwner(sol1);
-            auto e1_gpu = gpuClone(e1_owner);
-
-            std::visit([&](auto &sol2) {
-                auto e2_owner = gpuOwner(sol2);
-                auto e2_gpu = gpuClone(e2_owner);
+        auto single_edge_join = [&](SolutionVariant* edge) {
+            assert(edge != nullptr);
+            std::visit([&](auto &sol) {
+                auto edge_owner = gpuOwner(sol);
+                auto edge_gpu = gpuClone(edge_owner);
 
                 solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
                     solution_gpu.get(),
-                    e1_gpu.get(),
-                    e2_gpu.get(),
+                    edge_gpu.get(),
+                    (decltype(edge_owner)*)nullptr,
                     variables,
                     edgeVariables1,
                     edgeVariables2,
@@ -778,20 +759,48 @@ void solveJoinWrapper(
                     exponent,
                     meta
                 );
-            }, *e2);
-        }, *e1);
-        gpuErrchk(cudaDeviceSynchronize());
-    };
+            }, *edge);
+            gpuErrchk(cudaDeviceSynchronize());
+        };
 
-    if (edge1.has_value() && !edge2.has_value()) {
-        single_edge_join(edge1.value());
-    } else if (!edge1.has_value() && edge2.has_value()) {
-        single_edge_join(edge2.value());
-    } else {
-        assert(edge1.has_value() && edge2.has_value());
-        double_edge_join(edge1.value(), edge2.value());
-    }
-    update(solution, solution_gpu);
+        auto double_edge_join = [&](SolutionVariant* e1, SolutionVariant* e2) {
+            assert(e1 != nullptr);
+            assert(e2 != nullptr);
+            std::visit([&](auto &sol1) {
+                auto e1_owner = gpuOwner(sol1);
+                auto e1_gpu = gpuClone(e1_owner);
+
+                std::visit([&](auto &sol2) {
+                    auto e2_owner = gpuOwner(sol2);
+                    auto e2_gpu = gpuClone(e2_owner);
+
+                    solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
+                        solution_gpu.get(),
+                        e1_gpu.get(),
+                        e2_gpu.get(),
+                        variables,
+                        edgeVariables1,
+                        edgeVariables2,
+                        weights,
+                        value, 
+                        exponent,
+                        meta
+                    );
+                }, *e2);
+            }, *e1);
+            gpuErrchk(cudaDeviceSynchronize());
+        };
+
+        if (edge1.has_value() && !edge2.has_value()) {
+            single_edge_join(edge1.value());
+        } else if (!edge1.has_value() && edge2.has_value()) {
+            single_edge_join(edge2.value());
+        } else {
+            assert(edge1.has_value() && edge2.has_value());
+            double_edge_join(edge1.value(), edge2.value());
+        }
+        update(solution, solution_gpu);
+    }, solution_variant);
 }
 
 void introduceForgetWrapper(
@@ -898,6 +907,12 @@ T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
         thrust::fill(start, start + gpu.dataStructureSize(), orig.initializer());
     }
     return std::move(gpu);
+}
+
+CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve) {
+    return std::visit([](auto& sol) -> CudaSolutionVariant {
+        return std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>(std::move(gpuOwner(sol)));
+    }, orig);
 }
 
 }

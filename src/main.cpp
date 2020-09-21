@@ -39,7 +39,7 @@ template<class T>
 boost::multiprecision::cpp_bin_float_100 solutionSum(T& sol) {
     boost::multiprecision::cpp_bin_float_100 sols = 0.0;
     for (int64_t i = sol.minId(); i < sol.maxId(); i++) {
-        sols = sols + sol.solutionCountFor(i);
+        sols = sols + std::max(sol.solutionCountFor(i), 0.0);
     }
     return sols;
 }
