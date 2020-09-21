@@ -689,8 +689,7 @@ TreeSolution<CudaMem> array2treeWrapper(
     RunMeta meta
 ) {
     
-    // FIXME: better upper bound
-    auto max_tree_size = (1l << tree_variables) * 2 + 1;
+    auto max_tree_size = (array.maxId() - array.minId()) * 2 + tree_variables;
     TreeSolution<CpuMem> tmp(max_tree_size, array.minId(), array.maxId(), tree_variables);
 
     auto tree_owner = gpuOwner(tmp);
