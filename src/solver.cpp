@@ -118,12 +118,18 @@ namespace gpusat {
                     TreeSolution<CpuMem> sol(1, 0, 1, cNode.variables.size());
                     sol.allocate();
                     sol.setCount(0, val);
+                    // this is not strictly necessary, but ensures
+                    // trace conformity with original
+                    sol.setSatisfiability(0.0);
                     SolutionVariant variant(std::move(sol));
                     cNode.solution.push_back(std::move(variant));
                 } else if (solutionType == dataStructure::ARRAY) {
                     ArraySolution<CpuMem> sol(1, 0, 1);
                     sol.allocate();
                     sol.setCount(0, val);
+                    // this is not strictly necessary, but ensures
+                    // trace conformity with original
+                    sol.setSatisfiability(0.0);
                     SolutionVariant variant(std::move(sol));
                     cNode.solution.push_back(std::move(variant));
                 } else {
@@ -395,21 +401,10 @@ namespace gpusat {
                 return cpuCopy(gpu_sol);
             }, solution_gpu);
 
-            auto num_entries = 0;
-            // FIXME: should soon be obsoleted.
-            if (auto sol = std::get_if<TreeSolution<CpuMem>>(&solution)) {
-                num_entries = sol->currentTreeSize();
-            } else if (auto sol = std::get_if<ArraySolution<CpuMem>>(&solution)) {
-                num_entries = sol->solutions();
-            } else {
-                assert(0);
-            }
-
-
             //std::cerr << "num solutions (join): " << num_entries << std::endl;
             std::cout << "a is " << node.solution.size() << std::endl;
 
-            if (num_entries == 0) {
+            if (!isSatisfiable(solution)) {
                 freeData(solution);
 
                 if (solutionType == TREE) {
@@ -635,19 +630,8 @@ namespace gpusat {
                 return cpuCopy(gpu_sol);
             }, solution_gpu);
 
-            uint64_t num_entries = 0;
-            // FIXME: should soon be obsoleted.
-            if (auto sol = std::get_if<TreeSolution<CpuMem>>(&solution)) {
-                num_entries = sol->currentTreeSize();
-            } else if (auto sol = std::get_if<ArraySolution<CpuMem>>(&solution)) {
-                num_entries = sol->solutions();
-            } else {
-                assert(0);
-            }
-
-            std::cerr << "num solutions: " << num_entries << std::endl;
-            if (num_entries == 0) {
-
+            std::cerr << "num solutions: " << isSatisfiable(solution) << std::endl;
+            if (!isSatisfiable(solution)) {
                 freeData(solution);
 
                 if (solutionType == TREE) {
