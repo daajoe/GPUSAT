@@ -609,7 +609,6 @@ __global__ void solveIntroduceForget(
             if (!(run.mode & NO_EXP))  {
                 solsF->setCount(id, (tmp / value + last));
                 atomicMax(exponent, ilogb((tmp / value + last)));
-                assert(*exponent != FP_ILOGB0);
             } else {
                 solsF->setCount(id, (tmp + last));
             }
@@ -691,7 +690,7 @@ TreeSolution<CudaMem> array2treeWrapper(
 ) {
     
     // FIXME: better upper bound
-    auto max_tree_size = 1l << tree_variables;
+    auto max_tree_size = (1l << tree_variables) * 2 + 1;
     TreeSolution<CpuMem> tmp(max_tree_size, array.minId(), array.maxId(), tree_variables);
 
     auto tree_owner = gpuOwner(tmp);
