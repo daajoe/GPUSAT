@@ -118,22 +118,12 @@ namespace gpusat {
                     TreeSolution<CpuMem> sol(1, 0, 1, cNode.variables.size());
                     sol.allocate();
                     sol.setCount(0, val);
-                    /*sol.tree = (TreeNode*)malloc(sizeof(TreeNode));
-                    sol.tree[0].content = val;
-                    sol.maxId = 1,
-                    sol.size = 1;
-                    */
                     SolutionVariant variant(std::move(sol));
                     cNode.solution.push_back(std::move(variant));
                 } else if (solutionType == dataStructure::ARRAY) {
                     ArraySolution<CpuMem> sol(1, 0, 1);
                     sol.allocate();
                     sol.setCount(0, val);
-                    /*sol.elements = (double*)malloc(sizeof(double));
-                    sol.elements[0] = val;
-                    sol.maxId = 1,
-                    sol.size = 1;
-                    */
                     SolutionVariant variant(std::move(sol));
                     cNode.solution.push_back(std::move(variant));
                 } else {
@@ -205,43 +195,11 @@ namespace gpusat {
     }
 
     TreeSolution<CpuMem> Solver::arrayToTree(ArraySolution<CpuMem> &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize) {
-        // this is not needed any longer when creating new containers
-        // anyway.
-        //assert(nextSize == 0);
-        /*t.numSolutions = 0;
-        t.size = size + numVars;
-        t.minId = table.minId;
-        t.maxId = table.maxId;
-        */
 
         if (table.dataStructureSize() > 0) {
 
-            //CudaBuffer<double> buf_sols_old((double*)table.data(), table.dataStructureSize());
-            //table.freeData();
-            //delete [] table.elements;
-            //table.elements = NULL;
-
-            //CudaBuffer<TreeNode> buf_sols_new(max_tree_size + 2 * numVars);
-
-            //CudaBuffer<uint64_t> buf_num_sol(&(t.solutions()), 1);
             CudaBuffer<int64_t> buf_exp(&(node.exponent), 1);
 
-            //double range = table.maxId() - table.minId();
-
-            //auto gpu_array = table.gpuCopyWithData(buf_sols_old.data());
-
-            //FIXME: why + numVars?
-            //size_t max_tree_size = size + numVars;
-            //const auto gpu_tree = tmp.gpuCopyWithData(buf_sols_new.data());
-            //tmp.freeData();
-
-            // Splitting does not get us anything here...
-            /*
-            int64_t s = std::ceil(range / (1l << 31));
-            for (int64_t i = 0; i < s; i++) {
-                int64_t id1 = table.minId() + (1 << 31) * i;
-                int64_t range = std::min((int64_t) 1 << 31, (int64_t) table.maxId() - table.minId() - (1 << 31) * i);
-            */
             RunMeta meta = {
                 .minId = table.minId(),
                 .maxId = table.maxId(),
@@ -253,22 +211,11 @@ namespace gpusat {
 
             // make sure we allocate enough space for the next solution container
             size_t reserveNodes = nextSize;
-            // TreeSolution::fromGPU(gpu_tree, reserveNodes);
             TreeSolution tree = cpuCopy(tree_gpu, reserveNodes);
 
-            // actually the tree size
-            //buf_num_sol.read(&(t.numSolutions));
             std::cerr << "clean tree num solutions: " << tree.currentTreeSize() << std::endl;
             buf_exp.read(&(node.exponent));
 
-            //int64_t nodeCount = t.treeSize + 1 + nextSize;
-            //t.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
-
-            //gpuErrchk(cudaMemcpy(t.tree, buf_sols_new.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost));
-
-            // this should be redundant
-            //t.setMinId(std::min(table.minId(), t.minId()));
-            //t.setMaxId(std::max(table.maxId(), t.maxId()));
             std::cerr << "tree output hash: " << tree.hash() << std::endl;
             return std::move(tree);
         } else {
@@ -286,15 +233,6 @@ namespace gpusat {
 
         if (t2.dataStructureSize() > 0) {
 
-            //auto new_size = t1.currentTreeSize() + t2.currentTreeSize() + 2;
-            //CudaBuffer<TreeNode> buf_sols_new(new_size);
-            //gpuErrchk(cudaMemset(buf_sols_new.device_mem, 0, buf_sols_new.size() * sizeof(TreeNode)));
-            //gpuErrchk(cudaMemcpy(buf_sols_new.data(), t1.data(), sizeof(TreeNode) * new_size, cudaMemcpyHostToDevice));
-
-            //CudaBuffer<TreeNode> buf_sols_old(t2.data(), t2.currentTreeSize() + 1);
-
-            //t2.freeData();
-
             // make id spaces equal
             t1.setMinId(std::min(t2.minId(), t1.minId()));
             t2.setMaxId(std::max(t2.maxId(), t1.maxId()));
@@ -303,19 +241,6 @@ namespace gpusat {
             t1.setDataStructureSize(t1.currentTreeSize() + 1);
             t2.setDataStructureSize(t2.currentTreeSize() + 1);
 
-            //auto gpu_to = t1.gpuCopyWithData(buf_sols_new.data());
-            //const auto gpu_from = t2.gpuCopyWithData(buf_sols_old.data());
-
-            // Splitting does not get us anything here...
-            /*
-            double range = t2.maxId() - t2.minId();
-            int64_t s = std::ceil(range / (1l << 31));
-            for (long i = 0; i < s; i++) {
-
-                // use id space of the second tree
-                int64_t id1 = t2.minId() + (1 << 31) * i;
-                int64_t range = std::min((int64_t)1 << 31, t2.maxId() - t2.minId() - (1 << 31) * i);
-            */
             RunMeta meta = {
                 .minId = t2.minId(),
                 .maxId = t2.maxId(),
@@ -327,11 +252,8 @@ namespace gpusat {
             t2.freeData();
 
             TreeSolution<CpuMem> result = cpuCopy(result_gpu);
-            //TreeSolution to = TreeSolution::fromGPU(gpu_to, 1);
 
-            //buf_num_sol.read(&t.numSolutions);
             std::cerr << "combine tree solutions: " << result.currentTreeSize() << std::endl;
-            //gpuErrchk(cudaMemcpy(t.tree, buf_sols_new.device_mem, sizeof(TreeNode) * (t.numSolutions + 1), cudaMemcpyDeviceToHost));
             result.setMinId(std::min(t2.minId(), t1.minId()));
             result.setMaxId(std::max(t2.maxId(), t1.maxId()));
             std::cerr << "combine tree output hash: " << result.hash() << std::endl;
@@ -417,9 +339,6 @@ namespace gpusat {
 
             std::cout << "run: " << run << " " << tmp_solution.minId() << " " << tmp_solution.maxId() << std::endl;
 
-            //CudaBuffer<double> buf_sol(tmp_solution.data(), tmp_solution.dataStructureSize());
-            //auto solution_gpu = tmp_solution.gpuCopyWithData(buf_sol.data());
-
             auto solution_gpu = gpuOwner(tmp_solution);
 
             for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
@@ -471,8 +390,6 @@ namespace gpusat {
 
             if (solution.solutions() == 0) {
                 solution.freeData();
-                //delete [] solution.elements;
-                //solution.elements = NULL;
 
                 if (solutionType == TREE) {
                     if (node.solution.size() > 0) {
@@ -491,8 +408,6 @@ namespace gpusat {
                     node.solution.push_back(std::move(solution));
                 }
             } else {
-                // node.elements is an array here
-                //buf_sol.read(solution.elements);
                 this->isSat = 1;
                 if (solutionType == TREE) {
                     TreeSolution<CpuMem>* last = NULL;
@@ -514,7 +429,6 @@ namespace gpusat {
                         );
                         auto new_tree = combineTree(tree, *last);
                         new_max_size = new_tree.currentTreeSize() + 1;
-                        //tree.size = tree.numSolutions + 1;
                         node.solution.back() = std::move(new_tree);
                     // previous back is empty, replace it
                     } else if (last != NULL && !last->hasData()) {
@@ -528,7 +442,6 @@ namespace gpusat {
                         );
                         tree.setMinId(last->minId());
                         new_max_size = tree.currentTreeSize() + 1;
-                        //tree.size = tree.numSolutions + 1;
                         node.solution.back() = std::move(tree);
                     } else {
                         std::cerr << "simple clean tree" << std::endl;
@@ -540,8 +453,6 @@ namespace gpusat {
                             0
                         );
                         new_max_size = tree.currentTreeSize() + 1;
-                        // size?
-                        //tree.size = tree.numSolutions + 1;
                         node.solution.push_back(std::move(tree));
                     }
                     node.maxSize = std::max(node.maxSize, (int64_t)new_max_size);
@@ -722,17 +633,6 @@ namespace gpusat {
                 );
             }
 
-            // number of additional tree nodes to reserve
-            /*
-            auto reserveCount = 0;
-            if (solutionType == TREE && !node.solution.empty()) {
-                if (auto last = std::get_if<TreeSolution<CpuMem>>(&node.solution.back())) {
-                    if (last->hasData()) reserveCount = last->currentTreeSize() + 2;
-                };
-            }
-            */
-
-            //auto solution = fromGPU(solution_gpu, reserveCount);
             auto solution = std::visit([](auto& gpu_sol) -> SolutionVariant {
                 return cpuCopy(gpu_sol);
             }, solution_gpu);
@@ -785,7 +685,6 @@ namespace gpusat {
                         // This mismatch should be solved.
                         // But with 0 variables, we only need one node.
                         new_max_size = 1;
-                        //sol.numSolutions--;
                     }
 
                     //free(sol.tree);
@@ -793,23 +692,10 @@ namespace gpusat {
 
                     if (last != NULL && last->hasData()
                         && (sol.currentTreeSize() + last->currentTreeSize() + 2) < sol.dataStructureSize()) {
-
-                        //int64_t nodeCount = sol.currentTreeSize() + last->currentTreeSize() + 2;
-                        //sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
-                        //cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost);
-
-                        // additional nodes where reserved through `reserveCount`.
                         combineTree(sol, *last);
-                        //sol.size = sol.numSolutions + 1;
                         new_max_size = sol.currentTreeSize() + 1;
                         node.solution.back() = std::move(sol);
                     } else {
-                        //int64_t nodeCount = sol.numSolutions + 1;
-                        //sol.tree = (TreeNode*)malloc(sizeof(TreeNode) * nodeCount);
-                        //sol.size = sol.numSolutions + 1;
-
-                        //cudaMemcpy(sol.tree, buf_solsF.device_mem, sizeof(TreeNode) * nodeCount, cudaMemcpyDeviceToHost);
-
                         // replace previous bag if needed
                         if (last != NULL && !last->hasData()) {
                             sol.setMinId(last->minId());
@@ -826,7 +712,6 @@ namespace gpusat {
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize((size_t)bagSizeForget);
 
-                    //cudaMemcpy(sol.elements, buf_solsF.device_mem, sizeof(double) * bagSizeForget, cudaMemcpyDeviceToHost);
                     node.solution.push_back(std::move(solution));
                 }
             }

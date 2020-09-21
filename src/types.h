@@ -188,34 +188,6 @@ namespace gpusat {
                 return 0.0;
             }
 
-            /*
-            ArraySolutionData* gpuCopy(double* element_buffer) const {
-
-                ArraySolutionData cpu = *members;
-                cpu.elements = (double*)element_buffer;
-                ArraySolutionData* gpu = nullptr;
-                gpuErrchk(cudaMalloc(&gpu, sizeof(ArraySolutionData)));
-                assert(gpu != nullptr);
-                gpuErrchk(cudaMemcpy(gpu, &cpu, sizeof(ArraySolutionData), cudaMemcpyHostToDevice));
-                return gpu;
-            };
-            */
-
-            /*
-            static ArraySolution fromGPU(const ArraySolutionData* gpu) {
-                ArraySolutionData tmp;
-                gpuErrchk(cudaMemcpy(&tmp, gpu, sizeof(ArraySolutionData), cudaMemcpyDeviceToHost));
-                auto solution = ArraySolution(
-                    tmp.size,
-                    tmp.minId,
-                    tmp.maxId
-                );
-                solution.members->numSolutions = tmp.numSolutions;
-                gpuErrchk(cudaMemcpy(solution.members->elements, tmp.elements, solution.elementSize() * solution.dataStructureSize(), cudaMemcpyDeviceToHost));
-                return std::move(solution);
-            }
-            */
-
             size_t hash() const {
                 size_t h = dataStructureSize();
                 hash_combine(h, minId());
@@ -261,16 +233,6 @@ namespace gpusat {
             uint64_t solutions() const {
                 return numSolutions;
             }
-
-            /**
-             * Copy solution metadata that may have changed
-             * when processing. This does not copy the allocated data.
-             */
-            /*
-            void update_from(ArraySolution<M>& other) {
-                numSolutions = other.numSolutions;
-            }
-            */
 
             __device__ void setCount(int64_t id, double val) {
                 data()[id - minId_] = val;
@@ -322,16 +284,6 @@ namespace gpusat {
             void freeData() {
                 tree = nullptr;
             }
-
-            /**
-             * Copy solution metadata that may have changed
-             * when processing. This does not copy the allocated data.
-             */
-            /*
-            void update_from(TreeSolution<M>& other) {
-                treeSize = other.treeSize;
-            }
-            */
 
             TreeSolution(const TreeSolution&) = delete;
             TreeSolution& operator=(TreeSolution& other) = delete;
@@ -455,47 +407,6 @@ namespace gpusat {
                 return h;
             }
 
-            /*
-            // FIXME: only for convenience
-            TreeSolutionData* gpuCopyWithData(uint64_t* element_buffer) const {
-                return gpuCopyWithData((TreeNode*)element_buffer);
-            }
-
-            TreeSolutionData* gpuCopyWithData(TreeNode* element_buffer) const {
-                TreeSolutionData* gpu = nullptr;
-                TreeSolutionData cpu = *members;
-                cpu.tree = (TreeNode*)element_buffer;
-                gpuErrchk(cudaMalloc(&gpu, sizeof(TreeSolutionData)));
-                assert(gpu != nullptr);
-                gpuErrchk(cudaMemcpy(gpu, &cpu, sizeof(TreeSolutionData), cudaMemcpyHostToDevice));
-                return gpu;
-            };
-            */
-
-            /**
-             * Copy a solution back from the GPU.
-             * Reserve `reserveNodes` additional nodes in the new solution tree.
-             */
-            /*
-            static TreeSolution fromGPU(const TreeSolutionData* gpu, size_t reserveNodes) {
-                TreeSolutionData tmp;
-                gpuErrchk(cudaMemcpy(&tmp, gpu, sizeof(TreeSolutionData), cudaMemcpyDeviceToHost));
-                // +1, because treeSize is INDEX of the last node
-                auto size = tmp.treeSize + reserveNodes + 1;
-                auto solution = TreeSolution(
-                        size,
-                        tmp.minId,
-                        tmp.maxId,
-                        tmp.variableCount
-                );
-                solution.members->treeSize = tmp.treeSize;
-                // FIXME: only memset elements that are not copied over
-                //memset(solution.members->tree, 0, solution.elementSize() * size);
-                gpuErrchk(cudaMemcpy(solution.members->tree, tmp.tree, solution.elementSize() * size, cudaMemcpyDeviceToHost));
-                return std::move(solution);
-            }
-            */
-
             __device__ void incSolutions() {};
 
             GPU_HOST_ATTR TreeNode* data() const {
@@ -603,56 +514,6 @@ namespace gpusat {
     inline bool hasData(SolutionVariant& solution) {
         return std::visit([](auto& sol) { return sol.hasData(); }, solution);
     }
-
-
-
-    /**
-     * Create a copy with the data pointer replaced.
-     * FIXME: This is a temporary workaround for real
-     * resource management.
-     */
-    /*
-    inline std::variant<TreeSolutionData*,ArraySolutionData*> gpuCopyWithData(const std::variant<TreeSolution, ArraySolution>& solution, uint64_t* element_buffer) {
-        if (const auto sol = std::get_if<ArraySolution>(&solution)) {
-            return std::variant<TreeSolutionData*,ArraySolutionData*>(sol->gpuCopyWithData((double*)element_buffer));
-        } else if (const auto sol = std::get_if<TreeSolution>(&solution)) {
-            return std::variant<TreeSolutionData*,ArraySolutionData*>(sol->gpuCopyWithData((TreeNode*)element_buffer));
-        };
-        __builtin_unreachable();
-    }
-
-    inline void freeGPUDataVariant(std::variant<TreeSolutionData*,ArraySolutionData*>& data) {
-        if (std::holds_alternative<TreeSolutionData*>(data)) {
-            gpuErrchk(cudaFree(std::get<TreeSolutionData*>(data)));
-            return;
-        } else if (std::holds_alternative<ArraySolutionData*>(data)) {
-            gpuErrchk(cudaFree(std::get<ArraySolutionData*>(data)));
-            return;
-        }
-        assert(false);
-    }
-    */
-
-    /***
-     * Copy a solution from the GPU and build a variant.
-     * @param: reserveElements reserve some elements in case the solution grows.
-     *         Currently only used by TreeSolution.
-     */
-    /*
-    inline std::variant<TreeSolution, ArraySolution> fromGPU(const std::variant<TreeSolutionData*,ArraySolutionData*>& gpu_data, size_t reserveElements) {
-        if (std::holds_alternative<ArraySolutionData*>(gpu_data)) {
-            auto ptr = std::get<ArraySolutionData*>(gpu_data);
-            // we cannot cast normally here, since `gpu` is only valid on the GPU.
-            ArraySolution solution = ArraySolution::fromGPU(ptr);
-            return std::variant<TreeSolution, ArraySolution>(std::move(solution));
-        } else if (std::holds_alternative<TreeSolutionData*>(gpu_data)) {
-            auto ptr = std::get<TreeSolutionData*>(gpu_data);
-            TreeSolution solution = TreeSolution::fromGPU(ptr, reserveElements);
-            return std::variant<TreeSolution, ArraySolution>(std::move(solution));
-        }
-        __builtin_unreachable();
-    }
-    */
 
     struct GPUVars {
         /// Number of variables.
