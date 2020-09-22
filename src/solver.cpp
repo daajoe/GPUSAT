@@ -407,10 +407,12 @@ namespace gpusat {
                         std::cerr << "second branch" << std::endl;
                         std::cerr << "tree output hash: " << sol.hash() << std::endl;
                         sol.setMinId(last->minId());
+                        sol.setDataStructureSize(sol.currentTreeSize());
                         node.solution.back() = std::move(sol);
                     } else {
                         std::cerr << "simple clean tree" << std::endl;
                         std::cerr << "tree output hash: " << sol.hash() << std::endl;
+                        sol.setDataStructureSize(sol.currentTreeSize());
                         node.solution.push_back(std::move(sol));
                     }
                     auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
@@ -628,6 +630,7 @@ namespace gpusat {
                         combineTree(sol, *last);
                         node.solution.back() = std::move(sol);
                     } else {
+                        sol.setDataStructureSize(sol.currentTreeSize());
                         // replace previous bag if needed
                         if (last != NULL && !last->hasData()) {
                             sol.setMinId(last->minId());
