@@ -13,15 +13,6 @@ namespace gpusat {
         RunMeta meta
     );
 
-    TreeSolution<CudaMem> array2treeWrapper(
-        const ArraySolution<CpuMem>& array,
-        int64_t *exponent,
-        /// Number of variables in the resulting tree
-        size_t tree_variables,
-        /// Only the `mode` is currently used.
-        RunMeta meta
-    );
-
     void solveJoinWrapper(
         CudaSolutionVariant& solution,
         const std::optional<SolutionVariant*> edge1,

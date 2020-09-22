@@ -70,15 +70,6 @@ namespace gpusat {
 
         /**
          *
-         * @param table
-         * @param size
-         * @param numVars
-         * @param node
-         */
-        TreeSolution<CpuMem> arrayToTree(ArraySolution<CpuMem> &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize);
-
-        /**
-         *
          * @param to
          * @param from
          * @param numVars

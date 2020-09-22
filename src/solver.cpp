@@ -200,36 +200,6 @@ namespace gpusat {
         }
     }
 
-    TreeSolution<CpuMem> Solver::arrayToTree(ArraySolution<CpuMem> &table, int64_t size, int64_t numVars, BagType &node, int64_t nextSize) {
-
-        if (table.dataStructureSize() > 0) {
-
-            CudaBuffer<int64_t> buf_exp(&(node.exponent), 1);
-
-            RunMeta meta = {
-                .minId = table.minId(),
-                .maxId = table.maxId(),
-                .mode = solve_mode
-            };
-
-            auto tree_gpu = array2treeWrapper(table, buf_exp.data(), numVars, meta);
-            table.freeData();
-
-            // make sure we allocate enough space for the next solution container
-            size_t reserveNodes = nextSize;
-            TreeSolution tree = cpuCopy(tree_gpu, reserveNodes);
-
-            buf_exp.read(&(node.exponent));
-
-            std::cerr << "tree output hash: " << tree.hash() << std::endl;
-            return std::move(tree);
-        } else {
-            std::cerr << "tree output hash: empty" << std::endl;
-            //1 + nextSize : not in use, see above
-            return TreeSolution<CpuMem>(0, table.minId(), table.maxId(), numVars);
-        }
-    }
-
     TreeSolution<CpuMem> Solver::combineTree(TreeSolution<CpuMem> &t1, TreeSolution<CpuMem> &t2) {
         std::cerr << "combine tree " << t1.hash() << " " << t2.hash() << std::endl;
 
