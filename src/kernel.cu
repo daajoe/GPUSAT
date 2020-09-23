@@ -708,6 +708,22 @@ void introduceForgetWrapper(
     }, solution_owner);
 }
 
+
+// memory initialization for the ArraySolution
+void meminit(ArraySolution<CudaMem>& sol, size_t from, size_t to) { 
+    auto start = thrust::device_ptr<decltype(sol.initializer())>(sol.data());
+    thrust::fill(start + from, start + to, sol.initializer());
+}
+
+// memory initialization for the TreeSolution
+void meminit(TreeSolution<CudaMem>& sol, size_t from, size_t to) { 
+    // make sure that we can simplyfy to a memset
+    assert(sol.initializer().empty == 0);
+    static_assert(std::is_same<decltype(sol.initializer().empty), uint64_t>::value);
+
+    gpuErrchk(cudaMemset(sol.data() + from, 0, (to - from) * sol.elementSize()));
+}
+
 /**
  * Returns a solution bag that lives on the CPU
  * but owns GPU data copied from the input bag.
@@ -732,16 +748,10 @@ T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
         ));
         // reserve additional elements if desired
         if (reserve) {
-            auto start = thrust::device_ptr<decltype(orig.initializer())>(gpu.data());
-            thrust::fill(
-                start + orig.dataStructureSize(),
-                start + gpu.dataStructureSize(),
-                orig.initializer()
-            );
+            meminit(gpu, orig.dataStructureSize(), gpu.dataStructureSize());
         }
     } else {
-        auto start = thrust::device_ptr<decltype(orig.initializer())>(gpu.data());
-        thrust::fill(start, start + gpu.dataStructureSize(), orig.initializer());
+        meminit(gpu, 0, gpu.dataStructureSize());
     }
     return std::move(gpu);
 }
