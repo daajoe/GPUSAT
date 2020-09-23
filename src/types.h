@@ -510,7 +510,6 @@ namespace gpusat {
         }
         void operator()(TreeNode* ptr, size_t size) const {
             if (ptr != nullptr) {
-                fprintf(stdout, "pinned dealloc of: %lu\n", size);
                 cuda_pinned_alloc_pool.deallocate(ptr, size);
                 gpuErrchk(cudaGetLastError());
             }
@@ -538,6 +537,18 @@ namespace gpusat {
         return std::visit([](auto& sol) { return sol.isSatisfiable(); }, solution);
     }
 
+    inline bool isSatisfiable(CudaSolutionVariant& solution) {
+        return std::visit([](auto& sol) { return sol.isSatisfiable(); }, solution);
+    }
+
+    inline uint64_t minId(CudaSolutionVariant& solution) {
+        return std::visit([](auto& sol) { return sol.minId(); }, solution);
+    }
+
+    inline uint64_t maxId(CudaSolutionVariant& solution) {
+        return std::visit([](auto& sol) { return sol.maxId(); }, solution);
+    }
+
     struct GPUVars {
         /// Number of variables.
         size_t count;
@@ -553,6 +564,10 @@ namespace gpusat {
         std::vector<int64_t> variables;
         std::vector<BagType> edges;
         std::vector<SolutionVariant> solution;
+        // if all solutions fit in one bag, leave it on the GPU.
+        // Solver functions assume this solution is equivalent
+        // to the first solution stored in the `solution` vector!
+        std::optional<CudaSolutionVariant> cached_solution;
         int64_t maxSize = 0;
 
         size_t hash() const {

@@ -74,7 +74,7 @@ namespace gpusat {
          * @param from
          * @param numVars
          */
-        TreeSolution<CpuMem> combineTree(TreeSolution<CpuMem> &t1, TreeSolution<CpuMem> &t2);
+        TreeSolution<CudaMem> combineTree(TreeSolution<CudaMem> &t1, TreeSolution<CudaMem> &t2);
     };
 }
 #endif //GPUSAT_SOLVER_H_H

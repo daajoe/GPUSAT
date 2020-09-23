@@ -532,7 +532,7 @@ __global__ void solveIntroduceForget(
  */
 
 template <template<typename> typename T>
-std::unique_ptr<T<GpuOnly>, CudaMem> gpuClone(T<CudaMem>& owner) {
+std::unique_ptr<T<GpuOnly>, CudaMem> gpuClone(const T<CudaMem>& owner) {
     static_assert(sizeof(T<CudaMem>) == sizeof(T<GpuOnly>));
     
     // Note that since clone is malloc'ed here,
@@ -545,14 +545,10 @@ std::unique_ptr<T<GpuOnly>, CudaMem> gpuClone(T<CudaMem>& owner) {
 }
 
 TreeSolution<CudaMem> combineTreeWrapper(
-    TreeSolution<CpuMem>& to,
-    const TreeSolution<CpuMem>& from,
+    TreeSolution<CudaMem>& to_owner,
+    const TreeSolution<CudaMem>& from_owner,
     RunMeta meta
 ) {
-    // copy to-tree and reserve additional space for the from-tree + connecting node
-    auto to_owner = gpuOwner(to, from.currentTreeSize() + 1);
-    auto from_owner = gpuOwner(from);
-
     auto to_gpu = gpuClone(to_owner);
     auto from_gpu = gpuClone(from_owner);
 
@@ -571,8 +567,8 @@ TreeSolution<CudaMem> combineTreeWrapper(
 
 void solveJoinWrapper( 
     CudaSolutionVariant& solution_variant,
-    const std::optional<SolutionVariant*> edge1,
-    const std::optional<SolutionVariant*> edge2,
+    const std::optional<CudaSolutionVariant>& edge1,
+    const std::optional<CudaSolutionVariant>& edge2,
     GPUVars variables,
     GPUVars edgeVariables1,
     GPUVars edgeVariables2,
@@ -590,16 +586,14 @@ void solveJoinWrapper(
     std::visit([&](auto& solution) {
         auto solution_gpu = gpuClone(solution);
 
-        auto single_edge_join = [&](SolutionVariant* edge) {
-            assert(edge != nullptr);
-            std::visit([&](auto &sol) {
-                auto edge_owner = gpuOwner(sol);
+        auto single_edge_join = [&](const CudaSolutionVariant& edge) {
+            std::visit([&](const auto &edge_owner) {
                 auto edge_gpu = gpuClone(edge_owner);
 
                 solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
                     solution_gpu.get(),
                     edge_gpu.get(),
-                    (decltype(edge_owner)*)nullptr,
+                    (decltype(edge_gpu.get()))nullptr,
                     variables,
                     edgeVariables1,
                     edgeVariables2,
@@ -608,19 +602,15 @@ void solveJoinWrapper(
                     exponent,
                     meta
                 );
-            }, *edge);
+            }, edge);
             gpuErrchk(cudaDeviceSynchronize());
         };
 
-        auto double_edge_join = [&](SolutionVariant* e1, SolutionVariant* e2) {
-            assert(e1 != nullptr);
-            assert(e2 != nullptr);
-            std::visit([&](auto &sol1) {
-                auto e1_owner = gpuOwner(sol1);
+        auto double_edge_join = [&](const CudaSolutionVariant& e1, const CudaSolutionVariant& e2) {
+            std::visit([&](const auto &e1_owner) {
                 auto e1_gpu = gpuClone(e1_owner);
 
-                std::visit([&](auto &sol2) {
-                    auto e2_owner = gpuOwner(sol2);
+                std::visit([&](const auto &e2_owner) {
                     auto e2_gpu = gpuClone(e2_owner);
 
                     solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
@@ -635,8 +625,8 @@ void solveJoinWrapper(
                         exponent,
                         meta
                     );
-                }, *e2);
-            }, *e1);
+                }, e2);
+            }, e1);
             gpuErrchk(cudaDeviceSynchronize());
         };
 
@@ -653,9 +643,9 @@ void solveJoinWrapper(
 }
 
 void introduceForgetWrapper(
-    std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>& solution_owner,
+    CudaSolutionVariant& solution_owner,
     GPUVars varsForget,
-    const std::optional<SolutionVariant*> edge,
+    const std::optional<CudaSolutionVariant>& edge,
     GPUVars lastVars,
     GPUVars varsIntroduce,
     // FIXME: Move this static information to GPU once.
@@ -693,10 +683,8 @@ void introduceForgetWrapper(
                 meta
             );
         } else {
-            assert(edge.value() != nullptr);
-            std::visit([&](auto& solsE) {
-                auto edge_owner = gpuOwner(solsE);
-                auto edge_gpu = gpuClone(edge_owner);
+            std::visit([&](const auto& solsE) {
+                auto edge_gpu = gpuClone(solsE);
  
                 solveIntroduceForget<<<blocksPerGrid, threadsPerBlock>>>(
                     solution_gpu.get(),
@@ -713,7 +701,7 @@ void introduceForgetWrapper(
                     previous_value,
                     meta
                 );
-            }, *edge.value());
+            }, edge.value());
         }
         gpuErrchk(cudaDeviceSynchronize());
         update(solsF, solution_gpu);
@@ -727,7 +715,7 @@ void introduceForgetWrapper(
 template <template<typename> typename T>
 T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
     // copy parameters
-    T<CudaMem> gpu(orig, nullptr);
+    T<CudaMem> gpu(orig, nullptr, 0);
 
     gpu.setDataStructureSize(gpu.dataStructureSize() + reserve);
 
@@ -763,5 +751,46 @@ CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve) {
         return std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>(std::move(gpuOwner(sol)));
     }, orig);
 }
+
+
+    /**
+     * Returns a solution bag that is constructed
+     * (copied) from a bag tat owns GPU data.
+     */
+    template <template<typename> typename T>
+    T<CpuMem> cpuCopy(const T<CudaMem>& gpu, size_t reserve) {
+        // copy parameters
+        T<CpuMem> cpu(gpu, nullptr, 0);
+
+        cpu.setDataStructureSize(cpu.dataStructureSize() + reserve);
+
+        // allocate CPU memory
+        cpu.allocate();
+
+        assert(gpu.hasData());
+        // copy data structure
+        gpuErrchk(cudaMemcpy(
+            cpu.data(),
+            gpu.data(),
+            gpu.dataStructureSize() * gpu.elementSize(),
+            cudaMemcpyDeviceToHost
+        ));
+
+        // reserve additional elements if desired
+        if (reserve) {
+            std::fill(
+                cpu.data() + gpu.dataStructureSize(),
+                cpu.data() + cpu.dataStructureSize(),
+                cpu.initializer()
+            );
+        }
+        return std::move(cpu);
+    }
+
+    SolutionVariant cpuCopy(const CudaSolutionVariant& gpu, size_t reserve) {
+        return std::visit([&](const auto& gpu_sol) -> SolutionVariant {
+            return SolutionVariant(std::move(cpuCopy(gpu_sol, reserve)));
+        }, gpu);
+    }
 
 }

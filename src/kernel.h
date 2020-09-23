@@ -8,15 +8,15 @@
 
 namespace gpusat {
     TreeSolution<CudaMem> combineTreeWrapper(
-        TreeSolution<CpuMem>& to,
-        const TreeSolution<CpuMem>& from,
+        TreeSolution<CudaMem>& to_owner,
+        const TreeSolution<CudaMem>& from_owner,
         RunMeta meta
     );
 
     void solveJoinWrapper(
         CudaSolutionVariant& solution,
-        const std::optional<SolutionVariant*> edge1,
-        const std::optional<SolutionVariant*> edge2,
+        const std::optional<CudaSolutionVariant>& edge1,
+        const std::optional<CudaSolutionVariant>& edge2,
         GPUVars variables,
         GPUVars edgeVariables1,
         GPUVars edgeVariables2,
@@ -29,7 +29,7 @@ namespace gpusat {
     void introduceForgetWrapper(
         CudaSolutionVariant& solution_owner,
         GPUVars varsForget,
-        const std::optional<SolutionVariant*> edge,
+        const std::optional<CudaSolutionVariant>& edge,
         GPUVars lastVars,
         GPUVars varsIntroduce,
         // FIXME: Move this static information to GPU once.
@@ -42,39 +42,10 @@ namespace gpusat {
         RunMeta meta
     );
 
-    /**
-     * Returns a solution bag that is constructed
-     * (copied) from a bag tat owns GPU data.
-     */
     template <template<typename> typename T>
-    T<CpuMem> cpuCopy(const T<CudaMem>& gpu, size_t reserve = 0) {
-        // copy parameters
-        T<CpuMem> cpu(gpu, nullptr);
+    T<CpuMem> cpuCopy(const T<CudaMem>& gpu, size_t reserve = 0);
 
-        cpu.setDataStructureSize(cpu.dataStructureSize() + reserve);
-
-        // allocate CPU memory
-        cpu.allocate();
-
-        assert(gpu.hasData());
-        // copy data structure
-        gpuErrchk(cudaMemcpy(
-            cpu.data(),
-            gpu.data(),
-            gpu.dataStructureSize() * gpu.elementSize(),
-            cudaMemcpyDeviceToHost
-        ));
-
-        // reserve additional elements if desired
-        if (reserve) {
-            std::fill(
-                cpu.data() + gpu.dataStructureSize(),
-                cpu.data() + cpu.dataStructureSize(),
-                cpu.initializer()
-            );
-        }
-        return std::move(cpu);
-    }
+    SolutionVariant cpuCopy(const CudaSolutionVariant& gpu, size_t reserve = 0);
 
     /**
      * Updates a solution bag with information
@@ -95,6 +66,5 @@ namespace gpusat {
     T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve = 0);
 
     CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve = 0);
-
 }
 #endif // KERNEL_H
