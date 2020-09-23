@@ -296,12 +296,10 @@ __global__ void solveJoin(
     }
 
     double solution_value = -1.0;
-    auto only_one_edge_has_solution = [&](double edge_value, double oldVal) {
-        // no solutions stored yet, but some present in edge
-        if (oldVal < 0.0) {
-            if (edge_value > 0.0) {
-                solution->setSatisfiability(true);
-            }
+    auto only_one_edge_has_solution = [&](double edge_value) {
+        double oldVal = solution->solutionCountFor(id); 
+        if (edge_value > 0.0) {
+            solution->setSatisfiability(true);
         }
 
         // if the solution was not present before, multiply with one.
@@ -330,12 +328,11 @@ __global__ void solveJoin(
     // we need to consider individual edges and maybe look
     // at we have already stored for the current id.
     } else {
-        double oldVal = solution->solutionCountFor(id); 
         // only one edge has a solution, the other has none.
-        if (edge1_solutions >= 0.0 && edge2_solutions < 0.0) {
-            only_one_edge_has_solution(edge1_solutions, oldVal);
-        } else if (edge1_solutions < 0.0 && edge2_solutions >= 0.0) {
-            only_one_edge_has_solution(edge2_solutions, oldVal);
+        if (edge1_solutions > 0.0 && edge2_solutions < 0.0) {
+            only_one_edge_has_solution(edge1_solutions);
+        } else if (edge1_solutions < 0.0 && edge2_solutions > 0.0) {
+            only_one_edge_has_solution(edge2_solutions);
         }
     }
 
