@@ -21,6 +21,7 @@
 #include "gpusatparser.h"
 #include "gpusatutils.h"
 #include "gpusatpreprocessor.h"
+#include "alloc.h"
 
 #include "FitnessFunctions/NumJoinFitnessFunction.h"
 #include "FitnessFunctions/JoinSizeFitnessFunction.h"
@@ -50,6 +51,11 @@ boost::multiprecision::cpp_bin_float_100 bag_sum(BagType& bag) {
         sols = sols + std::visit([](auto& sol) { return solutionSum(sol); }, solution);
     }
     return sols;
+}
+
+namespace gpusat {
+    // The pinned memory suballocator to use for solution bags.
+    PinnedSuballocator cuda_pinned_alloc_pool;
 }
 
 int main(int argc, char *argv[]) {
@@ -138,10 +144,12 @@ int main(int argc, char *argv[]) {
 
         if (satString.size() < 8) {
             std::cerr << "Error: SAT formula\n";
+            cuda_pinned_alloc_pool.deinit();
             exit(EXIT_FAILURE);
         }
         if (treeDString.size() < 8) {
             std::cerr << "Error: tree decomposition\n";
+            cuda_pinned_alloc_pool.deinit();
             exit(EXIT_FAILURE);
         }
         satFormula = CNFParser(weighted).parseSatFormula(sat.str());
@@ -163,6 +171,7 @@ int main(int argc, char *argv[]) {
         std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
         std::cout << "\n    }";
         std::cout << "\n}\n";
+        cuda_pinned_alloc_pool.deinit();
         exit(20);
     }
 
@@ -262,6 +271,7 @@ int main(int argc, char *argv[]) {
     std::cout << "\n    }";
     std::cout << "\n}\n";
     std::cout.flush();
+    cuda_pinned_alloc_pool.deinit();
     if (sols > 0) {
         exit(10);
     } else {

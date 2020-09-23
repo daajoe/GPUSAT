@@ -18,6 +18,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <atomic>
+#include "alloc.h"
 
 namespace gpusat {
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -79,13 +80,16 @@ namespace gpusat {
         public:
             SolutionDataPtr() {
                 data = nullptr;
+                allocated_size = 0;
             }
-            SolutionDataPtr(T* ptr) {
+            SolutionDataPtr(T* ptr, size_t size) {
                 data = ptr;
+                allocated_size = size;
             }
             ~SolutionDataPtr() {
-                M()(data);
+                M()(data, allocated_size);
                 data = nullptr;
+                allocated_size = 0;
             }
 
             SolutionDataPtr(const SolutionDataPtr&) = delete;
@@ -93,13 +97,17 @@ namespace gpusat {
 
             SolutionDataPtr(SolutionDataPtr&& other) {
                 data = other.data;
+                allocated_size = other.allocated_size;
                 other.data = nullptr;
+                other.allocated_size = 0;
             }
 
             SolutionDataPtr& operator=(SolutionDataPtr&& other) {
-                M()(data);
+                M()(data, allocated_size);
                 data = other.data;
+                allocated_size = other.allocated_size;
                 other.data = nullptr;
+                other.allocated_size = 0;
                 return *this;
             }
 
@@ -107,8 +115,13 @@ namespace gpusat {
                 return data;
             }
 
+            GPU_HOST_ATTR T* allocatedSize() const {
+                return allocated_size;
+            }
+
         protected:
             T* data;
+            size_t allocated_size;
     };
 
     template <typename M>
@@ -116,30 +129,30 @@ namespace gpusat {
         public:
             ArraySolution(size_t size_, int64_t minId, int64_t maxId) :
                 size(size_), minId_(minId), maxId_(maxId),
-                elements(nullptr), satisfiable(false) {}
+                elements(nullptr, 0), satisfiable(false) {}
 
 
             /**
              * Create with data. This will take ownership of gpu_data.
              */
             template<typename M2>
-            ArraySolution(const ArraySolution<M2>& other, double* gpu_data) {
+            ArraySolution(const ArraySolution<M2>& other, double* gpu_data, size_t data_size) {
                 size = other.dataStructureSize();
                 minId_ = other.minId();
                 maxId_ = other.maxId();
                 satisfiable = other.isSatisfiable();
                 // FIXME: this type is technically wrong, but works
                 // because no destructors are called on the GPU
-                elements = SolutionDataPtr<double, M>(gpu_data);
+                elements = SolutionDataPtr<double, M>(gpu_data, data_size);
             }
 
             void allocate() {
-                elements = SolutionDataPtr<double, M>((double*)M().malloc(size * elementSize()));
+                elements = SolutionDataPtr<double, M>((double*)M().malloc(size * elementSize()), size * elementSize());
                 assert(data() != nullptr);
             }
 
             void freeData() {
-                elements = nullptr;
+                elements = SolutionDataPtr<double, M>();
             }
 
             ~ArraySolution() {
@@ -246,21 +259,21 @@ namespace gpusat {
             TreeSolution(size_t size_, int64_t minId, int64_t maxId, int64_t variableCount_) :
                 size(size_), minId_(minId), maxId_(maxId),
                 variableCount(variableCount_),
-                tree(nullptr), lastNodeIndex(0), satisfiable(false) {};
+                tree(nullptr, 0), lastNodeIndex(0), satisfiable(false) {};
 
             template<typename M2>
-            TreeSolution(const TreeSolution<M2>& other, TreeNode* gpu_data) {
+            TreeSolution(const TreeSolution<M2>& other, TreeNode* gpu_data, size_t data_size) {
                 size = other.dataStructureSize();
                 minId_ = other.minId();
                 maxId_ = other.maxId();
                 lastNodeIndex = other.currentTreeSize() - 1;
                 variableCount = other.variables();
                 satisfiable = other.isSatisfiable();
-                tree = SolutionDataPtr<TreeNode, M>(gpu_data);
+                tree = SolutionDataPtr<TreeNode, M>(gpu_data, data_size);
             }
 
             void allocate() {
-                tree = SolutionDataPtr<TreeNode, M>((TreeNode*)M().malloc(size * elementSize()));
+                tree = SolutionDataPtr<TreeNode, M>((TreeNode*)M().malloc(size * elementSize()), size * elementSize());
                 assert(data() != nullptr);
             }
 
@@ -269,7 +282,7 @@ namespace gpusat {
             }
 
             void freeData() {
-                tree = nullptr;
+                tree = SolutionDataPtr<TreeNode, M>();
             }
 
             TreeSolution(const TreeSolution&) = delete;
@@ -449,42 +462,58 @@ namespace gpusat {
             assert(mem != nullptr);
             return mem;
         }
-        void operator()(double* ptr) const {
+        void operator()(double* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
-        void operator()(uint64_t* ptr) const {
+        void operator()(uint64_t* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
-        void operator()(int64_t* ptr) const {
+        void operator()(int64_t* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
 
-        void operator()(TreeNode* ptr) const {
+        void operator()(TreeNode* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
-        void operator()(ArraySolution<GpuOnly>* ptr) const {
+        void operator()(ArraySolution<GpuOnly>* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
-        void operator()(TreeSolution<GpuOnly>* ptr) const {
+        void operator()(TreeSolution<GpuOnly>* ptr, size_t size = 0) const {
             gpuErrchk(cudaFree(ptr));
         }
     };
 
-    // avoid name clashes with default C malloc
-    const auto c_malloc = &malloc;
+
+    extern PinnedSuballocator cuda_pinned_alloc_pool;
 
     /**
      * Manages memory on the CPU side.
+     *
+     * Uses Page-Pinned memory, which speeds up
+     * Memcpy to the device dramatically.
      */
     struct CpuMem {
         void* malloc(size_t size) const {
-            return (*c_malloc)(size);
+            if (size == 0) {
+                return nullptr;
+            }
+            uint8_t* mem = (uint8_t*)cuda_pinned_alloc_pool.allocate(size);
+            gpuErrchk(cudaGetLastError());
+            gpuErrchk(cudaDeviceSynchronize());
+            return mem;
         }
-        void operator()(double* ptr) const {
-            free(ptr);
+        void operator()(double* ptr, size_t size) const {
+            if (ptr != nullptr) {
+                cuda_pinned_alloc_pool.deallocate(ptr, size);
+                gpuErrchk(cudaGetLastError());
+            }
         }
-        void operator()(TreeNode* ptr) const {
-            free(ptr);
+        void operator()(TreeNode* ptr, size_t size) const {
+            if (ptr != nullptr) {
+                fprintf(stdout, "pinned dealloc of: %lu\n", size);
+                cuda_pinned_alloc_pool.deallocate(ptr, size);
+                gpuErrchk(cudaGetLastError());
+            }
         }
     };
 
