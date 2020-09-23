@@ -16,44 +16,16 @@ namespace gpusat {
 
 __device__ uint64_t atomicAdd(uint64_t* address, uint64_t val)
 {
-    unsigned long long int* address_as_ull = (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        (val + (uint64_t)(assumed)));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-    } while (assumed != old);
-    return old;
-}
-
-__device__ uint64_t atomicSub(uint64_t* address, uint64_t val)
-{
-    unsigned long long int* address_as_ull = (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        ((uint64_t)(assumed) - val));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-    } while (assumed != old);
-    return old;
+    static_assert(sizeof(uint64_t) == sizeof(unsigned long long));
+    auto addr = (unsigned long long*)address;
+    return (uint64_t)atomicAdd_system(addr, (unsigned long long)val);
 }
 
 __device__ int64_t atomicMax(int64_t* address, int64_t val)
 {
-    unsigned long long int* address_as_ull = (unsigned long long int*)address;
-    unsigned long long int old = *address_as_ull, assumed;
-    do {
-        assumed = old;
-        old = atomicCAS(address_as_ull, assumed,
-                        (max(val, (int64_t)(assumed))));
-
-    // Note: uses integer comparison to avoid hang in case of NaN (since NaN != NaN)
-    } while (assumed != old);
-    return old;
+    static_assert(sizeof(int64_t) == sizeof(long long));
+    auto addr = (long long*)address;
+    return (int64_t)atomicMax_system(addr, (long long)val);
 }
 
 // FIXME: normal atomicAdd might not be atomic across devices
