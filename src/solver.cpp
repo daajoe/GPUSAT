@@ -15,7 +15,11 @@
 #include "kernel.h"
 #include "solver.h"
 
+#define TRACE(fmt, ...) { if (do_trace) {printf("%s() -> ", __func__); printf(fmt, __VA_ARGS__); printf("\n");} }
+
 namespace gpusat {
+
+    const bool do_trace = true;
 
     template <typename T>
     class CudaBuffer {
@@ -58,7 +62,6 @@ namespace gpusat {
         } else {
             mem = (T*)CudaMem().malloc(sizeof(T) * length);
             gpuErrchk(cudaMemcpy(mem, from, sizeof(T) * length, cudaMemcpyHostToDevice));
-            std::cout << "generic memcpy of size: " << length << std::endl;
             this->buf_size = length;
         }
         this->device_mem = std::unique_ptr<T, CudaMem>(mem);
@@ -78,7 +81,6 @@ namespace gpusat {
         if (vec.size()) {
             mem = (T*)CudaMem().malloc(sizeof(T) * vec.size());
             gpuErrchk(cudaMemcpy(mem, &vec[0], sizeof(T) * vec.size(), cudaMemcpyHostToDevice));
-            std::cout << "vector memcpy of size: " << vec.size() << std::endl;
             this->buf_size = vec.size();
         } else {
             this->buf_size = 0;
@@ -106,9 +108,8 @@ namespace gpusat {
 
     void Solver::solveProblem(satformulaType &formula, BagType& node, BagType& pnode, nodeType lastNode) {
 
-        std::cerr << "\nsolve problem. isSAT: " << isSat << std::endl;
-        std::cerr << " " << node.hash() << std::endl;
-        std::cerr << " " << pnode.hash() << std::endl;
+        TRACE("\n\tis_sat: %ld \n\tnode: %lu \n\tpnode: %lu", isSat, node.hash(), pnode.hash());
+
         if (isSat > 0) {
             if (node.edges.empty()) {
                 BagType cNode;
@@ -156,20 +157,16 @@ namespace gpusat {
                 for (int64_t i = 1; i < node.edges.size(); i++) {
                     BagType& edge1 = node.edges[0];
                     BagType& edge2 = node.edges[i];
-                    std::cerr << "\ncombine step SOLVE (" << node.id << ") " << i << " of " << node.edges.size() - 1 << std::endl;
-                    std::cerr << edge1.hash() << std::endl;
-                    std::cerr << edge2.hash() << std::endl;
-                    std::cerr << node.hash() << std::endl;
+
+                    TRACE("combine solve(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
+                        node.id, edge1.hash(), edge2.hash(), node.hash());
                     solveProblem(formula, edge2, node, JOIN);
                     if (isSat <= 0) {
                         return;
                     }
 
-                    std::cerr << "\ncombine step JOIN (" << node.id << ") " << i << " of " << node.edges.size() - 1 << std::endl;
-                    std::cerr << edge1.hash() << std::endl;
-                    std::cerr << edge2.hash() << std::endl;
-                    std::cerr << node.hash() << std::endl;
-
+                    TRACE("combine join(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
+                        node.id, edge1.hash(), edge2.hash(), node.hash());
 
                     std::vector<int64_t> vt;
                     std::set_union(
@@ -179,17 +176,15 @@ namespace gpusat {
 
                     BagType tmp;
                     tmp.variables = vt;
-                    std::cerr << tmp.hash() << std::endl;
 
                     if (i == node.edges.size() - 1) {
                         solveJoin(tmp, edge1, edge2, formula, INTRODUCEFORGET);
                         if (isSat <= 0) {
                             return;
                         }
-                        std::cerr << "\ncombine step IF (" << node.id << ") " << i << " of " << node.edges.size() - 1 << std::endl;
-                        std::cerr << edge1.hash() << std::endl;
-                        std::cerr << edge2.hash() << std::endl;
-                        std::cerr << node.hash() << std::endl;
+
+                        TRACE("combine intro/forget(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
+                            node.id, edge1.hash(), edge2.hash(), node.hash());
 
                         node.edges[0] = std::move(tmp);
                         solveIntroduceForget(formula, pnode, node, node.edges[0], false, lastNode);
@@ -203,7 +198,6 @@ namespace gpusat {
     }
 
     TreeSolution<CudaMem> Solver::combineTree(TreeSolution<CudaMem> &t1, TreeSolution<CudaMem> &t2) {
-        //std::cerr << "combine tree " << t1.hash() << " " << t2.hash() << std::endl;
 
         // must have the same ID space
         assert(t1.variables() == t2.variables());
@@ -226,7 +220,7 @@ namespace gpusat {
             t1.freeData();
             t2.freeData();
 
-            std::cerr << "combine tree size: " << result.currentTreeSize() << std::endl;
+            TRACE("combine tree size: %lu", result.currentTreeSize());
             result.setMinId(std::min(t2.minId(), t1.minId()));
             result.setMaxId(std::max(t2.maxId(), t1.maxId()));
             return std::move(result);
@@ -252,12 +246,7 @@ namespace gpusat {
     }
 
     void Solver::solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode) {
-        /*
-        std::cerr << "join input: " << std::endl;
-        std::cerr << bagTypeHash(node) << std::endl;
-        std::cerr << " " << bagTypeHash(edge1) << std::endl;
-        std::cerr << " " << bagTypeHash(edge2) << std::endl;
-        */
+
         isSat = 0;
         this->numJoin++;
 
@@ -319,9 +308,6 @@ namespace gpusat {
                 }
             }();
 
-
-            std::cout << "run: " << run << " " << minId << " " << maxId << std::endl;
-
             solution_gpu = gpuOwner(tmp_solution);
 
             for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
@@ -350,7 +336,6 @@ namespace gpusat {
                     }
                 }
 
-                std::cerr << "thread offset: " << minId << " threads " << maxId - minId << std::endl;
                 RunMeta meta = {
                     .minId = minId,
                     .maxId = maxId,
@@ -380,8 +365,7 @@ namespace gpusat {
                 );
             }
 
-            //std::cerr << "num solutions (join): " << num_entries << std::endl;
-            std::cout << "a is " << node.solution.size() << std::endl;
+            TRACE("satisfiable: %d", isSatisfiable(solution_gpu));
 
             if (!isSatisfiable(solution_gpu)) {
 
@@ -410,22 +394,21 @@ namespace gpusat {
 
                     // previous bag is not empty, combine if there is still space.
                     if (last != NULL && last->hasData() && (sol.currentTreeSize() + last->currentTreeSize() + 1) < sol.dataStructureSize()) {
-                        std::cerr << "first branch" << std::endl;
+                        TRACE("%s", "first branch");
                         auto gpu_last = gpuOwner(*last);
                         auto new_tree_gpu = combineTree(sol, gpu_last);
                         new_tree_gpu.setDataStructureSize(new_tree_gpu.currentTreeSize());
                         auto new_tree = cpuCopy(new_tree_gpu);
                         solution_gpu = std::move(new_tree_gpu);
-                        std::cerr << "combine tree output hash: " << new_tree.hash() << std::endl;
                         node.solution.back() = std::move(new_tree);
                     // previous back is empty, replace it
                     } else if (last != NULL && !last->hasData()) {
-                        std::cerr << "second branch" << std::endl;
+                        TRACE("%s", "second branch");
                         sol.setMinId(last->minId());
                         sol.setDataStructureSize(sol.currentTreeSize());
                         node.solution.back() = cpuCopy(sol);
                     } else {
-                        std::cerr << "simple clean tree" << std::endl;
+                        TRACE("%s", "simple clean tree");
                         sol.setDataStructureSize(sol.currentTreeSize());
                         node.solution.push_back(cpuCopy(sol));
                     }
@@ -437,19 +420,22 @@ namespace gpusat {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize((size_t)bagSizeNode);
+                    TRACE("array output hash: %lu", cpuCopy(sol).hash());
                     node.maxSize = std::max(node.maxSize, (int64_t)sol.dataStructureSize());
                     node.solution.push_back(cpuCopy(sol));
                 }
             }
         }
         buf_exponent.read(&(node.exponent));
-        std::cerr << "exponent: " << node.exponent << std::endl;
+
+        TRACE("join exponent: %ld", node.exponent);
+
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
         int64_t tableSize = 0;
         for (const auto &sol : node.solution) {
             tableSize += dataStructureSize(sol);
         }
-        std::cout << "table size: " << tableSize << std::endl;
+
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (auto &sol : edge1.solution) {
             freeData(sol);
@@ -457,7 +443,9 @@ namespace gpusat {
         for (auto &sol : edge2.solution) {
             freeData(sol);
         }
-        std::cerr << "JOIN output hash: " << node.hash() << std::endl;
+
+        TRACE("output hash: %lu", node.hash());
+
         // if only one solution bag was used, reuse
         // it in the next node
         if (node.solution.size() == 1 && cache_last_solution_bag) {
@@ -473,10 +461,8 @@ namespace gpusat {
 
     void Solver::solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
 
-        std::cerr << "IF input hash: " << std::endl;
-        std::cerr << "  " << pnode.hash() << std::endl;
-        std::cerr << "  " << node.hash() << std::endl;
-        std::cerr << "  " << cnode.hash() << std::endl;
+        TRACE("\n\tpnode: %lu \n\tnode: %lu \n\tcnode: %lu", pnode.hash(), node.hash(), cnode.hash());
+
         isSat = 0;
         std::vector<int64_t> fVars;
         std::set_intersection(
@@ -485,9 +471,6 @@ namespace gpusat {
         std::back_inserter(fVars));
         std::vector<int64_t> iVars = node.variables;
         std::vector<int64_t> eVars = cnode.variables;
-
-        std::cerr << "variables: " << node.variables.size() << std::endl;
-        std::cerr << "fvars: " << fVars.size() << std::endl;
 
         node.variables = fVars;
 
@@ -547,9 +530,8 @@ namespace gpusat {
         }
 
         uint64_t maxSize = std::ceil((1ul << (node.variables.size())) * 1.0 / bagSizeForget);
-        std::cerr << "bag size forget: " << bagSizeForget << std::endl;
-        std::cerr << "variables: " << node.variables.size() << std::endl;
-        std::cerr << "used memory: " << usedMemory << std::endl;
+
+        TRACE("used memory: %lu", usedMemory);
 
         node.solution.clear();
 
@@ -625,9 +607,8 @@ namespace gpusat {
                 );
             }
 
-            //auto solution = cpuCopy(solution_gpu);
+            TRACE("satisfiable: %d", isSatisfiable(solution_gpu));
 
-            std::cerr << "num solutions: " << isSatisfiable(solution_gpu) << std::endl;
             if (!isSatisfiable(solution_gpu)) {
 
                 if (solutionType == TREE) {
@@ -660,7 +641,6 @@ namespace gpusat {
                         auto new_tree_gpu = combineTree(sol, gpu_last);
                         new_tree_gpu.setDataStructureSize(new_tree_gpu.currentTreeSize());
                         auto new_tree = cpuCopy(new_tree_gpu);
-                        std::cerr << "combine tree output hash: " << new_tree.hash() << std::endl;
                         solution_gpu = std::move(new_tree_gpu);
                         node.solution.back() = std::move(new_tree);
                     } else {
@@ -693,14 +673,16 @@ namespace gpusat {
         }
 
         buf_exponent.read(&(node.exponent));
-        std::cerr << "exponent: " << node.exponent << std::endl;
+
+        TRACE("node exponent: %ld", node.exponent);
+
         node.correction = cnode.correction + cnode.exponent;
         int64_t tableSize = 0;
         for (const auto &sol : node.solution) {
             tableSize += dataStructureSize(sol);
         }
-        std::cout << "table size: " << tableSize << std::endl;
-        std::cerr << "IF output hash: " << node.hash() << std::endl;
+
+        TRACE("output hash: %lu", node.hash());
 
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (auto &csol : cnode.solution) {
