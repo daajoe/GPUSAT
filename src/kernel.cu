@@ -268,22 +268,6 @@ __global__ void solveJoin(
     }
 
     double solution_value = -1.0;
-    auto only_one_edge_has_solution = [&](double edge_value) {
-        double oldVal = solution->solutionCountFor(id); 
-        if (edge_value > 0.0) {
-            solution->setSatisfiability(true);
-        }
-
-        // if the solution was not present before, multiply with one.
-        if (oldVal < 0.0) {
-            oldVal = 1.0;
-        }
-
-        solution_value = edge_value * oldVal / weight;
-        if (!(run.mode & NO_EXP)) {
-            solution_value /= value;
-        }
-    };
 
     if (edge1_solutions > 0.0 && edge2_solutions > 0.0) {
         solution->setSatisfiability(true);
@@ -299,12 +283,29 @@ __global__ void solveJoin(
         }
     // we need to consider individual edges and maybe look
     // at we have already stored for the current id.
-    } else {
-        // only one edge has a solution, the other has none.
-        if (edge1_solutions > 0.0 && edge2_solutions < 0.0) {
-            only_one_edge_has_solution(edge1_solutions);
-        } else if (edge1_solutions < 0.0 && edge2_solutions > 0.0) {
-            only_one_edge_has_solution(edge2_solutions);
+    } else if (edge1_solutions > 0.0 || edge2_solutions > 0.0) {
+        double oldVal = solution->solutionCountFor(id); 
+        solution->setSatisfiability(true);
+
+        // if the solution was not present before, multiply with one.
+        if (oldVal < 0.0) {
+            oldVal = 1.0;
+        }
+
+        // In order to not use weight and value twice,
+        // move them to different branches of the calculation.
+        // If one edge is 0, the whole will be 0 anyway.
+
+        // edge 1 has the solution
+        if (edge1_solutions > 0.0) {
+            // use weight here
+            solution_value = edge1_solutions * oldVal / weight;
+        } else if (edge2_solutions > 0.0) {
+            solution_value = edge2_solutions * oldVal;
+            // use value here
+            if (!(run.mode & NO_EXP)) {
+                solution_value /= value;
+            }
         }
     }
 
