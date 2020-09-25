@@ -268,6 +268,9 @@ __global__ void solveJoin(
     }
 
     double solution_value = -1.0;
+    // indicates that this value is incomplete
+    // and should not yet be used to derive a possible exponent
+    bool value_incomplete = false;
 
     // do both edges have an entry for edge1 and edge2?
     if (edge1_solutions >= 0.0 && edge2_solutions >= 0.0) {
@@ -293,6 +296,7 @@ __global__ void solveJoin(
 
         // if the solution was not present before, multiply with one.
         if (oldVal < 0.0) {
+            value_incomplete = true;
             oldVal = 1.0;
         }
 
@@ -316,7 +320,7 @@ __global__ void solveJoin(
     // if we found solutions, store them
     if (solution_value > 0.0) {
         solution->setCount(id, solution_value);
-        if (!(run.mode & NO_EXP)) {
+        if (!(run.mode & NO_EXP) && !value_incomplete) {
             atomicMax(exponent, ilogb(solution_value));
         }
     }
