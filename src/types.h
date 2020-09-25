@@ -402,7 +402,9 @@ namespace gpusat {
                 size_t h = 0;
                 hash_combine(h, minId());
                 hash_combine(h, maxId());
-                hash_combine(h, isSatisfiable());
+                // in the original, nodes with 0 variables cannot be
+                // categorized in sat / unsat if their data is freed :/
+                hash_combine(h, isSatisfiable() && variables() > 0);
                 if (!hasData()) {
                     return h;
                 }
