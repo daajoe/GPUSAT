@@ -269,17 +269,21 @@ __global__ void solveJoin(
 
     double solution_value = -1.0;
 
-    if (edge1_solutions > 0.0 && edge2_solutions > 0.0) {
-        solution->setSatisfiability(true);
+    // do both edges have an entry for edge1 and edge2?
+    if (edge1_solutions >= 0.0 && edge2_solutions >= 0.0) {
+        // only store a solution if both edges have a count > 0
+        if (edge1_solutions > 0.0 && edge2_solutions > 0.0) {
+            solution->setSatisfiability(true);
 
-        // we do not need to consider the old solution
-        // count in this bag, because each id can only occur
-        // in an edge node once, and here the id occurs for both edges.
+            // we do not need to consider the old solution
+            // count in this bag, because each id can only occur
+            // in an edge node once, and here the id occurs for both edges.
 
-        solution_value = edge1_solutions * edge2_solutions / weight;
-        //atomicAdd(sols, 1);
-        if (!(run.mode & NO_EXP)) {
-            solution_value /= value;
+            solution_value = edge1_solutions * edge2_solutions / weight;
+            //atomicAdd(sols, 1);
+            if (!(run.mode & NO_EXP)) {
+                solution_value /= value;
+            }
         }
     // we need to consider individual edges and maybe look
     // at we have already stored for the current id.
