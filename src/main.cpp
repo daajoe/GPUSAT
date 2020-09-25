@@ -65,13 +65,13 @@ int main(int argc, char *argv[]) {
     std::string fitness;
     std::string type;
     std::string decompDir;
-    long combineWidth = -1;
+    size_t combineWidth = 0;
     time_t seed = 2;
     bool cpu, weighted, noExp, nvidia, amd;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
-    int64_t maxBag = -1;
+    size_t maxBag = 0;
 
     //cmd options
     app.add_option("-s,--seed", seed, "path to the file containing the sat formula")->set_default_str("");
@@ -90,8 +90,8 @@ int main(int argc, char *argv[]) {
     app.add_flag("--weighted", weighted, "use weighted model count");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
     app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
-    app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("-1");
-    app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("-1");
+    app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("0");
+    app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("0");
     CLI11_PARSE(app, argc, argv)
 
     std::srand(seed);
@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
     // full mem beeing available
     int64_t maxMemoryBuffer = deviceProp.totalGlobalMem / 4;
 
-    if (combineWidth < 0) {
+    if (combineWidth == 0) {
 	std::cerr << "maximum workgroup size: " << deviceProp.maxThreadsPerBlock << " " << deviceProp.multiProcessorCount << std::endl;
 	combineWidth = (long) std::floor(std::log2(deviceProp.maxThreadsPerBlock * deviceProp.multiProcessorCount));
     }

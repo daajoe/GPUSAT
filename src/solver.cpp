@@ -269,7 +269,7 @@ namespace gpusat {
         uint64_t bagSizeNode = 1;
 
         if (maxBag > 0) {
-            bagSizeNode = 1l << (int64_t) std::min(node.variables.size(), (size_t) maxBag);
+            bagSizeNode = 1l << (int64_t) std::min(node.variables.size(), maxBag);
         } else {
             if (solutionType == TREE) {
                 if (nextNode == JOIN) {
@@ -511,7 +511,7 @@ namespace gpusat {
         uint64_t s = sizeof(int64_t);
 
         if (maxBag > 0) {
-            bagSizeForget = 1ul << (uint64_t) std::min(node.variables.size(), (size_t) maxBag);
+            bagSizeForget = 1ul << (uint64_t) std::min(node.variables.size(), maxBag);
         } else {
             if (solutionType == TREE) {
                 if (nextNode == JOIN) {
