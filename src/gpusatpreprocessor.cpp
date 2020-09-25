@@ -8,14 +8,14 @@
 #include "gpusatpreprocessor.h"
 
 namespace gpusat {
-    void Preprocessor::preprocessDecomp(BagType& decomp, int64_t combineWidth) {
+    void Preprocessor::preprocessDecomp(BagType& decomp, size_t combineWidth) {
 
         bool changed = true;
         // try to merge child nodes
         while (changed) {
             changed = false;
-            for (long a = 0; a < decomp.edges.size() && !changed; a++) {
-                for (long b = 0; b < decomp.edges.size() && !changed; b++) {
+            for (size_t a = 0; a < decomp.edges.size() && !changed; a++) {
+                for (size_t b = 0; b < decomp.edges.size() && !changed; b++) {
                     auto& edge_a = decomp.edges[a];
                     auto& edge_b = decomp.edges[b];
                     if (a != b &&
@@ -34,7 +34,6 @@ namespace gpusat {
                         if (v.size() < combineWidth || edge_a.variables.size() == 0 ||
                             edge_b.variables.size() == 0) {
                             changed = true;
-                            int64_t cid = edge_b.id;
                             edge_a.variables.assign(v.begin(), v.end());
 
                             edge_a.edges.insert(
@@ -55,7 +54,7 @@ namespace gpusat {
         if (decomp.variables.size() < combineWidth || decomp.variables.size() == 0) {
             while (changed) {
                 changed = false;
-                for (long i = 0; i < decomp.edges.size(); i++) {
+                for (size_t i = 0; i < decomp.edges.size(); i++) {
                     std::vector<int64_t> v;
                     auto& edge_i = decomp.edges[i];
                     std::set_union(
@@ -66,7 +65,6 @@ namespace gpusat {
 
                     if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
                         changed = true;
-                        int64_t cid = edge_i.id;
                         decomp.variables.assign(v.begin(), v.end());
 
                         decomp.edges.insert(
@@ -82,12 +80,12 @@ namespace gpusat {
         }
 
         // process child nodes
-        for (long i = 0; i < decomp.edges.size(); i++) {
+        for (size_t i = 0; i < decomp.edges.size(); i++) {
             preprocessDecomp((decomp.edges)[i], combineWidth);
         }
         //std::sort(decomp.variables.begin(), decomp.variables.end());
 
-        for (long i = 0; i < decomp.edges.size(); i++) {
+        for (size_t i = 0; i < decomp.edges.size(); i++) {
             std::vector<int64_t> fVars;
             auto& edge_i = decomp.edges[i];
             std::set_intersection(
@@ -121,9 +119,9 @@ namespace gpusat {
     }
 
     void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight) {
-        for (int64_t i = 0; i < formula.facts.size(); i++) {
+        for (size_t i = 0; i < formula.facts.size(); i++) {
             int64_t fact = formula.facts[i];
-            for (int64_t a = 0; a < formula.clauses.size(); a++) {
+            for (size_t a = 0; a < formula.clauses.size(); a++) {
                 std::vector<int64_t>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
                 if (elem != formula.clauses[a].end()) {
                     if (*elem == (fact)) {
@@ -145,7 +143,7 @@ namespace gpusat {
                     }
                 }
             }
-            for (long j = i; j < formula.facts.size(); ++j) {
+            for (size_t j = i; j < formula.facts.size(); ++j) {
                 if (std::abs(formula.facts[j]) > std::abs(fact)) {
                     if (formula.facts[j] > 0) {
                         formula.facts[j]--;
@@ -164,7 +162,7 @@ namespace gpusat {
                     defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
                 }
                 formula.numWeights -= 2;
-                for (long j = std::abs(fact); j < formula.numVars; ++j) {
+                for (size_t j = std::abs(fact); j < formula.numVars; ++j) {
                     formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
                     formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
                 }
@@ -176,7 +174,7 @@ namespace gpusat {
 
 
     void Preprocessor::relabelDecomp(BagType& decomp, int64_t id) {
-        for (long i = 0; i < decomp.variables.size(); i++) {
+        for (size_t i = 0; i < decomp.variables.size(); i++) {
             if (decomp.variables[i] > id) {
                 decomp.variables[i]--;
             } else if (decomp.variables[i] == id) {
@@ -184,14 +182,14 @@ namespace gpusat {
                 i--;
             }
         }
-        for (long j = 0; j < decomp.edges.size(); ++j) {
+        for (size_t j = 0; j < decomp.edges.size(); ++j) {
             relabelDecomp(decomp.edges[j], id);
         }
     }
 
     void Preprocessor::relabelFormula(satformulaType &formula, int64_t id) {
-        for (long i = 0; i < formula.clauses.size(); i++) {
-            for (long j = 0; j < formula.clauses[i].size(); ++j) {
+        for (size_t i = 0; i < formula.clauses.size(); i++) {
+            for (size_t j = 0; j < formula.clauses[i].size(); ++j) {
                 if (std::abs(formula.clauses[i][j]) > id) {
                     if (formula.clauses[i][j] > 0) {
                         formula.clauses[i][j]--;

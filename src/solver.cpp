@@ -108,7 +108,7 @@ namespace gpusat {
 
     void Solver::solveProblem(satformulaType &formula, BagType& node, BagType& pnode, nodeType lastNode) {
 
-        TRACE("\n\tis_sat: %ld \n\tnode: %lu \n\tpnode: %lu", isSat, node.hash(), pnode.hash());
+        TRACE("\n\tis_sat: %d \n\tnode: %lu \n\tpnode: %lu", isSat, node.hash(), pnode.hash());
 
         if (isSat > 0) {
             if (node.edges.empty()) {
@@ -154,7 +154,7 @@ namespace gpusat {
                     return;
                 }
 
-                for (int64_t i = 1; i < node.edges.size(); i++) {
+                for (size_t i = 1; i < node.edges.size(); i++) {
                     BagType& edge1 = node.edges[0];
                     BagType& edge2 = node.edges[i];
 
@@ -292,25 +292,30 @@ namespace gpusat {
         // track wether we can leave the last solution bag on the gpu.
         bool cache_last_solution_bag = true;
 
-        for (int64_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
+        for (size_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
             const auto numVars = node.variables.size();
             const auto minId = run * bagSizeNode;
             const auto maxId = std::min(run * bagSizeNode + bagSizeNode, 1ul << numVars);
 
             SolutionVariant tmp_solution = [&]() -> SolutionVariant {
-                if (solutionType == TREE) {
-                    auto tree_size = (maxId - minId) * 2 + numVars;
-                    return TreeSolution<CpuMem>(tree_size, minId, maxId, numVars);
-                } else if (solutionType == ARRAY) {
-                    // FIXME: why + node.variables.size()?
-                    auto array_size = (maxId - minId) + numVars;
-                    return ArraySolution<CpuMem>(array_size, minId, maxId);
+                switch (solutionType) {
+                    case TREE: {
+                        auto tree_size = (maxId - minId) * 2 + numVars;
+                        return TreeSolution<CpuMem>(tree_size, minId, maxId, numVars);
+                    }
+                    case ARRAY: {
+                        // FIXME: why + node.variables.size()?
+                        auto array_size = (maxId - minId) + numVars;
+                        return ArraySolution<CpuMem>(array_size, minId, maxId);
+                    }
                 }
+                assert(0);
+                __builtin_unreachable();
             }();
 
             solution_gpu = gpuOwner(tmp_solution);
 
-            for (int64_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
+            for (size_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
 
                 std::optional<CudaSolutionVariant> edge1_solution = std::nullopt;
                 if (b < edge1.solution.size() && hasData(edge1.solution[b])) {
@@ -414,14 +419,14 @@ namespace gpusat {
                     }
                     cache_last_solution_bag = true;
                     auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
-                    node.maxSize = std::max(node.maxSize, (int64_t)max_tree_size);
+                    node.maxSize = std::max(node.maxSize, max_tree_size);
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution<CudaMem>>(solution_gpu);
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize((size_t)bagSizeNode);
                     TRACE("array output hash: %lu", cpuCopy(sol).hash());
-                    node.maxSize = std::max(node.maxSize, (int64_t)sol.dataStructureSize());
+                    node.maxSize = std::max(node.maxSize, sol.dataStructureSize());
                     node.solution.push_back(cpuCopy(sol));
                 }
             }
@@ -431,7 +436,7 @@ namespace gpusat {
         TRACE("join exponent: %ld", node.exponent);
 
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
-        int64_t tableSize = 0;
+        size_t tableSize = 0;
         for (const auto &sol : node.solution) {
             tableSize += dataStructureSize(sol);
         }
@@ -480,13 +485,13 @@ namespace gpusat {
         std::vector<int64_t> numVarsClause;
         std::vector<int64_t> clauses;
         int64_t numClauses = 0;
-        for (int64_t i = 0; i < formula.clauses.size(); i++) {
+        for (size_t i = 0; i < formula.clauses.size(); i++) {
             std::vector<int64_t> v;
             std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), back_inserter(v), compVars);
             if (v.size() == formula.clauses[i].size()) {
                 numClauses++;
                 numVarsClause.push_back(formula.clauses[i].size());
-                for (int64_t a = 0; a < formula.clauses[i].size(); a++) {
+                for (size_t a = 0; a < formula.clauses[i].size(); a++) {
                     clauses.push_back(formula.clauses[i][a]);
                 }
             }
@@ -539,7 +544,7 @@ namespace gpusat {
         // track wether we can leave the last solution bag on the gpu.
         bool cache_last_solution_bag = true;
 
-        for (int64_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
+        for (size_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
 
             uint64_t sol_minId =  run * bagSizeForget;
             uint64_t sol_maxId = std::min(run * bagSizeForget + bagSizeForget, 1ul << (node.variables.size()));
@@ -659,13 +664,13 @@ namespace gpusat {
                     cache_last_solution_bag = true;
 
                     auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
-                    node.maxSize = std::max(node.maxSize, (int64_t)max_tree_size);
+                    node.maxSize = std::max(node.maxSize, max_tree_size);
 
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution<CudaMem>>(solution_gpu);
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
-                    sol.setDataStructureSize((size_t)bagSizeForget);
+                    sol.setDataStructureSize(bagSizeForget);
 
                     node.solution.push_back(cpuCopy(sol));
                 }
@@ -677,7 +682,7 @@ namespace gpusat {
         TRACE("node exponent: %ld", node.exponent);
 
         node.correction = cnode.correction + cnode.exponent;
-        int64_t tableSize = 0;
+        size_t tableSize = 0;
         for (const auto &sol : node.solution) {
             tableSize += dataStructureSize(sol);
         }

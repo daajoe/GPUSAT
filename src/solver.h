@@ -14,17 +14,17 @@ namespace gpusat {
      */
     class Solver {
     protected:
-        int64_t memorySize;
+        size_t memorySize;
 
     public:
-        int64_t isSat = 1;
-        int64_t numJoin = 0;
-        int64_t numIntroduceForget = 0;
-        int64_t maxTableSize = 0;
-        int64_t maxBag = 0;
-        int64_t maxMemoryBuffer = 0;
-        SolveMode solve_mode = DEFAULT;
-        dataStructure solutionType = TREE;
+        bool isSat = true;
+        size_t numJoin = 0;
+        size_t numIntroduceForget = 0;
+        size_t maxTableSize = 0;
+        size_t maxBag;
+        size_t maxMemoryBuffer;
+        SolveMode solve_mode;
+        dataStructure solutionType;
 
         /**
          *
@@ -34,7 +34,7 @@ namespace gpusat {
          * @param memorySize_
          * @param maxMemoryBuffer_
          */
-        Solver(int64_t memorySize_, int64_t maxMemoryBuffer_, dataStructure solutionType_, int64_t maxBag_, SolveMode solve_mode_) : memorySize(memorySize_), maxMemoryBuffer(maxMemoryBuffer_), solutionType(solutionType_), maxBag(maxBag_), solve_mode(solve_mode_) {}
+        Solver(size_t memorySize_, size_t maxMemoryBuffer_, dataStructure solutionType_, size_t maxBag_, SolveMode solve_mode_) : memorySize(memorySize_), maxBag(maxBag_), maxMemoryBuffer(maxMemoryBuffer_), solve_mode(solve_mode_), solutionType(solutionType_) {}
 
         /**
          * function to solve the sat problem

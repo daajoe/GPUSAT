@@ -18,7 +18,7 @@ namespace gpusat {
          * @param combineWidth
          *      max width to combine bags
          */
-        static void preprocessDecomp(BagType& decomp, int64_t combineWidth);
+        static void preprocessDecomp(BagType& decomp, size_t combineWidth);
 
         /**
          * removes facts from the sat formula

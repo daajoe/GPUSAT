@@ -68,7 +68,7 @@ namespace gpusat {
             }
             ret.numWeights = (ret.numVars + 1) * 2;
 
-            for (int64_t i = 0; i <= ret.numVars; i++) {
+            for (size_t i = 0; i <= ret.numVars; i++) {
                 std::unordered_map<int64_t, double>::const_iterator elem = weights.find(i);
                 if (elem != weights.end()) {
                     double we = weights[i];
@@ -206,7 +206,7 @@ namespace gpusat {
         }
 
         if (!edges.empty()) {
-            for (long a = 0; a < edges.size(); a++) {
+            for (size_t a = 0; a < edges.size(); a++) {
                 std::sort(edges[a].begin(), edges[a].end());
             }
             std::list<int64_t> backlog;

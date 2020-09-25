@@ -15,7 +15,7 @@ namespace gpusat {
         ~JoinSizeFitnessFunction() = default;
 
         htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override {
-            long maxSize = 0;
+            size_t maxSize = 0;
             for (auto node:decomposition.joinNodes()) {
                 maxSize = (decomposition.bagContent(node).size() > maxSize)
                     ? decomposition.bagContent(node).size() : maxSize;

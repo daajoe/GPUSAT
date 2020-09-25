@@ -127,7 +127,7 @@ namespace gpusat {
     template <typename M>
     class ArraySolution {
         public:
-            ArraySolution(size_t size_, int64_t minId, int64_t maxId) :
+            ArraySolution(size_t size_, uint64_t minId, uint64_t maxId) :
                 size(size_), minId_(minId), maxId_(maxId),
                 elements(nullptr, 0), satisfiable(false) {}
 
@@ -215,7 +215,7 @@ namespace gpusat {
                 if (!hasData()) {
                     return h;
                 }
-                for (int i=0; i < dataStructureSize(); i++) {
+                for (size_t i=0; i < dataStructureSize(); i++) {
                     // regard empty entries as 0.0, for compatibility
                     // with original implementation
                     auto value = std::max(0.0, data()[i]);
@@ -256,10 +256,10 @@ namespace gpusat {
     template <typename M>
     class TreeSolution {
         public:
-            TreeSolution(size_t size_, int64_t minId, int64_t maxId, int64_t variableCount_) :
+            TreeSolution(size_t size_, uint64_t minId, uint64_t maxId, size_t variableCount_) :
                 size(size_), minId_(minId), maxId_(maxId),
-                variableCount(variableCount_),
-                tree(nullptr, 0), lastNodeIndex(0), satisfiable(false) {};
+                tree(nullptr, 0), lastNodeIndex(0),
+                variableCount(variableCount_), satisfiable(false) {};
 
             template<typename M2>
             TreeSolution(const TreeSolution<M2>& other, TreeNode* gpu_data, size_t data_size) {
@@ -570,7 +570,7 @@ namespace gpusat {
         // Solver functions assume this solution is equivalent
         // to the first solution stored in the `solution` vector!
         std::optional<CudaSolutionVariant> cached_solution;
-        int64_t maxSize = 0;
+        size_t maxSize = 0;
 
         size_t hash() const {
             size_t h = 0;
@@ -583,7 +583,7 @@ namespace gpusat {
             for (const BagType& edge : edges) {
                 hash_combine(h, edge.hash());
             }
-            for (const auto &sol : solution) {
+            for (const auto& sol : solution) {
                 hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
             }
             hash_combine(h, maxSize);
@@ -626,8 +626,8 @@ namespace gpusat {
 
     /// type for saving the sat formula
     struct satformulaType {
-        int64_t numVars = 0;
-        int64_t numWeights = 0;
+        size_t numVars = 0;
+        size_t numWeights = 0;
         bool unsat = false;
         double *variableWeights = nullptr;
         std::vector<std::vector<int64_t>> clauses;
