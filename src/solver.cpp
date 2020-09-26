@@ -415,7 +415,9 @@ namespace gpusat {
                     } else {
                         TRACE("%s", "simple clean tree");
                         sol.setDataStructureSize(sol.currentTreeSize());
-                        node.solution.push_back(cpuCopy(sol));
+                        auto cpu_sol = cpuCopy(sol);
+                        TRACE("tree output hash: %lu", cpu_sol.hash());
+                        node.solution.push_back(std::move(cpu_sol));
                     }
                     cache_last_solution_bag = true;
                     auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
