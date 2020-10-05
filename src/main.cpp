@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
     std::string type;
     std::string decompDir;
     size_t combineWidth = 0;
-    time_t seed = 2;
+    time_t seed = time(0);
     bool weighted, noExp, trace;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
