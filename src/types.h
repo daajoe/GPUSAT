@@ -603,10 +603,13 @@ namespace gpusat {
 
     /// type for saving a tree decomposition
     struct treedecType {
+        // number of bags
         int64_t numb = 0;
+        // number of variables
         int64_t numVars = 0;
+        // tree width
         int64_t width = 0;
-        std::vector<BagType> bags;
+        BagType root;
     };
 
     /**

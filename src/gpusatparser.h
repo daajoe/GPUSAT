@@ -29,7 +29,7 @@ namespace gpusat {
          * @return
          *      the sat formula
          */
-        satformulaType parseSatFormula(std::string formula);
+        satformulaType parseSatFormula(std::istream& formula);
 
     private:
         bool wmc;
@@ -89,45 +89,11 @@ namespace gpusat {
          * @return
          *      the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
+        // IF NEEDED, implement construct a decomposition from the string,
+        // then use htd_to_bags from decomposer.
+        //treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
         double defaultWeight = 1.0;
-
-    private:
-
-        /**
-         * parse an edge from the tree decomposition
-         *
-         * @param item
-         *      the line
-         * @param edges
-         *      queue containing all edges
-         */
-        void parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges);
-
-        /**
-         * parses the start line from the tree decomposition
-         *
-         * @param ret
-         *      the tree decomposition
-         * @param item
-         *      the line
-         * @param edges
-         *      queue containing all edges
-         */
-        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges);
-
-        /**
-         * parses a pag from the tree decomposition
-         *
-         * @param ret
-         *      object containing the tree decomposition
-         * @param item
-         *      a line from the decomposition
-         */
-        void parseBagLine(treedecType &ret, std::string item);
-
-        BagType constructTree(std::vector<std::vector<long>>& edges, std::vector<BagType>& bags);
     };
 }
 #endif //GPUSAT_PARSER_H

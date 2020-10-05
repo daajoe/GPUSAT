@@ -152,7 +152,7 @@ namespace gpusat {
                     }
                 }
             }
-            relabelDecomp(decomp.bags[0], std::abs(fact));
+            relabelDecomp(decomp.root, std::abs(fact));
             decomp.numVars--;
             if (formula.variableWeights != nullptr) {
                 //make product of removed variable weights

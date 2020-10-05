@@ -100,29 +100,26 @@ int main(int argc, char *argv[]) {
     TDParser tdParser;
     long long int time_decomposing;
     {
-        std::stringbuf treeD, sat;
+
+        CNFParser cnf_parser(weighted);
         if (formulaDir != "") {
             std::ifstream fileIn(formulaDir);
-            while (getline(fileIn, inputLine)) {
-                sat.sputn(inputLine.c_str(), inputLine.size());
-                sat.sputn("\n", 1);
-            }
+            satFormula = cnf_parser.parseSatFormula(fileIn);
         } else {
-            while (getline(std::cin, inputLine)) {
-                sat.sputn(inputLine.c_str(), inputLine.size());
-                sat.sputn("\n", 1);
-            }
+            satFormula = cnf_parser.parseSatFormula(std::cin);
         }
 
         time_decomposing = getTime();
-        std::string treeDString;
         if (decompDir != "") {
+            // FIXME: implement through htd_io
+            /*
             std::ifstream fileIn(decompDir);
             while (getline(fileIn, inputLine)) {
                 treeD.sputn(inputLine.c_str(), inputLine.size());
                 treeD.sputn("\n", 1);
             }
             treeDString = treeD.str();
+            */
         } else {
             htd::ITreeDecompositionFitnessFunction *fit;
             if (fitness == "width") {
@@ -134,24 +131,9 @@ int main(int argc, char *argv[]) {
             } else {
                 fit = new WidthCutSetFitnessFunction();
             }
-            treeDString = Decomposer::computeDecomposition(sat.str(), fit, numDecomps);
+            treeDecomp = Decomposer::computeDecomposition(satFormula, fit, numDecomps);
         }
         time_decomposing = getTime() - time_decomposing;
-
-        std::string satString = sat.str();
-
-        if (satString.size() < 8) {
-            std::cerr << "Error: SAT formula\n";
-            cuda_pinned_alloc_pool.deinit();
-            exit(EXIT_FAILURE);
-        }
-        if (treeDString.size() < 8) {
-            std::cerr << "Error: tree decomposition\n";
-            cuda_pinned_alloc_pool.deinit();
-            exit(EXIT_FAILURE);
-        }
-        satFormula = CNFParser(weighted).parseSatFormula(sat.str());
-        treeDecomp = tdParser.parseTreeDecomp(treeDString, satFormula);
     }
     std::cout.flush();
 
@@ -206,9 +188,9 @@ int main(int argc, char *argv[]) {
     //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
 
     // combine small bags
-    if (trace) std::cerr << "before pp: " << treeDecomp.bags[0].hash() << std::endl;
-    Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
-    if (trace) std::cerr << "after pp: " << treeDecomp.bags[0].hash() << std::endl;
+    if (trace) std::cerr << "before pp: " << treeDecomp.root.hash() << std::endl;
+    Preprocessor::preprocessDecomp(treeDecomp.root, combineWidth);
+    if (trace) std::cerr << "after pp: " << treeDecomp.root.hash() << std::endl;
 
     std::cout.flush();
 
@@ -217,11 +199,11 @@ int main(int argc, char *argv[]) {
     sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_cfg, trace);
 
     next.variables.assign(
-            treeDecomp.bags[0].variables.begin(),
-            treeDecomp.bags[0].variables.begin()
-                + std::min((int64_t) treeDecomp.bags[0].variables.size(), (int64_t)12));
+            treeDecomp.root.variables.begin(),
+            treeDecomp.root.variables.begin()
+                + std::min((int64_t) treeDecomp.root.variables.size(), (int64_t)12));
     long long int time_solving = getTime();
-    (*sol).solveProblem(satFormula, treeDecomp.bags[0], next, INTRODUCEFORGET);
+    (*sol).solveProblem(satFormula, treeDecomp.root, next, INTRODUCEFORGET);
     time_solving = getTime() - time_solving;
 
     std::cout << "\n{\n";
@@ -233,14 +215,14 @@ int main(int argc, char *argv[]) {
     long long int time_model = getTime();
     boost::multiprecision::cpp_bin_float_100 sols = 0.0;
     if ((*sol).isSat > 0) {
-        sols += bag_sum(treeDecomp.bags[0]);
-        for (auto& solution : treeDecomp.bags[0].solution) {
+        sols += bag_sum(treeDecomp.root);
+        for (auto& solution : treeDecomp.root.solution) {
             std::visit([](auto& sol) {sol.freeData(); }, solution);
         }
 
         if (!noExp) {
             boost::multiprecision::cpp_bin_float_100 base = 2;
-            boost::multiprecision::cpp_bin_float_100 exponent = treeDecomp.bags[0].correction;
+            boost::multiprecision::cpp_bin_float_100 exponent = treeDecomp.root.correction;
             sols = sols * pow(base, exponent);
         }
 
