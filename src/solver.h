@@ -25,6 +25,7 @@ namespace gpusat {
         size_t maxMemoryBuffer;
         SolveConfig solve_cfg;
         dataStructure solutionType;
+        const bool do_trace = false;
 
         /**
          *
@@ -34,7 +35,7 @@ namespace gpusat {
          * @param memorySize_
          * @param maxMemoryBuffer_
          */
-        Solver(size_t memorySize_, size_t maxMemoryBuffer_, dataStructure solutionType_, size_t maxBag_, SolveConfig solve_cfg_) : memorySize(memorySize_), maxBag(maxBag_), maxMemoryBuffer(maxMemoryBuffer_), solve_cfg(solve_cfg_), solutionType(solutionType_) {}
+        Solver(size_t memorySize_, size_t maxMemoryBuffer_, dataStructure solutionType_, size_t maxBag_, SolveConfig solve_cfg_, bool do_trace_) : memorySize(memorySize_), maxBag(maxBag_), maxMemoryBuffer(maxMemoryBuffer_), solve_cfg(solve_cfg_), solutionType(solutionType_), do_trace(do_trace_) {}
 
         /**
          * function to solve the sat problem

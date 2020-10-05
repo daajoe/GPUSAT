@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     std::string decompDir;
     size_t combineWidth = 0;
     time_t seed = 2;
-    bool cpu, weighted, noExp, nvidia, amd;
+    bool weighted, noExp, trace;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
@@ -84,11 +84,9 @@ int main(int argc, char *argv[]) {
                 "\t\t\tjoinSize: minimize the numer of variables in a join node\n"
                 "\t\t\twidth_cutSet: minimize the width and then the cut set size\n"
                 "\t\t\tcutSet_width: minimize the cut set size and then the width")->set_default_str("width_cutSet");
-    app.add_flag("--CPU", cpu, "run the solver on a cpu");
-    app.add_flag("--NVIDIA", nvidia, "run the solver on an NVIDIA device");
-    app.add_flag("--AMD", amd, "run the solver on an AMD device");
     app.add_flag("--weighted", weighted, "use weighted model count");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
+    app.add_flag("--trace", trace, "output a solver trace");
     app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("0");
     app.add_option("-w,--combineWidth", maxBag, "maximum width to combine bags of the decomposition")->set_default_str("0");
@@ -208,15 +206,15 @@ int main(int argc, char *argv[]) {
     //buildKernel(context, devices, queue, program, memorySize, maxMemoryBuffer, nvidia, amd, cpu, combineWidth);
 
     // combine small bags
-    std::cerr << "before pp: " << treeDecomp.bags[0].hash() << std::endl;
+    if (trace) std::cerr << "before pp: " << treeDecomp.bags[0].hash() << std::endl;
     Preprocessor::preprocessDecomp(treeDecomp.bags[0], combineWidth);
-    std::cerr << "after pp: " << treeDecomp.bags[0].hash() << std::endl;
+    if (trace) std::cerr << "after pp: " << treeDecomp.bags[0].hash() << std::endl;
 
     std::cout.flush();
 
     Solver *sol;
     auto next = BagType();
-    sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_cfg);
+    sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_cfg, trace);
 
     next.variables.assign(
             treeDecomp.bags[0].variables.begin(),

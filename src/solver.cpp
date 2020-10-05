@@ -19,8 +19,6 @@
 
 namespace gpusat {
 
-    const bool do_trace = false;
-
     template <typename T>
     class CudaBuffer {
         private:
