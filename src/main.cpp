@@ -175,25 +175,21 @@ int main(int argc, char *argv[]) {
         exit(20);
     }
 
-    SolveMode solve_mode = SolveMode::DEFAULT;
+    SolveConfig solve_cfg;
     if (noExp) {
-        solve_mode = solve_mode | SolveMode::NO_EXP;
+        solve_cfg.no_exponent = true;
     }
     if (type == "array") {
-        solve_mode = solve_mode | SolveMode::ARRAY_TYPE;
         solutionType = dataStructure::ARRAY;
     } else if (type == "tree") {
         solutionType = dataStructure::TREE;
     } else if (type == "combined") {
         if (treeDecomp.width < 30) {
-            solve_mode = solve_mode | SolveMode::ARRAY_TYPE;
             solutionType = dataStructure::ARRAY;
         } else {
             solutionType = dataStructure::TREE;
         }
     }
-
-    //std::cerr << "solve mode: " << solve_mode << std::endl;
 
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, 0);
@@ -220,7 +216,7 @@ int main(int argc, char *argv[]) {
 
     Solver *sol;
     auto next = BagType();
-    sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_mode);
+    sol = new Solver(memorySize, maxMemoryBuffer, solutionType, maxBag, solve_cfg);
 
     next.variables.assign(
             treeDecomp.bags[0].variables.begin(),

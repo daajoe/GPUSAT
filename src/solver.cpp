@@ -19,7 +19,7 @@
 
 namespace gpusat {
 
-    const bool do_trace = true;
+    const bool do_trace = false;
 
     template <typename T>
     class CudaBuffer {
@@ -210,13 +210,7 @@ namespace gpusat {
 
             assert(t1.dataStructureSize() >= t1.currentTreeSize() + t2.currentTreeSize() + 1);
 
-            RunMeta meta = {
-                .minId = t2.minId(),
-                .maxId = t2.maxId(),
-                .mode = solve_mode
-            };
-
-            auto result = combineTreeWrapper(t1, t2, meta);
+            auto result = combineTreeWrapper(t1, t2);
             t1.freeData();
             t2.freeData();
 
@@ -341,12 +335,6 @@ namespace gpusat {
                     }
                 }
 
-                RunMeta meta = {
-                    .minId = minId,
-                    .maxId = maxId,
-                    .mode = solve_mode
-                };
-
                 solveJoinWrapper(
                     solution_gpu,
                     edge1_solution,
@@ -366,7 +354,7 @@ namespace gpusat {
                     buf_weights.data(),
                     pow(2, edge1.exponent + edge2.exponent),
                     buf_exponent.data(),
-                    meta
+                    solve_cfg
                 );
             }
 
@@ -580,14 +568,6 @@ namespace gpusat {
                     edge_solution = gpuOwner(csol);
                 }
 
-                // Moved to kernel
-                //uint64_t combinations = (uint64_t) pow(2, iVars.size() - fVars.size());
-                RunMeta meta = {
-                    .minId = sol_minId,
-                    .maxId = sol_maxId,
-                    .mode = solve_mode
-                };
-
                 // FIXME: offset onto global id
                 introduceForgetWrapper(
                     solution_gpu,
@@ -610,7 +590,7 @@ namespace gpusat {
                     buf_weights.data(),
                     buf_exponent.data(),
                     pow(2, cnode.exponent),
-                    meta
+                    solve_cfg
                 );
             }
 

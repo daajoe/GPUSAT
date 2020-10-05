@@ -9,8 +9,7 @@
 namespace gpusat {
     TreeSolution<CudaMem> combineTreeWrapper(
         TreeSolution<CudaMem>& to_owner,
-        const TreeSolution<CudaMem>& from_owner,
-        RunMeta meta
+        const TreeSolution<CudaMem>& from_owner
     );
 
     void solveJoinWrapper(
@@ -23,7 +22,7 @@ namespace gpusat {
         double *weights,
         double value,
         int64_t *exponent,
-        RunMeta meta
+        const SolveConfig cfg
     );
 
     void introduceForgetWrapper(
@@ -39,7 +38,7 @@ namespace gpusat {
         double *weights,
         int64_t *exponent,
         double value,
-        RunMeta meta
+        const SolveConfig cfg
     );
 
     template <template<typename> typename T>
