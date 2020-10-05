@@ -11,6 +11,8 @@ CHECK_ARGS ?=
 space :=
 space +=
 
+all: build
+
 $(info args: $(CHECK_ARGS))
 .SECONDEXPANSION:
 run/orig/%: /$$(subst $$(space),/,$$(wordlist 2,1000,$$(subst /, ,$$*))) $(if $(CHECK_ARGS),,guard)
@@ -36,6 +38,11 @@ check_dirs:
 check: check_dirs $(foreach instance,$(INSTANCES),tree/$(instance) array/$(instance))
 	echo "all checked."
 
-build:
+build: configure
 	make -C build
-.PHONY: check_dirs check build
+
+configure:
+	mkdir -p build
+	(cd build && cmake -DDEBUG=false ..)
+
+.PHONY: check_dirs check build configure
