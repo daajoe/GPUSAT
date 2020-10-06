@@ -21,6 +21,8 @@ add_library(gpusat STATIC ${gpusat_SRC})
 target_compile_features(gpusat PUBLIC cxx_std_17)
 target_link_libraries(gpusat htd gpusat_kernel)
 
+file(GLOB_RECURSE gpusat_HEADERS "include/*.h")
+
 # TODO:  -Wconversion -Wsign-conversion -pedantic-errors
 set(COMMON_FLAGS -Wextra -Wall -Werror)
 
@@ -33,6 +35,17 @@ foreach (flag IN LISTS COMMON_FLAGS)
 endforeach()
 
 target_compile_options(gpusat PRIVATE $<$<CONFIG:Debug>:-fsanitize=leak>)
+target_include_directories(gpusat PUBLIC include/)
+
+set_target_properties(gpusat PROPERTIES PUBLIC_HEADER "${gpusat_HEADERS}")
+
+include(GNUInstallDirs)
+
+install(
+    TARGETS gpusat
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
 
 if (WITH_CLI)
     add_executable(gpusat_cli "src/cli/main.cpp")
