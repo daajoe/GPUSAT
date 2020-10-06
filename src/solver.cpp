@@ -11,7 +11,6 @@
 #include <optional>
 
 
-#include "types.h"
 #include "kernel.h"
 #include "solver.h"
 
@@ -104,7 +103,7 @@ namespace gpusat {
 
 
 
-    void Solver::solveProblem(satformulaType &formula, BagType& node, BagType& pnode, nodeType lastNode) {
+    void Solver::solveProblem(const satformulaType &formula, BagType& node, BagType& pnode, nodeType lastNode) {
 
         TRACE("\n\tis_sat: %d \n\tnode: %lu \n\tpnode: %lu", isSat, node.hash(), pnode.hash());
 
@@ -237,7 +236,7 @@ namespace gpusat {
         exit(1);
     }
 
-    void Solver::solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode) {
+    void Solver::solveJoin(BagType &node, BagType &edge1, BagType &edge2, const satformulaType &formula, nodeType nextNode) {
 
         isSat = 0;
         this->numJoin++;
@@ -452,7 +451,7 @@ namespace gpusat {
         return std::min(a, std::min(b, std::min(c, d)));
     }
 
-    void Solver::solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
+    void Solver::solveIntroduceForget(const satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
 
         TRACE("\n\tpnode: %lu \n\tnode: %lu \n\tcnode: %lu", pnode.hash(), node.hash(), cnode.hash());
 

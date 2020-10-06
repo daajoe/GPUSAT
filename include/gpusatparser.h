@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 
-#include "types.h"
+#include <gpusat_types.h>
 
 namespace gpusat {
     class CNFParser {
@@ -93,7 +93,6 @@ namespace gpusat {
         // then use htd_to_bags from decomposer.
         //treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
 
-        double defaultWeight = 1.0;
     };
 }
 #endif //GPUSAT_PARSER_H

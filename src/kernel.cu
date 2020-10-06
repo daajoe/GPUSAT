@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#include "types.h"
+#include <gpusat_types.h>
 #include "kernel.h"
 
 
@@ -695,43 +695,48 @@ void meminit(TreeSolution<CudaMem>& sol, size_t from, size_t to) {
     gpuErrchk(cudaMemset(sol.data() + from, 0, (to - from) * sol.elementSize()));
 }
 
-/**
- * Returns a solution bag that lives on the CPU
- * but owns GPU data copied from the input bag.
- */
-template <template<typename> typename T>
-T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
-    // copy parameters
-    T<CudaMem> gpu(orig, nullptr, 0);
+    /**
+     * Returns a solution bag that lives on the CPU
+     * but owns GPU data copied from the input bag.
+     */
+    template <template<typename> typename T>
+    T<CudaMem> gpuOwner(const T<CpuMem>& orig, size_t reserve) {
+        // copy parameters
+        T<CudaMem> gpu(orig, nullptr, 0);
 
-    gpu.setDataStructureSize(gpu.dataStructureSize() + reserve);
+        gpu.setDataStructureSize(gpu.dataStructureSize() + reserve);
 
-    // allocate GPU memory
-    gpu.allocate();
+        // allocate GPU memory
+        gpu.allocate();
 
-    if (orig.hasData()) {
-        // copy data structure
-        gpuErrchk(cudaMemcpy(
-            gpu.data(),
-            orig.data(),
-            orig.dataStructureSize() * orig.elementSize(),
-            cudaMemcpyHostToDevice
-        ));
-        // reserve additional elements if desired
-        if (reserve) {
-            meminit(gpu, orig.dataStructureSize(), gpu.dataStructureSize());
+        if (orig.hasData()) {
+            // copy data structure
+            gpuErrchk(cudaMemcpy(
+                gpu.data(),
+                orig.data(),
+                orig.dataStructureSize() * orig.elementSize(),
+                cudaMemcpyHostToDevice
+            ));
+            // reserve additional elements if desired
+            if (reserve) {
+                meminit(gpu, orig.dataStructureSize(), gpu.dataStructureSize());
+            }
+        } else {
+            meminit(gpu, 0, gpu.dataStructureSize());
         }
-    } else {
-        meminit(gpu, 0, gpu.dataStructureSize());
+        return std::move(gpu);
     }
-    return std::move(gpu);
-}
 
-CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve) {
-    return std::visit([](auto& sol) -> CudaSolutionVariant {
-        return std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>(std::move(gpuOwner(sol)));
-    }, orig);
-}
+    // Explicitly instantiate for all datastructures
+    // To ensure the compiler does not optimize them out.
+    template ArraySolution<CudaMem> gpuOwner(const ArraySolution<CpuMem>&, size_t);
+    template TreeSolution<CudaMem> gpuOwner(const TreeSolution<CpuMem>&, size_t);
+
+    CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve) {
+        return std::visit([&](auto& sol) -> CudaSolutionVariant {
+            return std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>>(std::move(gpuOwner(sol, reserve)));
+        }, orig);
+    }
 
 
     /**
@@ -767,6 +772,11 @@ CudaSolutionVariant gpuOwner(const SolutionVariant& orig, size_t reserve) {
         }
         return std::move(cpu);
     }
+
+    // Explicitly instantiate for all datastructures
+    // To ensure the compiler does not optimize them out.
+    template ArraySolution<CpuMem> cpuCopy(const ArraySolution<CudaMem>&, size_t);
+    template TreeSolution<CpuMem> cpuCopy(const TreeSolution<CudaMem>&, size_t);
 
     SolutionVariant cpuCopy(const CudaSolutionVariant& gpu, size_t reserve) {
         return std::visit([&](const auto& gpu_sol) -> SolutionVariant {

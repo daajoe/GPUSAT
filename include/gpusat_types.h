@@ -18,7 +18,9 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <atomic>
-#include "alloc.h"
+#include <thrust/mr/new.h>
+#include <thrust/mr/disjoint_pool.h>
+#include <thrust/system/cuda/memory_resource.h>
 
 namespace gpusat {
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -38,9 +40,9 @@ namespace gpusat {
        }
     }
 
-    ///
     enum dataStructure {
-        ARRAY, TREE
+        ARRAY,
+        TREE
     };
 
     // taken from boost
@@ -215,11 +217,12 @@ namespace gpusat {
                 if (!hasData()) {
                     return h;
                 }
+                TreeNode reinterpreter;
                 for (size_t i=0; i < dataStructureSize(); i++) {
                     // regard empty entries as 0.0, for compatibility
                     // with original implementation
-                    auto value = std::max(0.0, data()[i]);
-                    hash_combine(h, *reinterpret_cast<uint64_t*>(&value));
+                    reinterpreter.content = std::max(0.0, data()[i]);
+                    hash_combine(h, reinterpreter.empty);
                 }
                 return h;
             }
@@ -465,26 +468,50 @@ namespace gpusat {
             return mem;
         }
         void operator()(double* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
         void operator()(uint64_t* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
         void operator()(int64_t* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
 
         void operator()(TreeNode* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
         void operator()(ArraySolution<GpuOnly>* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
         void operator()(TreeSolution<GpuOnly>* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
             gpuErrchk(cudaFree(ptr));
         }
     };
 
+    /**
+     * Sub-allocator managing pinned memory to give to solution containers.
+     */
+    class PinnedSuballocator {
+        public:
+            PinnedSuballocator();
+            void* allocate(size_t bytes);
+            void deallocate(void* p, size_t bytes);
+            void deinit();
+        protected:
+            thrust::mr::disjoint_unsynchronized_pool_resource<thrust::system::cuda::universal_host_pinned_memory_resource, thrust::mr::new_delete_resource> allocator;
+    };
 
     extern PinnedSuballocator cuda_pinned_alloc_pool;
 
@@ -626,7 +653,6 @@ namespace gpusat {
         return a.id < b.id;
     }
 
-
     /// type for saving the sat formula
     struct satformulaType {
         size_t numVars = 0;
@@ -644,6 +670,7 @@ namespace gpusat {
 
     typedef struct {
         bool no_exponent = false;
+        bool weighted = false;
     } SolveConfig;
 
     /**

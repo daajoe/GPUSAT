@@ -6,7 +6,7 @@
 #include <htd/Helpers.hpp>
 #include <htd/ITreeDecompositionFitnessFunction.hpp>
 
-#include "types.h"
+#include <gpusat_types.h>
 
 namespace gpusat {
     class Decomposer {

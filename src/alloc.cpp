@@ -4,7 +4,7 @@
 // do not extend function signatures for CUDA.
 #define GPU_HOST_ATTR
 
-#include "types.h"
+#include <gpusat_types.h>
 
 namespace gpusat {
     PinnedSuballocator::PinnedSuballocator() {

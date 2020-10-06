@@ -1,10 +1,9 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include "types.h"
+#include <gpusat_types.h>
 #include <thrust/fill.h>
 #include <thrust/device_ptr.h>
-
 
 namespace gpusat {
     TreeSolution<CudaMem> combineTreeWrapper(
@@ -41,6 +40,7 @@ namespace gpusat {
         const SolveConfig cfg
     );
 
+    // Ensure to instantiate explicitly in kernel.cu for needed types.
     template <template<typename> typename T>
     T<CpuMem> cpuCopy(const T<CudaMem>& gpu, size_t reserve = 0);
 

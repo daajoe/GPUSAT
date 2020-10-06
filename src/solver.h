@@ -4,7 +4,7 @@
 #define alloca __builtin_alloca
 #endif
 
-#include "types.h"
+#include <gpusat_types.h>
 
 namespace gpusat {
 
@@ -44,7 +44,7 @@ namespace gpusat {
          * @param formula   the sat formula
          * @param node      the node to start from in the tree decompostion
          */
-        void solveProblem(satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
+        void solveProblem(const satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
 
     protected:
 
@@ -57,7 +57,7 @@ namespace gpusat {
          * @param cnode     the child of the current node
          * @param leaf      indicates that the current node is a leaf node
          */
-        void solveIntroduceForget(satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode);
+        void solveIntroduceForget(const satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode);
 
         /**
          * function to solve a join node
@@ -67,7 +67,7 @@ namespace gpusat {
          * @param edge2     the second child node
          * @param formula   the sat formula
          */
-        void solveJoin(BagType &node, BagType &edge1, BagType &edge2, satformulaType &formula, nodeType nextNode);
+        void solveJoin(BagType &node, BagType &edge1, BagType &edge2, const satformulaType &formula, nodeType nextNode);
 
         /**
          *

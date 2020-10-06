@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 
-#include "types.h"
+#include <gpusat_types.h>
 
 namespace gpusat {
     class Preprocessor {

@@ -11,7 +11,7 @@ CHECK_ARGS ?=
 space :=
 space +=
 
-all: build
+all: build_Release
 
 $(info args: $(CHECK_ARGS))
 .SECONDEXPANSION:
@@ -38,11 +38,11 @@ check_dirs:
 check: check_dirs $(foreach instance,$(INSTANCES),tree/$(instance) array/$(instance))
 	echo "all checked."
 
-build: configure
-	make -C build
+build_%: configure_%
+	cmake --build build
 
-configure:
+configure_%:
 	mkdir -p build
-	(cd build && cmake -DDEBUG=false ..)
+	(cd build && cmake -DWITH_CLI=On -DCMAKE_BUILD_TYPE=$* -G Ninja ..)
 
 .PHONY: check_dirs check build configure
