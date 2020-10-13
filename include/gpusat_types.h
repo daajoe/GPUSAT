@@ -659,6 +659,8 @@ namespace gpusat {
         size_t numWeights = 0;
         bool unsat = false;
         double *variableWeights = nullptr;
+        // Clauses are vectors of *signed* variable ids,
+        // which are *sorted* by acending absolute variable id!
         std::vector<std::vector<int64_t>> clauses;
         std::vector<int64_t> facts;
     };
