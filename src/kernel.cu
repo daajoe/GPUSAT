@@ -288,9 +288,8 @@ __global__ void solveJoin(
         }
     // we need to consider individual edges and maybe look
     // at we have already stored for the current id.
-    } else if (edge1_solutions > 0.0 || edge2_solutions > 0.0) {
+    } else if (edge1_solutions >= 0.0 || edge2_solutions >= 0.0) {
         double oldVal = solution->solutionCountFor(id); 
-        solution->setSatisfiability(true);
 
         // if the solution was not present before, multiply with one.
         if (oldVal < 0.0) {
@@ -312,14 +311,19 @@ __global__ void solveJoin(
             if (!cfg.no_exponent) {
                 solution_value /= value;
             }
+        } else {
+            solution_value = 0.0;
         }
     }
 
     // if we found solutions, store them
-    if (solution_value > 0.0) {
+    if (solution_value >= 0.0) {
         solution->setCount(id, solution_value);
-        if (!cfg.no_exponent && !value_incomplete) {
-            atomicMax(exponent, ilogb(solution_value));
+        if (!value_incomplete) {
+            solution->setSatisfiability(true);
+            if (!cfg.no_exponent) {
+                atomicMax(exponent, ilogb(solution_value));
+            }
         }
     }
 }
