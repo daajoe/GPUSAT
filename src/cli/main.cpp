@@ -12,7 +12,6 @@
 #include <sys/stat.h>
 #include <numeric>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include <cuda_runtime.h>
 #include "CLI11.hpp"
 
 
@@ -164,8 +163,8 @@ int main(int argc, char *argv[]) {
     std::cout << "    \"Num Join\": " << sol->numJoin;
     std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
     std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
-    std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << model_count;
     */
+    std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << model_count;
 
     std::cout.precision(6);
     std::cout << "\n    ,\"Time\":{";
