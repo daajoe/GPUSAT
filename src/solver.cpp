@@ -251,8 +251,8 @@ namespace gpusat {
             buf_weights = CudaBuffer<double>(formula.variableWeights, formula.numWeights);
         }
 
-        node.exponent = INT64_MIN;
-        CudaBuffer<int64_t> buf_exponent(&(node.exponent), 1);
+        node.exponent = INT32_MIN;
+        CudaBuffer<int32_t> buf_exponent(&(node.exponent), 1);
 
         uint64_t usedMemory = sizeof(int64_t) * node.variables.size() * 3 + sizeof(int64_t) * edge1.variables.size() + sizeof(int64_t) * edge2.variables.size() + sizeof(double) * formula.numWeights + sizeof(double) * formula.numWeights;
 
@@ -420,7 +420,7 @@ namespace gpusat {
         }
         buf_exponent.read(&(node.exponent));
 
-        TRACE("join exponent: %ld", node.exponent);
+        TRACE("join exponent: %d", node.exponent);
 
         node.correction = edge1.correction + edge2.correction + edge1.exponent + edge2.exponent;
         size_t tableSize = 0;
@@ -484,14 +484,14 @@ namespace gpusat {
             }
         }
 
-        node.exponent = INT64_MIN;
+        node.exponent = INT32_MIN;
 
         CudaBuffer<int64_t> buf_varsE(eVars);
         CudaBuffer<int64_t> buf_varsI(iVars);
         CudaBuffer<int64_t> buf_clauses(clauses);
         CudaBuffer<int64_t> buf_numVarsC(&numVarsClause[0], numClauses);
         CudaBuffer<double> buf_weights(formula.variableWeights, formula.numWeights);
-        CudaBuffer<int64_t> buf_exponent(&(node.exponent), 1);
+        CudaBuffer<int32_t> buf_exponent(&(node.exponent), 1);
 
         size_t usedMemory = sizeof(int64_t) * eVars.size() + sizeof(int64_t) * iVars.size() * 3 + sizeof(int64_t) * (clauses.size()) + sizeof(int64_t) * (numClauses) + sizeof(double) * formula.numWeights + sizeof(int64_t) * fVars.size() + sizeof(double) * formula.numWeights;
         uint64_t bagSizeForget = 1;
@@ -658,7 +658,7 @@ namespace gpusat {
 
         buf_exponent.read(&(node.exponent));
 
-        TRACE("node exponent: %ld", node.exponent);
+        TRACE("node exponent: %d", node.exponent);
 
         node.correction = cnode.correction + cnode.exponent;
         size_t tableSize = 0;

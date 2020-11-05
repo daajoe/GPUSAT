@@ -54,8 +54,8 @@ namespace gpusat {
     }
 
 #if defined(__CUDACC__)
-    extern __device__ uint64_t atomicAdd(uint64_t* address, uint64_t val);
-    extern __device__ uint64_t atomicSub(uint64_t* address, uint64_t val);
+    //extern __device__ unsigned long long atomicAdd(unsigned long long* address, unsigned long long val);
+    //extern __device__ uint64_t atomicSub(uint64_t* address, uint64_t val);
 #endif
 
     struct TreeNode {
@@ -365,7 +365,7 @@ namespace gpusat {
              */
             __device__ void setCount(int64_t id, double value) {
 #ifndef __CUDACC__
-                auto atomicAdd = [](uint64_t* address, uint64_t val) -> uint64_t {
+                auto atomicAdd = [](unsigned long long* address, unsigned long long val) -> unsigned long long {
                     auto old = *address;
                     *address += val;
                     return old;
@@ -382,17 +382,19 @@ namespace gpusat {
                 if (variables() == 0) {
                     setSatisfiability(true);
                 }
+
+                static_assert(sizeof(size_t) == sizeof(unsigned long long));
                 for (ulong i = 0; i < variables(); i++) {
                     // lower or upper 32bit, depending on if bit of variable i is set in id
                     uint * lowVal = &((uint *) &(data()[nextId]))[(id >> (variables() - i - 1)) & 1];
                     // secure our slot by incrementing lastNodeIndex
                     if (val == 0 && *lowVal == 0) {
-                        val = atomicAdd(&lastNodeIndex, 1) + 1;
+                        val = atomicAdd((unsigned long long*)&lastNodeIndex, 1ul) + 1;
                     }
                     atomicCAS(lowVal, 0, val);
                     if (*lowVal == val) {
                         if (i < (variables() - 1)) {
-                            val = atomicAdd(&lastNodeIndex, 1) + 1;
+                            val = atomicAdd((unsigned long long*)&lastNodeIndex, 1ul) + 1;
                         }
                     }
                     nextId = *lowVal;
@@ -478,6 +480,11 @@ namespace gpusat {
             gpuErrchk(cudaFree(ptr));
         }
         void operator()(int64_t* ptr, size_t size = 0) const {
+            // silence unused parameter warning
+            (void)(size);
+            gpuErrchk(cudaFree(ptr));
+        }
+        void operator()(int32_t* ptr, size_t size = 0) const {
             // silence unused parameter warning
             (void)(size);
             gpuErrchk(cudaFree(ptr));
@@ -588,7 +595,7 @@ namespace gpusat {
     /// type for a bag in the tree decomposition
     struct BagType {
         int64_t correction = 0;
-        int64_t exponent = 0;
+        int32_t exponent = 0;
         int64_t id = 0;
         std::vector<int64_t> variables;
         std::vector<BagType> edges;

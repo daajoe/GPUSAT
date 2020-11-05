@@ -20,7 +20,7 @@ namespace gpusat {
         GPUVars edgeVariables2,
         double *weights,
         double value,
-        int64_t *exponent,
+        int32_t *exponent,
         const SolveConfig cfg
     );
 
@@ -35,7 +35,7 @@ namespace gpusat {
         long *numVarsC,
         long numclauses,
         double *weights,
-        int64_t *exponent,
+        int32_t *exponent,
         double value,
         const SolveConfig cfg
     );

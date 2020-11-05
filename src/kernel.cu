@@ -14,23 +14,6 @@
 namespace gpusat {
 
 
-__device__ uint64_t atomicAdd(uint64_t* address, uint64_t val)
-{
-    static_assert(sizeof(uint64_t) == sizeof(unsigned long long));
-    auto addr = (unsigned long long*)address;
-    return (uint64_t)atomicAdd_system(addr, (unsigned long long)val);
-}
-
-__device__ int64_t atomicMax(int64_t* address, int64_t val)
-{
-    static_assert(sizeof(int64_t) == sizeof(long long));
-    auto addr = (long long*)address;
-    return (int64_t)atomicMax_system(addr, (long long)val);
-}
-
-// FIXME: normal atomicAdd might not be atomic across devices
-
-
 __device__ int64_t get_global_id(uint64_t minId, uint64_t maxId) {
     // TODO: y and z
     int64_t id = blockDim.x * blockIdx.x + threadIdx.x + minId;
@@ -239,7 +222,7 @@ __global__ void solveJoin(
         double *weights,
         //uint64_t *sols,
         double value,
-        int64_t *exponent,
+        int32_t *exponent,
         const SolveConfig cfg
 ) {
     int64_t id = get_global_id(solution->minId(), solution->maxId());
@@ -442,7 +425,7 @@ __global__ void solveIntroduceForget(
         long *numVarsC,
         long numclauses,
         double *weights,
-        long *exponent,
+        int32_t *exponent,
         double value,
         const SolveConfig cfg
 ) {
@@ -549,7 +532,7 @@ void solveJoinWrapper(
     GPUVars edgeVariables2,
     double *weights,
     double value,
-    int64_t *exponent,
+    int32_t *exponent,
     const SolveConfig cfg
 ) {
     int64_t threadsPerBlock = 512;
@@ -628,7 +611,7 @@ void introduceForgetWrapper(
     long *numVarsC,
     long numclauses,
     double *weights,
-    int64_t *exponent,
+    int32_t *exponent,
     double previous_value,
     const SolveConfig cfg
 ) {
