@@ -469,18 +469,35 @@ namespace gpusat {
         this->numIntroduceForget++;
 
         // get clauses which only contain iVars
-        std::vector<int64_t> numVarsClause;
-        std::vector<int64_t> clauses;
+        std::vector<uint64_t> clauses;
         int64_t numClauses = 0;
         for (size_t i = 0; i < formula.clauses.size(); i++) {
             std::vector<int64_t> v;
             std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), back_inserter(v), compVars);
             if (v.size() == formula.clauses[i].size()) {
                 numClauses++;
-                numVarsClause.push_back(formula.clauses[i].size());
-                for (size_t a = 0; a < formula.clauses[i].size(); a++) {
-                    clauses.push_back(formula.clauses[i][a]);
+                uint64_t c_vars = 0;
+                uint64_t c_signs = 0;
+                // assumption: variables in a clause are sorted
+                uint64_t variable_index = 0;
+                auto lit_iter = formula.clauses[i].begin();
+                for (auto var : iVars) {
+                    if (abs(*lit_iter) > var) {
+                        variable_index++;
+                        continue;
+                    }
+                    assert(abs(*lit_iter) == var);
+                    c_vars |= (1 << variable_index);
+                    c_signs |= ((*lit_iter < 0) << variable_index);
+                    lit_iter++;
+                    if (lit_iter == formula.clauses[i].end()) {
+                        break;
+                    }
+                    variable_index++;
                 }
+                assert(lit_iter == formula.clauses[i].end());
+                clauses.push_back(c_vars);
+                clauses.push_back(c_signs);
             }
         }
 
@@ -488,8 +505,7 @@ namespace gpusat {
 
         CudaBuffer<int64_t> buf_varsE(eVars);
         CudaBuffer<int64_t> buf_varsI(iVars);
-        CudaBuffer<int64_t> buf_clauses(clauses);
-        CudaBuffer<int64_t> buf_numVarsC(&numVarsClause[0], numClauses);
+        CudaBuffer<uint64_t> buf_clauses(clauses);
         CudaBuffer<double> buf_weights(formula.variableWeights, formula.numWeights);
         CudaBuffer<int32_t> buf_exponent(&(node.exponent), 1);
 
@@ -582,7 +598,6 @@ namespace gpusat {
                         .vars = buf_varsI.data()
                     },
                     buf_clauses.data(),
-                    buf_numVarsC.data(),
                     numClauses,
                     buf_weights.data(),
                     buf_exponent.data(),

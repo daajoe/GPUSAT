@@ -131,40 +131,12 @@ __device__ double solveIntroduce_(
  *      1 - if the assignment satisfies the formula
  *      0 - if the assignment doesn't satisfy the formula
  */
-__device__ int checkBag(long *clauses, long *numVarsC, long numclauses, int64_t id, GPUVars variables) {
-    long i, varNum = 0;
-    long satC = 0, a, b;
-    // iterate through all clauses
-    for (i = 0; i < numclauses; i++) {
-        satC = 0;
-        // iterate through clause variables
-        for (a = 0; a < numVarsC[i] && !satC; a++) {
-            satC = 1;
-            //check current variables
-            for (b = 0; b < variables.count; b++) {
-                // check if clause is satisfied
-                if ((clauses[varNum + a] == variables.vars[b]) ||
-                    (clauses[varNum + a] == -variables.vars[b])) {
-                    satC = 0;
-                    if (clauses[varNum + a] < 0) {
-                        //clause contains negative var and var is assigned negative
-                        if ((id & (1 << (b))) == 0) {
-                            satC = 1;
-                            break;
-                        }
-                    } else {
-                        //clause contains positive var and var is assigned positive
-                        if ((id & (1 << (b))) > 0) {
-                            satC = 1;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-        varNum += numVarsC[i];
-        // we have an unsattisifed clause
-        if (!satC) {
+__device__ int checkBag(uint64_t *clauses, long numClauses, int64_t id, GPUVars variables) {
+    uint64_t unsigned_id = abs(id);
+    for (long i = 0; i < numClauses; i++) {
+        uint64_t c_vars = clauses[2*i];
+        uint64_t c_neg = clauses[2*i+1];
+        if (((unsigned_id^c_neg) & c_vars) == 0) {
             return 0;
         }
     }
@@ -340,8 +312,7 @@ __global__ void solveJoin(
 
 template <class T>
 __device__ double solveIntroduceF(
-        long *clauses,
-        long *numVarsC,
+        uint64_t *clauses,
         long numclauses,
         GPUVars variables,
         const T* edge,
@@ -366,7 +337,7 @@ __device__ double solveIntroduceF(
     }
     if (tmp > 0.0) {
         // check if assignment satisfies the given clauses
-        int sat = checkBag(clauses, numVarsC, numclauses, id, variables);
+        int sat = checkBag(clauses, numclauses, id, variables);
         if (sat != 1) {
             return 0.0;
         } else {
@@ -402,8 +373,6 @@ __device__ double solveIntroduceF(
  *      the variables after the introduce
  * @param clauses
  *      the clauses which only contain variables from the introduce operation
- * @param numVarsC
- *      the number of variables per clause
  * @param numclauses
  *      the number of clauses
  * @param weights
@@ -421,8 +390,7 @@ __global__ void solveIntroduceForget(
         GPUVars lastVars,
         uint64_t combinations,
         GPUVars varsIntroduce,
-        long *clauses,
-        long *numVarsC,
+        uint64_t *clauses,
         long numclauses,
         double *weights,
         int32_t *exponent,
@@ -455,7 +423,7 @@ __global__ void solveIntroduceForget(
                     b++;
                 }
             }
-            tmp += solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, otherId);
+            tmp += solveIntroduceF(clauses, numclauses, varsIntroduce, solsE, lastVars, weights, otherId);
         }
         
         if (tmp > 0) {
@@ -472,7 +440,7 @@ __global__ void solveIntroduceForget(
         }
     } else {
         // no forget variables, only introduce
-        double tmp = solveIntroduceF(clauses, numVarsC, numclauses, varsIntroduce, solsE, lastVars, weights, id);
+        double tmp = solveIntroduceF(clauses, numclauses, varsIntroduce, solsE, lastVars, weights, id);
         if (tmp > 0) {
             double last = solsF->solutionCountFor(id);
             last = max(last, 0.0);
@@ -607,8 +575,7 @@ void introduceForgetWrapper(
     GPUVars lastVars,
     GPUVars varsIntroduce,
     // FIXME: Move this static information to GPU once.
-    long *clauses,
-    long *numVarsC,
+    uint64_t *clauses,
     long numclauses,
     double *weights,
     int32_t *exponent,
@@ -633,7 +600,6 @@ void introduceForgetWrapper(
                 combinations,
                 varsIntroduce,
                 clauses,
-                numVarsC,
                 numclauses,
                 weights,
                 exponent, 
@@ -652,7 +618,6 @@ void introduceForgetWrapper(
                     combinations,
                     varsIntroduce,
                     clauses,
-                    numVarsC,
                     numclauses,
                     weights,
                     exponent, 

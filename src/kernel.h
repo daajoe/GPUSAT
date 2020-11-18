@@ -31,8 +31,7 @@ namespace gpusat {
         GPUVars lastVars,
         GPUVars varsIntroduce,
         // FIXME: Move this static information to GPU once.
-        long *clauses,
-        long *numVarsC,
+        uint64_t *clauses,
         long numclauses,
         double *weights,
         int32_t *exponent,
