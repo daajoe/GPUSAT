@@ -15,76 +15,55 @@ namespace gpusat {
     // Inspired from htd::TdFormatExporter
     treedecType Decomposer::htd_to_bags(const htd::ITreeDecomposition& decomposition) {
         // pairs of (bag, child indices)
-        std::vector<std::pair<BagType, std::vector<size_t>>> bags;
-        bags.reserve(decomposition.vertexCount());
+
+        auto decomp = treedecType();
+        decomp.numb = decomposition.vertexCount();
+        decomp.width = decomposition.maximumBagSize();
 
         if (decomposition.vertexCount() > 0) {
+            std::vector<htd::vertex_t> vertex_stack;
+            std::vector<BagType*> parent_stack;
 
-            for (htd::vertex_t node : decomposition.vertices()) {
+            {
                 auto bag = BagType();
-
-                bag.id = bags.size();
-                for (htd::vertex_t vertex : decomposition.bagContent(node)) {
-                    bag.variables.push_back(vertex);
-                }
-
+                bag.id = decomposition.root() - 1;
+                auto bag_content = decomposition.bagContent(decomposition.root());
+                std::copy(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables));
                 std::sort(bag.variables.begin(), bag.variables.end());
-
-                bags.push_back(std::pair(std::move(bag), std::vector<size_t>()));
+                auto children = decomposition.children(decomposition.root());
+                vertex_stack.push_back(0ul);
+                vertex_stack.resize(vertex_stack.size() + children.size());
+                for (int i=0; i < children.size(); i++) {
+                    vertex_stack[vertex_stack.size() - 1 - i] = children[i];
+                }
+                decomp.root = std::move(bag);
+                parent_stack.push_back(&decomp.root);
             }
 
-            const auto& hyperedgeCollection = decomposition.hyperedges();
-
-            size_t edge_count = decomposition.edgeCount();
-
-            auto it = hyperedgeCollection.begin();
-
-            for (htd::index_t edge_index = 0; edge_index < edge_count; edge_index++) {
-                auto& hyperedge = *it;
-                assert(hyperedge.size() == 2);
-                bags[hyperedge.at(0) - 1].second.push_back(hyperedge.at(1) - 1);
-                it++;
-            }
-
-
-            // indices of the bags which still do not have all children
-            std::vector<size_t> incomplete_bag_indices;
-            incomplete_bag_indices.reserve(bags.size());
-            for (size_t i=0; i < bags.size(); i++) {
-                incomplete_bag_indices.push_back(i);
-            }
-
-            // FIXME: This could be done more efficiently
-            while (!incomplete_bag_indices.empty()) {
-                for (auto it = incomplete_bag_indices.cbegin(); it != incomplete_bag_indices.cend(); it++) {
-                    auto& bag = bags[*it];
-                    for (auto e_it = bag.second.cbegin(); e_it != bag.second.cend();) {
-                        bool incomplete = std::binary_search(
-                            incomplete_bag_indices.begin(),
-                            incomplete_bag_indices.end(),
-                            *e_it
-                        );
-                        // child is done
-                        if (!incomplete) {
-                            bag.first.edges.push_back(std::move(bags[*e_it].first));
-                            e_it = bag.second.erase(e_it);
-                        } else {
-                            e_it++;
-                        }
+            while (!vertex_stack.empty()) {
+                auto root = vertex_stack.back();
+                vertex_stack.pop_back();
+                // one child layer finished
+                if (root == 0ul) {
+                    parent_stack.pop_back();
+                    continue;
+                }
+                auto bag = BagType();
+                bag.id = root - 1;
+                auto bag_content = decomposition.bagContent(root);
+                std::copy(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables));
+                std::sort(bag.variables.begin(), bag.variables.end());
+                parent_stack.back()->edges.push_back(std::move(bag));
+                auto children = decomposition.children(root);
+                if (!children.empty()) {
+                    vertex_stack.push_back(0ul);
+                    vertex_stack.resize(vertex_stack.size() + children.size());
+                    for (int i=0; i < children.size(); i++) {
+                        vertex_stack[vertex_stack.size() - 1 - i] = children[i];
                     }
-
-                    // no child edges remaining
-                    if (bag.second.empty()) {
-                        std::sort(bag.first.edges.begin(), bag.first.edges.end(), compTreedType);
-                        incomplete_bag_indices.erase(it);
-                        break;
-                    }
+                    parent_stack.push_back(&parent_stack.back()->edges.back());
                 }
             }
-            auto decomp = treedecType();
-            decomp.numb = decomposition.vertexCount();
-            decomp.width = decomposition.maximumBagSize();
-            decomp.root = std::move(bags[0].first);
             return std::move(decomp);
         }
         return treedecType();
