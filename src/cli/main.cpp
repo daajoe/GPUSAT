@@ -119,12 +119,15 @@ int main(int argc, char *argv[]) {
         cfg.solution_type = dataStructure::ARRAY;
     } else if (type == "tree") {
         cfg.solution_type = dataStructure::TREE;
-    } else if (type == "combined") {
-        if (decomposition.width < 30) {
+    } else if (type == "combined" || type == "") {
+        if (decomposition.width < 25) {
             cfg.solution_type = dataStructure::ARRAY;
         } else {
             cfg.solution_type = dataStructure::TREE;
         }
+    } else {
+        std::cerr << "unknown data structure: " << type << std::endl;
+        return 1;
     }
 
     if (trace) std::cerr << "before pp: " << decomposition.root.hash() << std::endl;
