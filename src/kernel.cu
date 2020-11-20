@@ -676,7 +676,7 @@ void meminit(TreeSolution<CudaMem>& sol, size_t from, size_t to) {
         } else {
             meminit(gpu, 0, gpu.dataStructureSize());
         }
-        return std::move(gpu);
+        return gpu;
     }
 
     // Explicitly instantiate for all datastructures
@@ -722,7 +722,7 @@ void meminit(TreeSolution<CudaMem>& sol, size_t from, size_t to) {
                 cpu.initializer()
             );
         }
-        return std::move(cpu);
+        return cpu;
     }
 
     // Explicitly instantiate for all datastructures
