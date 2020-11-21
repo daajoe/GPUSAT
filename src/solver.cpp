@@ -412,9 +412,11 @@ namespace gpusat {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize((size_t)bagSizeNode);
-                    TRACE("array output hash: %lu", cpuCopy(sol).hash());
+                    auto cpu_sol = cpuCopy(sol);
+                    size_t hash = cpu_sol.hash();
+                    TRACE("array output hash: %lu", hash);
                     node.maxSize = std::max(node.maxSize, sol.dataStructureSize());
-                    node.solution.push_back(cpuCopy(sol));
+                    node.solution.push_back(std::move(cpu_sol));
                 }
             }
         }
@@ -487,8 +489,8 @@ namespace gpusat {
                         continue;
                     }
                     assert(abs(*lit_iter) == var);
-                    c_vars |= (1 << variable_index);
-                    c_signs |= ((*lit_iter < 0) << variable_index);
+                    c_vars |= (1ul << variable_index);
+                    c_signs |= ((uint64_t)(*lit_iter < 0) << variable_index);
                     lit_iter++;
                     if (lit_iter == formula.clauses[i].end()) {
                         break;
@@ -539,7 +541,7 @@ namespace gpusat {
 
         uint64_t maxSize = std::ceil((1ul << (node.variables.size())) * 1.0 / bagSizeForget);
 
-        TRACE("used memory: %lu", usedMemory);
+        //TRACE("used memory: %lu", usedMemory);
 
         node.solution.clear();
 
@@ -665,7 +667,6 @@ namespace gpusat {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize(bagSizeForget);
-
                     node.solution.push_back(cpuCopy(sol));
                 }
             }
