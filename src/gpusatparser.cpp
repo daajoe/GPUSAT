@@ -13,11 +13,6 @@ namespace gpusat {
         satformulaType ret = satformulaType();
         std::string item;
         std::unordered_map<int64_t, double> weights;
-        std::vector<int64_t> *clause = new std::vector<int64_t>();
-        if (clause == NULL || errno == ENOMEM) {
-            std::cerr << "\nOut of Memory\n";
-            exit(0);
-        }
         while (getline(ss, item)) {
             //ignore empty line
             if (item.length() > 0) {
@@ -35,7 +30,7 @@ namespace gpusat {
                     this->parseSolutionLine(item);
                 } else {
                     //clause line
-                    parseClauseLine(ret, item, clause);
+                    parseClauseLine(ret, item);
                 }
             }
             if (item.find("c UNSATISFIABLE") != std::string::npos) {
@@ -58,6 +53,7 @@ namespace gpusat {
                 exit(20);
             }
         }
+        std::sort(ret.facts.begin(), ret.facts.end(), compVars);
 
         if (wmc) {
             ret.variableWeights = new double[(ret.numVars + 1) * 2]();
@@ -84,33 +80,47 @@ namespace gpusat {
                 }
             }
         }
-        delete clause;
         return ret;
     }
 
-    void CNFParser::parseClauseLine(satformulaType &ret, std::string &item, std::vector<int64_t> *clause) {
+    void CNFParser::parseClauseLine(satformulaType &ret, std::string &item) {
         std::stringstream sline(item);
         std::string i;
 
         int64_t num = 0;
+        int count = 0;
+        int64_t first = 0;
+        size_t clause_start = ret.clause_bag.size();
+
         while (!sline.eof()) {
             getline(sline, i, ' ');
             if (i.size() > 0) {
                 num = stol(i);
                 if (num != 0) {
-                    clause->push_back(num);
+                    // hold in case this is a fact.
+                    if (count == 0) {
+                        first = num;
+                    // this is at least a binary clause.
+                    } else {
+                        if (first) {
+                            ret.clause_bag.push_back(first);
+                            first = 0;
+                        }
+                        ret.clause_bag.push_back(num);
+                    }
                 }
+                count++;
             }
         }
-        if (clause->size() > 1 && num == 0) {
-            sort(clause->begin(), clause->end(), compVars);
-            ret.clauses.push_back(*clause);
-            clause->resize(0);
-        } else if (clause->size() == 1 && num == 0) {
-            if (find(ret.facts.begin(), ret.facts.end(), (*clause)[0]) == ret.facts.end())
-                ret.facts.push_back((*clause)[0]);
-            ret.clauses.push_back(*clause);
-            clause->resize(0);
+        // store a fact
+        if (first) {
+            // we sort this later
+            ret.facts.push_back(first);
+        // or finish the clause
+        } else {
+            std::sort(ret.clause_bag.begin() + clause_start, ret.clause_bag.end(), compVars);
+            ret.clause_bag.push_back(0);
+            ret.clause_offsets.push_back(clause_start);
         }
     }
 

@@ -96,6 +96,8 @@ int main(int argc, char *argv[]) {
             formula = cnf_parser.parseSatFormula(std::cin);
         }
 
+        std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
+
         time_decomposing = getTime();
         if (decompDir != "") {
             // FIXME: implement through htd_io
@@ -110,9 +112,11 @@ int main(int argc, char *argv[]) {
             } else {
                 fit = new WidthCutSetFitnessFunction();
             }
+            std::cout << "num decomps: " << numDecomps << std::endl;
             decomposition = GPUSAT::decompose(formula, *fit, numDecomps);
         }
         time_decomposing = getTime() - time_decomposing;
+        std::cout << "decomp time: " << time_decomposing / 1000.0 << std::endl;
     }
 
     if (type == "array") {
@@ -131,8 +135,13 @@ int main(int argc, char *argv[]) {
     }
 
     if (trace) std::cerr << "before pp: " << decomposition.root.hash() << std::endl;
+
+    auto time_pp = getTime();
     auto pp_result = GPUSAT::preprocess(formula, decomposition, combineWidth);
+    std::cout << "pp time: " << (getTime() - time_pp) / 1000.0 << std::endl;
     if (trace) std::cerr << "after pp: " << decomposition.root.hash() << std::endl;
+
+    std::cout << "formula preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
     auto weight_correction = pp_result.second;
     if (pp_result.first != PreprocessingResult::SUCCESS) {

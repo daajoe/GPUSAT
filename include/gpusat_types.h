@@ -668,9 +668,21 @@ namespace gpusat {
         double *variableWeights = nullptr;
         // Clauses are vectors of *signed* variable ids,
         // which are *sorted* by acending absolute variable id!
-        std::vector<std::vector<int64_t>> clauses;
+        std::vector<int64_t> clause_bag;
+        std::vector<size_t> clause_offsets;
         std::vector<int64_t> facts;
     };
+
+    // returns the size of a clause in a given formula.
+    inline size_t clause_size(const struct satformulaType& formula, size_t clause_index) {
+        assert(clause_index < formula.clause_offsets.size());
+        size_t ofs = formula.clause_offsets[clause_index];
+        if (clause_index + 1 >= formula.clause_offsets.size()) {
+            return formula.clause_bag.size() - ofs - 1;
+        } else {
+            return formula.clause_offsets[clause_index + 1] - ofs - 1;
+        }
+    }
 
     /// the graph type which was the base for the tree decomposition
     enum nodeType {

@@ -119,6 +119,100 @@ namespace gpusat {
     }
 
     void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight) {
+        std::vector<int64_t> intersection;
+        std::set_intersection(
+            formula.facts.begin(),
+            formula.facts.end(),
+            formula.clause_bag.begin(),
+            formula.clause_bag.end(),
+            back_inserter(intersection),
+            compVars
+        );
+        if (intersection.size() == 0) {
+            std::cerr << "preprocessing unnecessary." << std::endl;
+            return;
+        }
+
+        std::cerr << "WARNING: fact pp not implemented!" << std::endl;
+        std::vector<int64_t> new_clause_bag;
+        std::vector<size_t> new_offsets;
+
+        bool facts_changed = false;
+
+        size_t old_clause_idx = 0;
+        size_t old_clause_lits = 0;
+        size_t current_clause_lits = 0;
+        bool skip_clause = false;
+        for (auto lit : formula.clause_bag) {
+            if (lit == 0) {
+                // non-empty clause
+                if (current_clause_lits > 0) {
+                    //std::cout << "adding clause of length: " << current_clause_lits << std::endl;
+                    new_clause_bag.push_back(0);
+                    new_offsets.push_back(new_clause_bag.size() - current_clause_lits);
+                }
+                old_clause_lits = 0;
+                current_clause_lits = 0;
+                skip_clause = false;
+                old_clause_idx++;
+                continue;
+            }
+
+            if (skip_clause) {
+                continue;
+            }
+
+            old_clause_lits++;
+
+            bool skip_lit = false;
+            for (auto fact : intersection) {
+                // there is a fact describing this literal
+                if (abs(lit) == abs(fact)) {
+                    auto size = clause_size(formula, old_clause_idx);
+                    size_t remaining = size - old_clause_lits;
+
+                    // fact solves clause
+                    if (lit == fact) {
+                        skip_clause = true;
+                        skip_lit = true;
+                        new_clause_bag.erase(new_clause_bag.end() - current_clause_lits, new_clause_bag.end());
+                        current_clause_lits = 0;
+
+                    // fact does not solve clause
+                    } else if (lit != fact) {
+                        // this is a contradiction
+                        if (current_clause_lits == 0 && remaining == 0) {
+                            formula.unsat = true;
+                            return;
+                        // the other literal must be true
+                        } else if (current_clause_lits == 1 && remaining == 0) {
+                            formula.facts.push_back(new_clause_bag.back());
+                            facts_changed = true;
+                            new_clause_bag.pop_back();
+                            skip_lit = true;
+                        } else {
+                            // literal cannot satisfy clause
+                            skip_lit = true;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            if (!skip_lit) {
+                new_clause_bag.push_back(lit);
+                current_clause_lits++;
+            }
+        }
+
+        formula.clause_bag = std::move(new_clause_bag);
+        formula.clause_offsets = std::move(new_offsets);
+
+        if (facts_changed) {
+            preprocessFacts(decomp, formula, defaultWeight);
+        }
+
+        /*
         for (size_t i = 0; i < formula.facts.size(); i++) {
             int64_t fact = formula.facts[i];
             for (size_t a = 0; a < formula.clauses.size(); a++) {
@@ -143,6 +237,7 @@ namespace gpusat {
                     }
                 }
             }
+            // FIXME: Relabel unnötig.
             for (size_t j = i; j < formula.facts.size(); ++j) {
                 if (std::abs(formula.facts[j]) > std::abs(fact)) {
                     if (formula.facts[j] > 0) {
@@ -170,13 +265,14 @@ namespace gpusat {
             relabelFormula(formula, std::abs(fact));
             formula.numVars--;
         }
+        */
     }
 
 
     void Preprocessor::relabelDecomp(BagType& decomp, int64_t id) {
         for (size_t i = 0; i < decomp.variables.size(); i++) {
             if (decomp.variables[i] > id) {
-                decomp.variables[i]--;
+                //decomp.variables[i]--;
             } else if (decomp.variables[i] == id) {
                 decomp.variables.erase(decomp.variables.begin() + i);
                 i--;
@@ -188,6 +284,7 @@ namespace gpusat {
     }
 
     void Preprocessor::relabelFormula(satformulaType &formula, int64_t id) {
+        /*
         for (size_t i = 0; i < formula.clauses.size(); i++) {
             for (size_t j = 0; j < formula.clauses[i].size(); ++j) {
                 if (std::abs(formula.clauses[i][j]) > id) {
@@ -199,5 +296,6 @@ namespace gpusat {
                 }
             }
         }
+        */
     }
 }

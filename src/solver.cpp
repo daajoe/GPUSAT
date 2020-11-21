@@ -473,16 +473,28 @@ namespace gpusat {
         // get clauses which only contain iVars
         std::vector<uint64_t> clauses;
         int64_t numClauses = 0;
-        for (size_t i = 0; i < formula.clauses.size(); i++) {
+
+        for (size_t i = 0; i < formula.clause_offsets.size(); i++) {
+            size_t clause_offset = formula.clause_offsets[i];
+            size_t c_size = clause_size(formula, i);
             std::vector<int64_t> v;
-            std::set_intersection(iVars.begin(), iVars.end(), formula.clauses[i].begin(), formula.clauses[i].end(), back_inserter(v), compVars);
-            if (v.size() == formula.clauses[i].size()) {
+
+            bool applies = std::includes(
+                iVars.begin(),
+                iVars.end(),
+                formula.clause_bag.begin() + clause_offset,
+                formula.clause_bag.begin() + clause_offset + c_size,
+                compVars
+            );
+
+            if (applies) {
                 numClauses++;
                 uint64_t c_vars = 0;
                 uint64_t c_signs = 0;
                 // assumption: variables in a clause are sorted
                 uint64_t variable_index = 0;
-                auto lit_iter = formula.clauses[i].begin();
+                auto lit_iter = formula.clause_bag.begin() + clause_offset;
+                auto lit_end = formula.clause_bag.begin() + clause_offset + c_size;
                 for (auto var : iVars) {
                     if (abs(*lit_iter) > var) {
                         variable_index++;
@@ -492,16 +504,17 @@ namespace gpusat {
                     c_vars |= (1ul << variable_index);
                     c_signs |= ((uint64_t)(*lit_iter < 0) << variable_index);
                     lit_iter++;
-                    if (lit_iter == formula.clauses[i].end()) {
+                    if (lit_iter == lit_end) {
                         break;
                     }
                     variable_index++;
                 }
-                assert(lit_iter == formula.clauses[i].end());
+                assert(lit_iter == lit_end);
                 clauses.push_back(c_vars);
                 clauses.push_back(c_signs);
             }
         }
+        //std::cout << node.id << " clauses: " << numClauses << std::endl;
 
         node.exponent = INT32_MIN;
 

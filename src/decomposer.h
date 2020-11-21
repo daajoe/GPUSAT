@@ -29,7 +29,7 @@ namespace gpusat {
         /**
          * Build a tree of bags (treedecType) from a tree decomposition.
          */
-        static treedecType htd_to_bags(const htd::ITreeDecomposition& decomposition);
+        static treedecType htd_to_bags(const htd::ITreeDecomposition& decomposition, const struct satformulaType& formula);
 
 
         /**

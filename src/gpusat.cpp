@@ -49,6 +49,7 @@ namespace gpusat {
         if (formula.unsat) {
             return std::pair(PreprocessingResult::UNSATISFIABLE, GPUSAT::default_variable_weight);
         }
+        std::cout << "facts preprocessed." << std::endl;
 
         Preprocessor::preprocessDecomp(decomposition.root, combine_width);
         return std::pair(PreprocessingResult::SUCCESS, weight_correction);

@@ -13,12 +13,22 @@
 namespace gpusat {
 
     // Inspired from htd::TdFormatExporter
-    treedecType Decomposer::htd_to_bags(const htd::ITreeDecomposition& decomposition) {
+    treedecType Decomposer::htd_to_bags(const htd::ITreeDecomposition& decomposition, const struct satformulaType& formula) {
         // pairs of (bag, child indices)
 
         auto decomp = treedecType();
         decomp.numb = decomposition.vertexCount();
         decomp.width = decomposition.maximumBagSize();
+
+        auto not_fact = [&](htd::vertex_t variable) -> bool {
+            //return true;
+            return !std::binary_search(
+                    formula.facts.begin(),
+                    formula.facts.end(),
+                    variable,
+                    compVars
+            );
+        };
 
         if (decomposition.vertexCount() > 0) {
             std::vector<htd::vertex_t> vertex_stack;
@@ -28,8 +38,9 @@ namespace gpusat {
                 auto bag = BagType();
                 bag.id = decomposition.root() - 1;
                 auto bag_content = decomposition.bagContent(decomposition.root());
-                std::copy(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables));
+                std::copy_if(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables), not_fact);
                 std::sort(bag.variables.begin(), bag.variables.end());
+
                 auto children = decomposition.children(decomposition.root());
                 vertex_stack.push_back(0ul);
                 vertex_stack.resize(vertex_stack.size() + children.size());
@@ -51,7 +62,7 @@ namespace gpusat {
                 auto bag = BagType();
                 bag.id = root - 1;
                 auto bag_content = decomposition.bagContent(root);
-                std::copy(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables));
+                std::copy_if(bag_content.begin(), bag_content.end(), std::back_inserter(bag.variables), not_fact);
                 std::sort(bag.variables.begin(), bag.variables.end());
                 parent_stack.back()->edges.push_back(std::move(bag));
                 auto children = decomposition.children(root);
@@ -73,20 +84,24 @@ namespace gpusat {
 
         hypergraph.addVertices(formula.numVars);
 
-        std::vector<htd::vertex_t> clause;
         // Facts should be ignor-able, but they are added in the original
+        /*
         for (auto fact : formula.facts) {
+            std::vector<htd::vertex_t> clause;
             clause.push_back(htd::vertex_t(std::abs(fact)));
             hypergraph.addEdge(clause);
-            clause.clear();
         }
+        */
 
-        for (auto f_clause : formula.clauses) {
-            for (auto var : f_clause) {
-                clause.push_back(htd::vertex_t(std::abs(var)));
+        auto it = formula.clause_bag.begin();
+        while (it != formula.clause_bag.end()) {
+            std::vector<htd::vertex_t> clause;
+            while (*it != 0) {
+                clause.push_back(htd::vertex_t(std::abs(*it)));
+                it++;
             }
             hypergraph.addEdge(clause);
-            clause.clear();
+            it++;
         }
     }
 
@@ -96,13 +111,14 @@ namespace gpusat {
         htd::Hypergraph hypergraph(htdManager);
 
         gpusat_formula_to_hypergraph(hypergraph, formula);
+        std::cout << "parsed." << std::endl;
 
         htd::BucketEliminationTreeDecompositionAlgorithm *treeDecompositionAlgorithm = new htd::BucketEliminationTreeDecompositionAlgorithm(htdManager);
         htd::IterativeImprovementTreeDecompositionAlgorithm *algorithm = new htd::IterativeImprovementTreeDecompositionAlgorithm(htdManager, treeDecompositionAlgorithm, fitness);
         algorithm->setIterationCount(n);
         htd::ITreeDecomposition *decomp = algorithm->computeDecomposition(hypergraph);
         std::cout << "Decomposition Width: " << decomp->maximumBagSize() << std::endl;
-        auto gpusat_decomp = htd_to_bags(*decomp);
+        auto gpusat_decomp = htd_to_bags(*decomp, formula);
         gpusat_decomp.numVars = formula.numVars;
         delete algorithm;
         delete decomp;

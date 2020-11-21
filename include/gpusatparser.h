@@ -66,7 +66,7 @@ namespace gpusat {
          * @param clause
          *      the clauses
          */
-        void parseClauseLine(satformulaType &ret, std::string &item, std::vector<int64_t> *clause);
+        void parseClauseLine(satformulaType &ret, std::string &item);
 
         /**
          * parses a solution line (not present in cnf format but some preprocessors use it)
