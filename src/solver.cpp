@@ -479,11 +479,13 @@ namespace gpusat {
             size_t c_size = clause_size(formula, i);
             std::vector<int64_t> v;
 
+            auto clause_begin = formula.clause_bag.begin() + clause_offset;
+            auto clause_end = formula.clause_bag.begin() + clause_offset + c_size;
             bool applies = std::includes(
                 iVars.begin(),
                 iVars.end(),
-                formula.clause_bag.begin() + clause_offset,
-                formula.clause_bag.begin() + clause_offset + c_size,
+                clause_begin,
+                clause_end,
                 compVars
             );
 

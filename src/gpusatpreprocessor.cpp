@@ -133,9 +133,19 @@ namespace gpusat {
             return;
         }
 
-        std::cerr << "WARNING: fact pp not implemented!" << std::endl;
+        std::cerr << "WARNING: fact pp was re-implemented!" << std::endl;
         std::vector<int64_t> new_clause_bag;
         std::vector<size_t> new_offsets;
+
+        if (formula.variableWeights != nullptr) {
+            for (auto fact : formula.facts) {
+                if (fact < 0) {
+                    defaultWeight *= formula.variableWeights[std::abs(fact) * 2 + 1];
+                } else {
+                    defaultWeight *= formula.variableWeights[std::abs(fact) * 2];
+                }
+            }
+        }
 
         bool facts_changed = false;
 
@@ -147,9 +157,8 @@ namespace gpusat {
             if (lit == 0) {
                 // non-empty clause
                 if (current_clause_lits > 0) {
-                    //std::cout << "adding clause of length: " << current_clause_lits << std::endl;
                     new_clause_bag.push_back(0);
-                    new_offsets.push_back(new_clause_bag.size() - current_clause_lits);
+                    new_offsets.push_back(new_clause_bag.size() - current_clause_lits - 1);
                 }
                 old_clause_lits = 0;
                 current_clause_lits = 0;
@@ -170,12 +179,12 @@ namespace gpusat {
                 if (abs(lit) == abs(fact)) {
                     auto size = clause_size(formula, old_clause_idx);
                     size_t remaining = size - old_clause_lits;
+                    skip_lit = true;
 
                     // fact solves clause
                     if (lit == fact) {
                         skip_clause = true;
-                        skip_lit = true;
-                        new_clause_bag.erase(new_clause_bag.end() - current_clause_lits, new_clause_bag.end());
+                        new_clause_bag.erase(new_clause_bag.end() - current_clause_lits , new_clause_bag.end());
                         current_clause_lits = 0;
 
                     // fact does not solve clause
@@ -184,16 +193,14 @@ namespace gpusat {
                         if (current_clause_lits == 0 && remaining == 0) {
                             formula.unsat = true;
                             return;
-                        // the other literal must be true
-                        } else if (current_clause_lits == 1 && remaining == 0) {
-                            formula.facts.push_back(new_clause_bag.back());
-                            facts_changed = true;
-                            new_clause_bag.pop_back();
-                            skip_lit = true;
-                        } else {
-                            // literal cannot satisfy clause
-                            skip_lit = true;
                         }
+                        // the other literal must be true
+                        // } else if (current_clause_lits == 1 && remaining == 0) {
+                        //     formula.facts.push_back(new_clause_bag.back());
+                        //     facts_changed = true;
+                        //     new_clause_bag.pop_back();
+                        //     skip_lit = true;
+                        // literal cannot satisfy clause -> leave out
                     }
                     break;
                 }
@@ -208,11 +215,7 @@ namespace gpusat {
         formula.clause_bag = std::move(new_clause_bag);
         formula.clause_offsets = std::move(new_offsets);
 
-        if (facts_changed) {
-            preprocessFacts(decomp, formula, defaultWeight);
-        }
-
-        /*
+            /*
         for (size_t i = 0; i < formula.facts.size(); i++) {
             int64_t fact = formula.facts[i];
             for (size_t a = 0; a < formula.clauses.size(); a++) {
