@@ -614,9 +614,11 @@ namespace gpusat {
             for (int64_t var : variables) {
                 hash_combine(h, var);
             }
+            /*
             for (const BagType& edge : edges) {
                 hash_combine(h, edge.hash());
             }
+            */
             for (const auto& sol : solution) {
                 hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
             }
