@@ -18,6 +18,29 @@
 
 namespace gpusat {
 
+    size_t BagType::hash() const {
+        size_t h = 0;
+        hash_combine(h, correction);
+        hash_combine(h, exponent);
+        hash_combine(h, id);
+        for (int64_t var : variables) {
+            hash_combine(h, var);
+        }
+        /*
+        for (const BagType& edge : edges) {
+            hash_combine(h, edge.hash());
+        }
+        */
+        for (const auto& sol : solution) {
+            hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
+        }
+        if (cached_solution.has_value()) {
+            const auto sol = cpuCopy(cached_solution.value());
+            hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
+        }
+        hash_combine(h, maxSize);
+        return h;
+    }
     template <typename T>
     class CudaBuffer {
         private:
@@ -48,6 +71,11 @@ namespace gpusat {
             void read(T* to);
             /// Length of the buffer
             size_t size();
+
+            /// Total memory allocated in bytes.
+            size_t mem_size() {
+                return size() * sizeof(T);
+            }
 
     };
 
@@ -284,6 +312,11 @@ namespace gpusat {
         bool cache_last_solution_bag = true;
 
         for (size_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
+            // save previous soltuion bag
+            if (maxId(solution_gpu) > 0) {
+                node.solution.push_back(cpuCopy(solution_gpu));
+            }
+
             const auto numVars = node.variables.size();
             const auto minId = run * bagSizeNode;
             const auto maxId = std::min(run * bagSizeNode + bagSizeNode, 1ul << numVars);
@@ -306,30 +339,40 @@ namespace gpusat {
 
             solution_gpu = gpuOwner(tmp_solution);
 
-            for (size_t b = 0; b < std::max(edge1.solution.size(), edge2.solution.size()); b++) {
+            for (size_t b = 0; b < std::max(edge1.solutionBagCount(), edge2.solutionBagCount()); b++) {
 
                 std::optional<CudaSolutionVariant> edge1_solution = std::nullopt;
-                if (b < edge1.solution.size() && hasData(edge1.solution[b])) {
-                    if (edge1.cached_solution.has_value()) {
-                        // this must be the first and only bag
-                        assert(b == 0);
-                        assert(edge1.solution.size() == 1);
-                        swap(edge1_solution, edge1.cached_solution);
-                    } else {
-                        edge1_solution = gpuOwner(edge1.solution[b]);
+                if (edge1.cached_solution.has_value()) {
+                    // this must be the first and only bag
+                    assert(b == 0);
+                    assert(edge1.solution.size() == 0);
+                    assert(edge1.solutionBagCount() == 1);
+                    assert(hasData(edge1.cached_solution.value()));
+                    // we need the cached bag again, so we need to write it back.
+                    if (maxSize > 1) {
+                        edge1.solution.push_back(cpuCopy(edge1.cached_solution.value()));
                     }
+                    swap(edge1_solution, edge1.cached_solution);
+                } else if (b < edge1.solution.size()) {
+                    assert(hasData(edge1.solution[b]));
+                    edge1_solution = gpuOwner(edge1.solution[b]);
                 }
 
                 std::optional<CudaSolutionVariant> edge2_solution = std::nullopt;
-                if (b < edge2.solution.size() && hasData(edge2.solution[b])) {
-                    if (edge2.cached_solution.has_value()) {
-                        // this must be the first and only bag
-                        assert(b == 0);
-                        assert(edge2.solution.size() == 1);
-                        swap(edge2_solution, edge2.cached_solution);
-                    } else {
-                        edge2_solution = gpuOwner(edge2.solution[b]);
+                if (edge2.cached_solution.has_value()) {
+                    // this must be the first and only bag
+                    assert(b == 0);
+                    assert(edge2.solution.size() == 0);
+                    assert(edge2.solutionBagCount() == 1);
+                    assert(hasData(edge2.cached_solution.value()));
+                    // we need the cached bag again, so we need to write it back.
+                    if (maxSize > 1) {
+                        edge2.solution.push_back(cpuCopy(edge2.cached_solution.value()));
                     }
+                    swap(edge2_solution, edge2.cached_solution);
+                } else if (b < edge2.solution.size()) {
+                    assert(hasData(edge2.solution[b]));
+                    edge2_solution = gpuOwner(edge2.solution[b]);
                 }
 
                 solveJoinWrapper(
@@ -359,20 +402,20 @@ namespace gpusat {
 
             if (!isSatisfiable(solution_gpu)) {
 
-                if (solutionType == TREE) {
-                    if (node.solution.size() > 0) {
-                        auto& last = std::get<TreeSolution<CpuMem>>(node.solution.back());
-                        cache_last_solution_bag = false;
-                        last.setMaxId(maxId);
-                    } else {
-                        auto empty_tree = TreeSolution<CpuMem>(0, minId, maxId, numVars);
-                        cache_last_solution_bag = false;
-                        node.solution.push_back(std::move(empty_tree));
-                    }
+                if (node.solution.size() > 0) {
+                    setMaxId(node.solution.back(), maxId);
+                    // ensure this solution doesn't get copyied again
                 } else {
-                    auto empty_array = ArraySolution<CpuMem>(0, minId, maxId);
-                    node.solution.push_back(std::move(empty_array));
+                    cache_last_solution_bag = false;
+                    if (solutionType == TREE) {
+                        auto empty_tree = TreeSolution<CpuMem>(0, minId, maxId, numVars);
+                        node.solution.push_back(std::move(empty_tree));
+                    } else {
+                        auto empty_array = ArraySolution<CpuMem>(0, minId, maxId);
+                        node.solution.push_back(std::move(empty_array));
+                    }
                 }
+                setMaxId(solution_gpu, 0);
             } else {
                 this->isSat = 1;
                 if (solutionType == TREE) {
@@ -388,35 +431,26 @@ namespace gpusat {
                         auto gpu_last = gpuOwner(*last);
                         auto new_tree_gpu = combineTree(sol, gpu_last);
                         new_tree_gpu.setDataStructureSize(new_tree_gpu.currentTreeSize());
-                        auto new_tree = cpuCopy(new_tree_gpu);
                         solution_gpu = std::move(new_tree_gpu);
-                        node.solution.back() = std::move(new_tree);
+                        node.solution.pop_back();
                     // previous back is empty, replace it
                     } else if (last != NULL && !last->hasData()) {
                         TRACE("%s", "second branch");
                         sol.setMinId(last->minId());
                         sol.setDataStructureSize(sol.currentTreeSize());
-                        node.solution.back() = cpuCopy(sol);
                     } else {
                         TRACE("%s", "simple clean tree");
                         sol.setDataStructureSize(sol.currentTreeSize());
-                        auto cpu_sol = cpuCopy(sol);
-                        TRACE("tree output hash: %lu", cpu_sol.hash());
-                        node.solution.push_back(std::move(cpu_sol));
                     }
                     cache_last_solution_bag = true;
-                    auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
+                    auto max_tree_size = std::get<TreeSolution<CudaMem>>(solution_gpu).currentTreeSize();
                     node.maxSize = std::max(node.maxSize, max_tree_size);
                 } else if (solutionType == ARRAY) {
                     auto& sol = std::get<ArraySolution<CudaMem>>(solution_gpu);
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize((size_t)bagSizeNode);
-                    auto cpu_sol = cpuCopy(sol);
-                    size_t hash = cpu_sol.hash();
-                    TRACE("array output hash: %lu", hash);
                     node.maxSize = std::max(node.maxSize, sol.dataStructureSize());
-                    node.solution.push_back(std::move(cpu_sol));
                 }
             }
         }
@@ -438,15 +472,16 @@ namespace gpusat {
             freeData(sol);
         }
 
-        TRACE("output hash: %lu", node.hash());
-
         // if only one solution bag was used, reuse
         // it in the next node
-        if (node.solution.size() == 1 && cache_last_solution_bag) {
+        if (node.solution.size() == 0 && cache_last_solution_bag) {
             node.cached_solution = std::make_optional(std::move(solution_gpu));
         } else {
+            node.solution.push_back(cpuCopy(solution_gpu));
             node.cached_solution = std::nullopt;
         }
+
+        TRACE("output hash: %lu", node.hash());
     }
 
     long qmin(long a, long b, long c, long d) {
@@ -565,6 +600,10 @@ namespace gpusat {
         bool cache_last_solution_bag = true;
 
         for (size_t _a = 0, run = 0; _a < maxSize; _a++, run++) {
+            // save previous soltuion bag
+            if (maxId(solution_gpu) > 0) {
+                node.solution.push_back(cpuCopy(solution_gpu));
+            }
 
             uint64_t sol_minId =  run * bagSizeForget;
             uint64_t sol_maxId = std::min(run * bagSizeForget + bagSizeForget, 1ul << (node.variables.size()));
@@ -581,20 +620,19 @@ namespace gpusat {
 
             solution_gpu = gpuOwner(solution_tmp);
 
-            for (auto &csol : cnode.solution) {
-                if (!hasData(csol)) {
-                    continue;
-                }
-
+            for (int a = 0; a < cnode.solutionBagCount(); a++) {
                 std::optional<CudaSolutionVariant> edge_solution = std::nullopt;
                 // If we are already given a GPU-resident solution,
                 // it must be the first (and only) one.
                 if (cnode.cached_solution.has_value()) {
-                    assert(cnode.solution.size() == 1);
+                    assert(cnode.solution.size() == 0);
+                    assert(cnode.solutionBagCount() == 1);
                     std::swap(edge_solution, cnode.cached_solution);
                 }
 
                 if (!leaf && !edge_solution.has_value()) {
+                    auto& csol = cnode.solution[a];
+                    assert(hasData(csol));
                     edge_solution = gpuOwner(csol);
                 }
 
@@ -626,21 +664,19 @@ namespace gpusat {
             TRACE("satisfiable: %d", isSatisfiable(solution_gpu));
 
             if (!isSatisfiable(solution_gpu)) {
-
-                if (solutionType == TREE) {
-                    if (node.solution.size() > 0) {
-                        auto& last = std::get<TreeSolution<CpuMem>>(node.solution.back());
-                        last.setMaxId(maxId(solution_gpu));
-                        // the last solution bag is the unsatisfiable one
-                        cache_last_solution_bag = false;
-                    } else {
+                if (node.solution.size() > 0) {
+                    setMaxId(node.solution.back(), maxId(solution_gpu));
+                } else {
+                    cache_last_solution_bag = false;
+                    if (solutionType == TREE) {
                         auto dummy_tree = TreeSolution<CpuMem>(0, minId(solution_gpu), maxId(solution_gpu), node.variables.size());
                         node.solution.push_back(std::move(dummy_tree));
+                    } else {
+                        auto dummy_array = ArraySolution<CpuMem>(0, minId(solution_gpu), maxId(solution_gpu));
+                        node.solution.push_back(std::move(dummy_array));
                     }
-                } else {
-                    auto dummy_array = ArraySolution<CpuMem>(0, minId(solution_gpu), maxId(solution_gpu));
-                    node.solution.push_back(std::move(dummy_array));
                 }
+                setMaxId(solution_gpu, 0);
             } else {
                 this->isSat = 1;
 
@@ -656,9 +692,8 @@ namespace gpusat {
                         auto gpu_last = gpuOwner(*last);
                         auto new_tree_gpu = combineTree(sol, gpu_last);
                         new_tree_gpu.setDataStructureSize(new_tree_gpu.currentTreeSize());
-                        auto new_tree = cpuCopy(new_tree_gpu);
                         solution_gpu = std::move(new_tree_gpu);
-                        node.solution.back() = std::move(new_tree);
+                        node.solution.pop_back();
                     } else {
                         sol.setDataStructureSize(sol.currentTreeSize());
 
@@ -666,15 +701,13 @@ namespace gpusat {
                         if (last != NULL && !last->hasData()) {
                             sol.setMinId(last->minId());
 
-                            node.solution.back() = cpuCopy(sol);
-                        } else {
-                            node.solution.push_back(cpuCopy(sol));
+                            node.solution.pop_back();
                         }
                     }
 
                     cache_last_solution_bag = true;
 
-                    auto max_tree_size = std::get<TreeSolution<CpuMem>>(node.solution.back()).currentTreeSize();
+                    auto max_tree_size = std::get<TreeSolution<CudaMem>>(solution_gpu).currentTreeSize();
                     node.maxSize = std::max(node.maxSize, max_tree_size);
 
                 } else if (solutionType == ARRAY) {
@@ -682,7 +715,7 @@ namespace gpusat {
                     // the inital calculated size might overshoot, thus limit
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize(bagSizeForget);
-                    node.solution.push_back(cpuCopy(sol));
+                    cache_last_solution_bag = true;
                 }
             }
         }
@@ -697,18 +730,20 @@ namespace gpusat {
             tableSize += dataStructureSize(sol);
         }
 
+        // if only one solution bag was used, reuse
+        // it in the next node
+        if (node.solution.size() == 0 && cache_last_solution_bag) {
+            node.cached_solution = std::make_optional(std::move(solution_gpu));
+        } else {
+            node.solution.push_back(cpuCopy(solution_gpu));
+            node.cached_solution = std::nullopt;
+        }
+
         TRACE("output hash: %lu", node.hash());
 
         this->maxTableSize = std::max(this->maxTableSize, tableSize);
         for (auto &csol : cnode.solution) {
             freeData(csol);
-        }
-        // if only one solution bag was used, reuse
-        // it in the next node
-        if (node.solution.size() == 1 && cache_last_solution_bag) {
-            node.cached_solution = std::make_optional(std::move(solution_gpu));
-        } else {
-            node.cached_solution = std::nullopt;
         }
     }
 }

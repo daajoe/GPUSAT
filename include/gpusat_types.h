@@ -565,6 +565,10 @@ namespace gpusat {
         return std::visit([](auto& sol) { return sol.freeData(); }, solution);
     }
 
+    inline void setMaxId(SolutionVariant& solution, uint64_t maxId) {
+        return std::visit([=](auto& sol) { return sol.setMaxId(maxId); }, solution);
+    }
+
     inline bool hasData(SolutionVariant& solution) {
         return std::visit([](auto& sol) { return sol.hasData(); }, solution);
     }
@@ -573,12 +577,20 @@ namespace gpusat {
         return std::visit([](auto& sol) { return sol.isSatisfiable(); }, solution);
     }
 
+    inline bool hasData(CudaSolutionVariant& solution) {
+        return std::visit([](auto& sol) { return sol.hasData(); }, solution);
+    }
+
     inline bool isSatisfiable(CudaSolutionVariant& solution) {
         return std::visit([](auto& sol) { return sol.isSatisfiable(); }, solution);
     }
 
     inline uint64_t minId(CudaSolutionVariant& solution) {
         return std::visit([](auto& sol) { return sol.minId(); }, solution);
+    }
+
+    inline void setMaxId(CudaSolutionVariant& solution, uint64_t maxId) {
+        return std::visit([=](auto& sol) { return sol.setMaxId(maxId); }, solution);
     }
 
     inline uint64_t maxId(CudaSolutionVariant& solution) {
@@ -606,24 +618,10 @@ namespace gpusat {
         std::optional<CudaSolutionVariant> cached_solution;
         size_t maxSize = 0;
 
-        size_t hash() const {
-            size_t h = 0;
-            hash_combine(h, correction);
-            hash_combine(h, exponent);
-            hash_combine(h, id);
-            for (int64_t var : variables) {
-                hash_combine(h, var);
-            }
-            /*
-            for (const BagType& edge : edges) {
-                hash_combine(h, edge.hash());
-            }
-            */
-            for (const auto& sol : solution) {
-                hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
-            }
-            hash_combine(h, maxSize);
-            return h;
+        size_t hash() const;
+
+        size_t solutionBagCount() const {
+            return solution.size() + cached_solution.has_value();
         }
 
         BagType() = default;

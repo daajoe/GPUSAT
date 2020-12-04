@@ -3,6 +3,7 @@
 #include "gpusatparser.h"
 #include "gpusatpreprocessor.h"
 #include "solver.h"
+#include "kernel.h"
 #include <cuda_runtime.h>
 
 namespace gpusat {
@@ -79,6 +80,9 @@ namespace gpusat {
                     + std::min(root.variables.size(), 12ul)
         );
         solver.solveProblem(formula, root, dummy_parent, INTRODUCEFORGET);
+        if (root.cached_solution.has_value()) {
+            root.solution.push_back(cpuCopy(root.cached_solution.value()));
+        }
 
         boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         if (solver.isSat > 0) {
