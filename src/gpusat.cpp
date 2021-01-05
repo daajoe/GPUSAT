@@ -30,7 +30,7 @@ namespace gpusat {
 
 
     // The pinned memory suballocator to use for solution bags.
-    PinnedSuballocator cuda_pinned_alloc_pool;
+    PinnedSuballocator cuda_pinned_alloc_pool(false);
 
     treedecType GPUSAT::decompose(
         const satformulaType& formula,

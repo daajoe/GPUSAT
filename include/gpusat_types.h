@@ -21,6 +21,7 @@
 #include <thrust/mr/new.h>
 #include <thrust/mr/disjoint_pool.h>
 #include <thrust/system/cuda/memory_resource.h>
+#include <memory_resource>
 
 namespace gpusat {
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
@@ -507,17 +508,20 @@ namespace gpusat {
         }
     };
 
+
     /**
      * Sub-allocator managing pinned memory to give to solution containers.
      */
     class PinnedSuballocator {
         public:
-            PinnedSuballocator();
+            PinnedSuballocator(bool pinned);
             void* allocate(size_t bytes);
             void deallocate(void* p, size_t bytes);
             void deinit();
         protected:
             thrust::mr::disjoint_unsynchronized_pool_resource<thrust::system::cuda::universal_host_pinned_memory_resource, thrust::mr::new_delete_resource> allocator;
+            thrust::mr::new_delete_resource unpinned;
+            bool is_pinned;
     };
 
     extern PinnedSuballocator cuda_pinned_alloc_pool;

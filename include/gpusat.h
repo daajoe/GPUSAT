@@ -33,7 +33,10 @@ namespace gpusat {
             /**
              * Setup the GPU context.
              */
-            GPUSAT() {
+            GPUSAT(bool use_pinned_memory) {
+                cuda_pinned_alloc_pool.deinit();
+                cuda_pinned_alloc_pool = std::move(PinnedSuballocator(use_pinned_memory));
+
                 cudaDeviceProp deviceProp;
                 cudaGetDeviceProperties(&deviceProp, 0);
                 memory_size = deviceProp.totalGlobalMem;

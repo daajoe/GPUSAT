@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     std::string decompDir;
     size_t combineWidth = 0;
     time_t seed = time(0);
-    bool weighted, noExp, trace;
+    bool weighted, noExp, trace, unpinned;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
                 "\t\t\twidth_cutSet: minimize the width and then the cut set size\n"
                 "\t\t\tcutSet_width: minimize the cut set size and then the width")->set_default_str("width_cutSet");
     app.add_flag("--weighted", weighted, "use weighted model count");
+    app.add_flag("--unpinned", unpinned, "do not use pinned memory for solutions");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
     app.add_flag("--trace", trace, "output a solver trace");
     app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
@@ -65,7 +66,7 @@ int main(int argc, char *argv[]) {
     app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("0");
     CLI11_PARSE(app, argc, argv)
 
-    GPUSAT gsat;
+    GPUSAT gsat(!unpinned);
 
     if (combineWidth == 0) {
         combineWidth = gsat.recommended_bag_width();
