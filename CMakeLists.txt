@@ -12,7 +12,7 @@ find_package(Boost REQUIRED)
 file(GLOB gpusat_SRC "src/*.cpp")
 add_library(gpusat STATIC ${gpusat_SRC})
 target_compile_features(gpusat PUBLIC cxx_std_17)
-target_link_libraries(gpusat htd gpusat_kernel)
+target_link_libraries(gpusat htd gpusat_kernel -static-libgcc -static-libstdc++)
 target_include_directories(gpusat PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 file(GLOB_RECURSE gpusat_HEADERS "include/*.h")
@@ -21,7 +21,7 @@ file(GLOB_RECURSE gpusat_HEADERS "include/*.h")
 set(COMMON_FLAGS -Wextra -Wall -Werror)
 
 add_library(gpusat_kernel STATIC "src/kernel.cu")
-target_compile_options(gpusat_kernel PRIVATE -gencode arch=compute_75,code=sm_75)
+target_compile_options(gpusat_kernel PRIVATE -arch=sm_37)
 target_compile_options(gpusat_kernel PRIVATE -std=c++17 --expt-relaxed-constexpr)
 target_include_directories(gpusat_kernel PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_include_directories(gpusat_kernel PRIVATE include/)
@@ -43,11 +43,13 @@ install(
     PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+target_compile_options(gpusat PRIVATE -fdiagnostics-color=always)
+
 if (WITH_CLI)
     add_executable(gpusat_cli "src/cli/main.cpp")
     target_include_directories(gpusat_cli PRIVATE ${PROJECT_SOURCE_DIR})
     target_compile_features(gpusat_cli PUBLIC cxx_std_11)
-    target_link_libraries(gpusat_cli gpusat)
+    target_link_libraries(gpusat_cli gpusat  -static-libgcc -static-libstdc++)
     # FIXME: Remove the cuda dependency in the gpusat.h header
     target_include_directories(gpusat_cli PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif()

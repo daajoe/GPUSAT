@@ -45,4 +45,8 @@ configure_%:
 	mkdir -p build
 	(cd build && cmake -DWITH_CLI=On -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=$* -G Ninja ..)
 
+configure_Profile:
+	mkdir -p build
+	(cd build && cmake -DWITH_CLI=On -DCMAKE_CXX_FLAGS=-pg -DCMAKE_EXE_LINKER_FLAGS=-pg -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCMAKE_BUILD_TYPE=Profile -G Ninja ..)
+
 .PHONY: check_dirs check build configure
