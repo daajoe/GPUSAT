@@ -474,7 +474,7 @@ namespace gpusat {
 
         // if only one solution bag was used, reuse
         // it in the next node
-        if (node.solution.size() == 0 && cache_last_solution_bag) {
+        if (node.solution.size() == 0 && cache_last_solution_bag && do_cache) {
             node.cached_solution = std::make_optional(std::move(solution_gpu));
         } else {
             node.solution.push_back(cpuCopy(solution_gpu));
@@ -732,7 +732,7 @@ namespace gpusat {
 
         // if only one solution bag was used, reuse
         // it in the next node
-        if (node.solution.size() == 0 && cache_last_solution_bag) {
+        if (node.solution.size() == 0 && cache_last_solution_bag && do_cache) {
             node.cached_solution = std::make_optional(std::move(solution_gpu));
         } else {
             node.solution.push_back(cpuCopy(solution_gpu));

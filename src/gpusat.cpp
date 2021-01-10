@@ -68,7 +68,8 @@ namespace gpusat {
             cfg.solution_type,
             cfg.max_bag_size,
             cfg.solve_cfg,
-            cfg.trace
+            cfg.trace,
+            cfg.gpu_cache
         );
 
         auto& root = decomposition.root;

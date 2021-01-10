@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     std::string decompDir;
     size_t combineWidth = 0;
     time_t seed = time(0);
-    bool weighted, noExp, trace, unpinned;
+    bool weighted, noExp, trace, no_cache, unpinned;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
     app.add_flag("--unpinned", unpinned, "do not use pinned memory for solutions");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
     app.add_flag("--trace", trace, "output a solver trace");
+    app.add_flag("--no-cache", no_cache, "cache solution bags on GPU when possible");
     app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
     app.add_option("-m,--maxBagSize", maxBag, "max size of a bag on the gpu")->set_default_str("0");
     app.add_option("-w,--combineWidth", combineWidth, "maximum width to combine bags of the decomposition")->set_default_str("0");
@@ -80,6 +81,7 @@ int main(int argc, char *argv[]) {
     cfg.solve_cfg.no_exponent = noExp;
     cfg.solve_cfg.weighted = weighted;
     cfg.trace = trace;
+    cfg.gpu_cache = !no_cache;
     cfg.max_bag_size = maxBag;
 
     std::srand(seed);

@@ -15,6 +15,8 @@ namespace gpusat {
         SolveConfig solve_cfg;
         /// Output a trace of the solving process
         bool trace;
+        /// Cache solution bags in GPU mem
+        bool gpu_cache;
         /// Maximum size of a solution container on the GPU.
         /// Pass 0 to not restrict.
         size_t max_bag_size;
