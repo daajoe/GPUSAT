@@ -118,13 +118,27 @@ namespace gpusat {
 
     }
 
+
+    void Preprocessor::removeVarFromDecomp(BagType& decomp, int64_t var) {
+        auto elem = std::lower_bound( decomp.variables.begin(), decomp.variables.end(), var, compVars );
+        if (elem != decomp.variables.end()) {
+            decomp.variables.erase(elem);
+        }
+        for (auto& child : decomp.edges) {
+            removeVarFromDecomp(child, var);
+        }
+    }
+
     void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight) {
         std::vector<int64_t> intersection;
+        std::vector<int64_t> new_facts;
+        std::vector<int64_t> sorted_clausevars = formula.clause_bag;
+        std::sort(sorted_clausevars.begin(), sorted_clausevars.end(), compVars);
         std::set_intersection(
             formula.facts.begin(),
             formula.facts.end(),
-            formula.clause_bag.begin(),
-            formula.clause_bag.end(),
+            sorted_clausevars.begin(),
+            sorted_clausevars.end(),
             back_inserter(intersection),
             compVars
         );
@@ -157,6 +171,9 @@ namespace gpusat {
             if (lit == 0) {
                 // non-empty clause
                 if (current_clause_lits > 0) {
+                    if (current_clause_lits == 1) {
+                        new_facts.push_back(new_clause_bag.back());
+                    }
                     new_clause_bag.push_back(0);
                     new_offsets.push_back(new_clause_bag.size() - current_clause_lits - 1);
                 }
@@ -215,90 +232,14 @@ namespace gpusat {
         formula.clause_bag = std::move(new_clause_bag);
         formula.clause_offsets = std::move(new_offsets);
 
-            /*
-        for (size_t i = 0; i < formula.facts.size(); i++) {
-            int64_t fact = formula.facts[i];
-            for (size_t a = 0; a < formula.clauses.size(); a++) {
-                std::vector<int64_t>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
-                if (elem != formula.clauses[a].end()) {
-                    if (*elem == (fact)) {
-                        //remove clause from formula
-                        formula.clauses.erase(formula.clauses.begin() + a);
-                        a--;
-                    } else if (*elem == (-fact)) {
-                        if (formula.clauses[a].size() == 1) {
-                            //found contradiction
-                            formula.unsat = true;
-                            return;
-                        } else {
-                            //erase variable from clause
-                            formula.clauses[a].erase(elem);
-                            if (formula.clauses[a].size() == 1 && std::find(formula.facts.begin() + i, formula.facts.end(), formula.clauses[a][0]) == formula.facts.end() && std::find(formula.facts.begin() + i, formula.facts.end(), -formula.clauses[a][0]) == formula.facts.end()) {
-                                formula.facts.push_back(formula.clauses[a][0]);
-                            }
-                        }
-                    }
-                }
+        if (!new_facts.empty()) {
+            for (auto fact : new_facts) {
+                auto it = std::lower_bound( formula.facts.begin(), formula.facts.end(), fact, compVars );
+                formula.facts.insert( it, fact );
+                removeVarFromDecomp(decomp.root, fact);
+                decomp.numVars--;
             }
-            // FIXME: Relabel unnötig.
-            for (size_t j = i; j < formula.facts.size(); ++j) {
-                if (std::abs(formula.facts[j]) > std::abs(fact)) {
-                    if (formula.facts[j] > 0) {
-                        formula.facts[j]--;
-                    } else if (formula.facts[j] < 0) {
-                        formula.facts[j]++;
-                    }
-                }
-            }
-            relabelDecomp(decomp.root, std::abs(fact));
-            decomp.numVars--;
-            if (formula.variableWeights != nullptr) {
-                //make product of removed variable weights
-                if (fact < 0) {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2 + 1];
-                } else {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
-                }
-                formula.numWeights -= 2;
-                for (size_t j = std::abs(fact); j < formula.numVars; ++j) {
-                    formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
-                    formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
-                }
-            }
-            relabelFormula(formula, std::abs(fact));
-            formula.numVars--;
+            preprocessFacts(decomp, formula, defaultWeight);
         }
-        */
-    }
-
-
-    void Preprocessor::relabelDecomp(BagType& decomp, int64_t id) {
-        for (size_t i = 0; i < decomp.variables.size(); i++) {
-            if (decomp.variables[i] > id) {
-                //decomp.variables[i]--;
-            } else if (decomp.variables[i] == id) {
-                decomp.variables.erase(decomp.variables.begin() + i);
-                i--;
-            }
-        }
-        for (size_t j = 0; j < decomp.edges.size(); ++j) {
-            relabelDecomp(decomp.edges[j], id);
-        }
-    }
-
-    void Preprocessor::relabelFormula(satformulaType &formula, int64_t id) {
-        /*
-        for (size_t i = 0; i < formula.clauses.size(); i++) {
-            for (size_t j = 0; j < formula.clauses[i].size(); ++j) {
-                if (std::abs(formula.clauses[i][j]) > id) {
-                    if (formula.clauses[i][j] > 0) {
-                        formula.clauses[i][j]--;
-                    } else if (formula.clauses[i][j] < 0) {
-                        formula.clauses[i][j]++;
-                    }
-                }
-            }
-        }
-        */
     }
 }

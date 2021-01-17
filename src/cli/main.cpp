@@ -85,6 +85,7 @@ int main(int argc, char *argv[]) {
     cfg.max_bag_size = maxBag;
 
     std::srand(seed);
+    std::cout << "decomposition seed: " << seed << std::endl;
 
     satformulaType formula;
     treedecType decomposition;

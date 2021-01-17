@@ -33,26 +33,7 @@ namespace gpusat {
         static void preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight);
 
     private:
-
-        /**
-         * used to relabel a decomposition if a node is removed
-         *
-         * @param decomp
-         *      the tree decomposition
-         * @param id
-         *      the id of the removed node
-         */
-        static void relabelDecomp(BagType& decomp, int64_t id);
-
-        /**
-         * used to relabel a formula if a variable is removed
-         *
-         * @param formula
-         *      the formula
-         * @param id
-         *      the id of the removed variable
-         */
-        static void relabelFormula(satformulaType &formula, int64_t id);
+        static void removeVarFromDecomp(BagType& decomp, int64_t var);
     };
 }
 #endif //GPUSAT_GPUSATPREPROCESSOR_H
