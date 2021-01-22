@@ -25,6 +25,7 @@ target_compile_options(gpusat_kernel PRIVATE -arch=sm_70)
 target_compile_options(gpusat_kernel PRIVATE -std=c++17 --expt-relaxed-constexpr)
 target_include_directories(gpusat_kernel PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_include_directories(gpusat_kernel PRIVATE include/)
+target_compile_options(gpusat_kernel PRIVATE $<$<CONFIG:Debug>:-lineinfo>)
 
 foreach (flag IN LISTS COMMON_FLAGS)
     target_compile_options(gpusat_kernel PRIVATE --compiler-options=${flag})

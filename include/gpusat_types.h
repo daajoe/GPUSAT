@@ -234,7 +234,11 @@ namespace gpusat {
              * (if initialized correctly)
              */
             GPU_HOST_ATTR double solutionCountFor(int64_t id) const {
-                return data()[id - minId_];
+                if (id - minId_ < dataStructureSize()) {
+                    return data()[id - minId_];
+                } else {
+                    return -1.0;
+                }
             }
 
             __device__ void setCount(int64_t id, double val) {
