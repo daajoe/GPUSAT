@@ -491,6 +491,9 @@ namespace gpusat {
     void Solver::solveIntroduceForget(const satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
 
         TRACE("\n\tpnode: %lu \n\tnode: %lu \n\tcnode: %lu", pnode.hash(), node.hash(), cnode.hash());
+        if (node.variables.size() == 0) {
+            std::cout << "node with 0 variables: " << node.id << std::endl;
+        }
 
         isSat = 0;
         std::vector<int64_t> fVars;
@@ -662,6 +665,9 @@ namespace gpusat {
             }
 
             TRACE("satisfiable: %d", isSatisfiable(solution_gpu));
+            /*if (node.variables.size() == 0) {
+                std::cout << "satisfiable: " << isSatisfiable(solution_gpu) << std::endl;
+            }*/
 
             if (!isSatisfiable(solution_gpu)) {
                 if (node.solution.size() > 0) {

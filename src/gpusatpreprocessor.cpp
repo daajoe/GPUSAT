@@ -29,7 +29,8 @@ namespace gpusat {
                         std::set_union(
                                 edge_a.variables.begin(), edge_a.variables.end(),
                                 edge_b.variables.begin(), edge_b.variables.end(),
-                                back_inserter(v)
+                                back_inserter(v),
+                                compVars
                         );
                         if (v.size() < combineWidth || edge_a.variables.size() == 0 ||
                             edge_b.variables.size() == 0) {
@@ -52,6 +53,7 @@ namespace gpusat {
         changed = true;
         // try to merge with child nodes
         if (decomp.variables.size() < combineWidth || decomp.variables.size() == 0) {
+
             while (changed) {
                 changed = false;
                 for (size_t i = 0; i < decomp.edges.size(); i++) {
@@ -60,8 +62,10 @@ namespace gpusat {
                     std::set_union(
                             decomp.variables.begin(), decomp.variables.end(),
                             edge_i.variables.begin(), edge_i.variables.end(),
-                            back_inserter(v)
+                            back_inserter(v),
+                            compVars
                     );
+
 
                     if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
                         changed = true;
@@ -91,7 +95,8 @@ namespace gpusat {
             std::set_intersection(
                     decomp.variables.begin(), decomp.variables.end(),
                     edge_i.variables.begin(), edge_i.variables.end(),
-                    std::back_inserter(fVars));
+                    std::back_inserter(fVars),
+                    compVars);
             unsigned long long int numForgetVars = (edge_i.variables.size() - fVars.size());
             if (numForgetVars > 8) {
                 auto newEdge = BagType();
@@ -100,9 +105,10 @@ namespace gpusat {
                 std::set_difference(
                         edge_i.variables.begin(), edge_i.variables.end(),
                         decomp.variables.begin(), decomp.variables.end(),
-                        std::back_inserter(fVars));
+                        std::back_inserter(fVars),
+                        compVars);
                 newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
-                std::sort(newEdge.variables.begin(), newEdge.variables.end());
+                std::sort(newEdge.variables.begin(), newEdge.variables.end(), compVars);
                 // move existing node to be child of newEdge,
                 // wich becomes decomp.edges[i]
                 newEdge.edges.push_back(std::move(decomp.edges[i]));
@@ -115,7 +121,6 @@ namespace gpusat {
             std::cout << "\nERROR: width > 60";
             exit(0);
         }
-
     }
 
 
@@ -129,7 +134,36 @@ namespace gpusat {
         }
     }
 
-    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight) {
+    void Preprocessor::relabelFormula(satformulaType &formula) {
+        std::vector<int64_t> to_eliminate = formula.facts;
+        std::sort(to_eliminate.begin(), to_eliminate.end(), compVars);
+        // start from highest to lowest fact
+        std::reverse(to_eliminate.begin(), to_eliminate.end());
+        for (auto fact : to_eliminate) {
+            for (int i=0; i < formula.clause_bag.size(); i++) {
+                if (formula.clause_bag[i] > abs(fact)) {
+                    formula.clause_bag[i]--;
+                } else if (formula.clause_bag[i] < -abs(fact)) {
+                    formula.clause_bag[i]++;
+                }
+            }
+        }
+        /*
+        std::cout << "p cnf " << formula.numVars << " " << formula.clause_offsets.size() << std::endl;
+        for (auto lit : formula.facts) {
+            std::cout << " " << lit << " " << 0 << std::endl;
+        }
+        for (auto lit : formula.clause_bag) {
+            std::cout << " " << lit;
+            if (lit == 0) {
+                std::cout << std::endl;
+            }
+        }
+        */
+        formula.facts.clear();
+    }
+
+    void Preprocessor::preprocessFacts(satformulaType &formula, double &defaultWeight) {
         std::vector<int64_t> intersection;
         std::vector<int64_t> new_facts;
         std::vector<int64_t> sorted_clausevars = formula.clause_bag;
@@ -147,7 +181,14 @@ namespace gpusat {
             return;
         }
 
-        std::cerr << "WARNING: fact pp was re-implemented!" << std::endl;
+        /*
+        for (auto fact : formula.facts) {
+            std::cout << " " << fact;
+        }
+        */
+        std::cout << std::endl;
+
+        std::cerr << "WARNING: fact pp was re-implemented, WMC untested!" << std::endl;
         std::vector<int64_t> new_clause_bag;
         std::vector<size_t> new_offsets;
 
@@ -173,9 +214,11 @@ namespace gpusat {
                 if (current_clause_lits > 0) {
                     if (current_clause_lits == 1) {
                         new_facts.push_back(new_clause_bag.back());
+                        new_clause_bag.pop_back();
+                    } else {
+                        new_clause_bag.push_back(0);
+                        new_offsets.push_back(new_clause_bag.size() - current_clause_lits - 1);
                     }
-                    new_clause_bag.push_back(0);
-                    new_offsets.push_back(new_clause_bag.size() - current_clause_lits - 1);
                 }
                 old_clause_lits = 0;
                 current_clause_lits = 0;
@@ -211,6 +254,7 @@ namespace gpusat {
                             formula.unsat = true;
                             return;
                         }
+
                         // the other literal must be true
                         // } else if (current_clause_lits == 1 && remaining == 0) {
                         //     formula.facts.push_back(new_clause_bag.back());
@@ -229,17 +273,22 @@ namespace gpusat {
             }
         }
 
+        std::cout << "old clauses: " << formula.clause_offsets.size() << " new clauses: " << new_offsets.size() << std::endl;
         formula.clause_bag = std::move(new_clause_bag);
         formula.clause_offsets = std::move(new_offsets);
 
         if (!new_facts.empty()) {
             for (auto fact : new_facts) {
                 auto it = std::lower_bound( formula.facts.begin(), formula.facts.end(), fact, compVars );
-                formula.facts.insert( it, fact );
-                removeVarFromDecomp(decomp.root, fact);
-                decomp.numVars--;
+                if (abs(*it) != abs(fact)) {
+                    formula.facts.insert( it, fact );
+                    formula.numVars--;
+                } else if (*it == -fact) {
+                    formula.unsat = true;
+                    return;
+                }
             }
-            preprocessFacts(decomp, formula, defaultWeight);
+            preprocessFacts(formula, defaultWeight);
         }
     }
 }

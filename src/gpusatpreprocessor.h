@@ -30,10 +30,11 @@ namespace gpusat {
          * @param defaultWeight
          *      for WMC the product of the weights of the removed literals
          */
-        static void preprocessFacts(treedecType &decomp, satformulaType &formula, double &defaultWeight);
+        static void preprocessFacts(satformulaType &formula, double &defaultWeight);
 
-    private:
         static void removeVarFromDecomp(BagType& decomp, int64_t var);
+
+        static void relabelFormula(satformulaType &formula);
     };
 }
 #endif //GPUSAT_GPUSATPREPROCESSOR_H

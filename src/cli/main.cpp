@@ -90,6 +90,7 @@ int main(int argc, char *argv[]) {
     satformulaType formula;
     treedecType decomposition;
     time_t time_decomposing;
+    auto weight_correction = 1.0;
     {
 
         CNFParser cnf_parser(cfg.solve_cfg.weighted);
@@ -100,6 +101,27 @@ int main(int argc, char *argv[]) {
             formula = cnf_parser.parseSatFormula(std::cin);
         }
 
+        std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
+        // FIXME: this only precprocesses the formula
+        auto dummy_td = treedecType();
+        auto pp_result = GPUSAT::preprocess(formula, dummy_td, combineWidth);
+
+        if (pp_result.first != PreprocessingResult::SUCCESS) {
+            time_total = getTime() - time_total;
+            std::cout << "\n{\n";
+            std::cout << "    \"Num Join\": " << 0;
+            std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
+            std::cout << "\n    ,\"max Table Size\": " << 0;
+            std::cout << "\n    ,\"Model Count\": " << 0;
+            std::cout << "\n    ,\"Time\":{";
+            std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+            std::cout << "\n        ,\"Solving\": " << 0;
+            std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+            std::cout << "\n    }";
+            std::cout << "\n}\n";
+            return 20;
+        }
+        weight_correction = pp_result.second;
         std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
         time_decomposing = getTime();
@@ -147,7 +169,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "formula preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
-    auto weight_correction = pp_result.second;
+    //weight_correction *= pp_result.second;
     if (pp_result.first != PreprocessingResult::SUCCESS) {
         time_total = getTime() - time_total;
         std::cout << "\n{\n";

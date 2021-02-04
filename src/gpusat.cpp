@@ -46,7 +46,11 @@ namespace gpusat {
         size_t combine_width
     ) {
         double weight_correction = GPUSAT::default_variable_weight;
-        Preprocessor::preprocessFacts(decomposition, formula, weight_correction);
+        for (auto fact : formula.facts) {
+            Preprocessor::removeVarFromDecomp(decomposition.root, fact);
+        }
+        Preprocessor::preprocessFacts(formula, weight_correction);
+        Preprocessor::relabelFormula(formula);
         if (formula.unsat) {
             return std::pair(PreprocessingResult::UNSATISFIABLE, GPUSAT::default_variable_weight);
         }

@@ -80,6 +80,7 @@ namespace gpusat {
                 }
             }
         }
+        ret.numVars -= ret.facts.size();
         return ret;
     }
 
