@@ -32,7 +32,7 @@ namespace gpusat {
          */
         static void preprocessFacts(satformulaType &formula, double &defaultWeight);
 
-        static void removeVarFromDecomp(BagType& decomp, int64_t var);
+        static void checkNoFactInDecomp(BagType& decomp, const std::vector<int64_t>& var);
 
         static void relabelFormula(satformulaType &formula);
     };

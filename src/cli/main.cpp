@@ -102,9 +102,7 @@ int main(int argc, char *argv[]) {
         }
 
         std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
-        // FIXME: this only precprocesses the formula
-        auto dummy_td = treedecType();
-        auto pp_result = GPUSAT::preprocess(formula, dummy_td, combineWidth);
+        auto pp_result = GPUSAT::preprocessFormula(formula);
 
         if (pp_result.first != PreprocessingResult::SUCCESS) {
             time_total = getTime() - time_total;
@@ -163,28 +161,11 @@ int main(int argc, char *argv[]) {
     std::cerr << "before pp: " << decomposition.root.hash() << std::endl;
 
     auto time_pp = getTime();
-    auto pp_result = GPUSAT::preprocess(formula, decomposition, combineWidth);
+    auto pp_result = GPUSAT::preprocessDecomp(decomposition, combineWidth);
     std::cout << "pp time: " << (getTime() - time_pp) / 1000.0 << std::endl;
     std::cerr << "after pp: " << decomposition.root.hash() << std::endl;
 
     std::cout << "formula preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
-
-    //weight_correction *= pp_result.second;
-    if (pp_result.first != PreprocessingResult::SUCCESS) {
-        time_total = getTime() - time_total;
-        std::cout << "\n{\n";
-        std::cout << "    \"Num Join\": " << 0;
-        std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
-        std::cout << "\n    ,\"max Table Size\": " << 0;
-        std::cout << "\n    ,\"Model Count\": " << 0;
-        std::cout << "\n    ,\"Time\":{";
-        std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
-        std::cout << "\n        ,\"Solving\": " << 0;
-        std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-        std::cout << "\n    }";
-        std::cout << "\n}\n";
-        return 20;
-    }
 
     //cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
 

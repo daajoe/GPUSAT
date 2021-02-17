@@ -124,13 +124,13 @@ namespace gpusat {
     }
 
 
-    void Preprocessor::removeVarFromDecomp(BagType& decomp, int64_t var) {
-        auto elem = std::lower_bound( decomp.variables.begin(), decomp.variables.end(), var, compVars );
-        if (elem != decomp.variables.end()) {
-            decomp.variables.erase(elem);
+    void Preprocessor::checkNoFactInDecomp(BagType& decomp, const std::vector<int64_t>& facts) {
+        for (auto fact : facts) {
+            auto elem = std::lower_bound( decomp.variables.begin(), decomp.variables.end(), fact, compVars );
+            assert(elem != decomp.variables.end() && "Fact in decomposition!");
         }
         for (auto& child : decomp.edges) {
-            removeVarFromDecomp(child, var);
+            checkNoFactInDecomp(child, facts);
         }
     }
 

@@ -82,6 +82,7 @@ namespace gpusat {
 
     void Decomposer::gpusat_formula_to_hypergraph(htd::Hypergraph& hypergraph, const satformulaType& formula) {
 
+        assert(formula.facts.size() == 0 && "Formula must be fact-propagated and relabeled!");
         hypergraph.addVertices(formula.numVars);
 
         // Facts should be ignor-able, but they are added in the original

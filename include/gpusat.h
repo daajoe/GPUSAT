@@ -62,6 +62,7 @@ namespace gpusat {
 
             /**
              * Compute a tree decomposition of `formula` for the use in GPUSAT.
+             * `formula` must be *fact-free*!
              *
              * @param formula: The formula to decompose.
              * @param fitness: The fitness function to use.
@@ -71,17 +72,26 @@ namespace gpusat {
 
             /**
              * Apply preprocessing steps to a tree decomposition to allow for more
-             * efficient solving. These include removing facts from the formula
-             * and combining small bags.
+             * efficient solving.
              *
-             * @param formula: The sat formula.
-             * @param decomposition: A decomposition of `formula` to pre-process.
+             * @param decomposition: A decomposition of a fact-free formula.
              * @param combine_width: Maximal width of bags that can be combined.
              *
              * @returns: Pair of a result and weight correction. The weight correction
              * is needed to calculate the correct final results for weighted counting.
              */
-            static std::pair<PreprocessingResult, double> preprocess(satformulaType& formula, treedecType& decomposition, size_t combine_width);
+            static PreprocessingResult preprocessDecomp(treedecType& decomposition, size_t combine_width);
+
+            /**
+             * Apply fact propagation to a formula.
+             * The resulting formula is fact-free.
+             *
+             * @param formula: The sat formula.
+             *
+             * @returns: Pair of a result and weight correction. The weight correction
+             * is needed to calculate the correct final results for weighted counting.
+             */
+            static std::pair<PreprocessingResult, double> preprocessFormula(satformulaType& formula);
 
             /**
              * Count the models of `formula` with a given tree decomposition

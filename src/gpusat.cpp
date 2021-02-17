@@ -40,24 +40,25 @@ namespace gpusat {
         return Decomposer::computeDecomposition(formula, &fitness, iterations);
     }
 
-    std::pair<PreprocessingResult, double> GPUSAT::preprocess(
-        satformulaType& formula,
-        treedecType& decomposition,
-        size_t combine_width
-    ) {
+    std::pair<PreprocessingResult, double> GPUSAT::preprocessFormula(satformulaType& formula) {
+
         double weight_correction = GPUSAT::default_variable_weight;
-        for (auto fact : formula.facts) {
-            Preprocessor::removeVarFromDecomp(decomposition.root, fact);
-        }
         Preprocessor::preprocessFacts(formula, weight_correction);
         Preprocessor::relabelFormula(formula);
         if (formula.unsat) {
             return std::pair(PreprocessingResult::UNSATISFIABLE, GPUSAT::default_variable_weight);
         }
         std::cout << "facts preprocessed." << std::endl;
-
-        Preprocessor::preprocessDecomp(decomposition.root, combine_width);
         return std::pair(PreprocessingResult::SUCCESS, weight_correction);
+    }
+
+
+    PreprocessingResult GPUSAT::preprocessDecomp(
+        treedecType& decomposition,
+        size_t combine_width
+    ) {
+        Preprocessor::preprocessDecomp(decomposition.root, combine_width);
+        return PreprocessingResult::SUCCESS;
     }
 
     boost::multiprecision::cpp_bin_float_100 GPUSAT::solve(
@@ -75,8 +76,12 @@ namespace gpusat {
             cfg.trace,
             cfg.gpu_cache
         );
-
         auto& root = decomposition.root;
+
+#ifndef NDEBUG
+        Preprocessor::checkNoFactInDecomp(root, formula.facts);
+#endif
+
         auto dummy_parent = BagType();
         dummy_parent.variables.assign(
                 root.variables.begin(),
