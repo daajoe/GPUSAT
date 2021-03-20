@@ -512,6 +512,10 @@ namespace gpusat {
         std::vector<uint64_t> clauses;
         int64_t numClauses = 0;
 
+        // no facts are considered here, as they should have been eliminated
+        // in preprocessing.
+        assert(formula.facts.size() == 0);
+
         for (size_t i = 0; i < formula.clause_offsets.size(); i++) {
             size_t clause_offset = formula.clause_offsets[i];
             size_t c_size = clause_size(formula, i);

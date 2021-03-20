@@ -40,10 +40,13 @@ namespace gpusat {
         return Decomposer::computeDecomposition(formula, &fitness, iterations);
     }
 
-    std::pair<PreprocessingResult, double> GPUSAT::preprocessFormula(satformulaType& formula) {
+    std::pair<PreprocessingResult, double> GPUSAT::preprocessFormula(satformulaType& formula, std::vector<int64_t>& removed_facts) {
 
         double weight_correction = GPUSAT::default_variable_weight;
         Preprocessor::preprocessFacts(formula, weight_correction);
+        std::copy(formula.facts.begin(), formula.facts.end(), back_inserter(removed_facts));
+        std::sort(removed_facts.begin(), removed_facts.end(), compVars);
+        // We extract the facts before relabeling
         Preprocessor::relabelFormula(formula);
         if (formula.unsat) {
             return std::pair(PreprocessingResult::UNSATISFIABLE, GPUSAT::default_variable_weight);

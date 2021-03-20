@@ -101,8 +101,13 @@ int main(int argc, char *argv[]) {
             formula = cnf_parser.parseSatFormula(std::cin);
         }
 
-        std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
-        auto pp_result = GPUSAT::preprocessFormula(formula);
+        std::cout << "formula parsed: " << formula.facts.size() << " facts, " << formula.clause_offsets.size() << " clauses, " << formula.numVars << " variables." << std::endl;
+
+        std::vector<int64_t> removed_facts;
+
+        auto pp_result = GPUSAT::preprocessFormula(formula, removed_facts);
+
+        std::cout << "formula preprocessed: " << removed_facts.size() << " facts removed. " << formula.clause_offsets.size() << " clauses." << std::endl;
 
         if (pp_result.first != PreprocessingResult::SUCCESS) {
             time_total = getTime() - time_total;
@@ -120,11 +125,12 @@ int main(int argc, char *argv[]) {
             return 20;
         }
         weight_correction = pp_result.second;
-        std::cout << "formula parsed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
         time_decomposing = getTime();
         if (decompDir != "") {
-            // FIXME: implement through htd_io
+            TDParser tdparser;
+            std::ifstream fileIn(decompDir);
+            decomposition = tdparser.parseTreeDecomp(fileIn, removed_facts);
         } else {
             htd::ITreeDecompositionFitnessFunction *fit;
             if (fitness == "width") {
@@ -165,7 +171,7 @@ int main(int argc, char *argv[]) {
     std::cout << "pp time: " << (getTime() - time_pp) / 1000.0 << std::endl;
     std::cerr << "after pp: " << decomposition.root.hash() << std::endl;
 
-    std::cout << "formula preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
+    std::cout << "decomposition preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
     //cudaDeviceSetLimit(cudaLimitPrintfFifoSize, 1 << 26);
 

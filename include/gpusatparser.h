@@ -86,13 +86,55 @@ namespace gpusat {
          *
          * @param graph
          *      the string representation of the tree decomposition
+         * @param removed_facts
+         *      Sorted list of facts that have been removed during preprocessing.
+         *      Remove them from nodes and relabel variables accordingly.
          * @return
          *      the tree decomposition
          */
         // IF NEEDED, implement construct a decomposition from the string,
         // then use htd_to_bags from decomposer.
-        //treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
+        treedecType parseTreeDecomp(std::istream& graph, std::vector<int64_t>& removed_facts);
 
+    private:
+
+        /**
+         * parse an edge from the tree decomposition
+         *
+         * @param item
+         *      the line
+         * @param edges
+         *      queue containing all edges
+         */
+        void parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges);
+
+        /**
+         * parses the start line from the tree decomposition
+         *
+         * @param ret
+         *      the tree decomposition
+         * @param item
+         *      the line
+         * @param edges
+         *      queue containing all edges
+         */
+        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges);
+
+        /**
+         * parses a pag from the tree decomposition
+         *
+         * @param ret
+         *      object containing the tree decomposition
+         * @param item
+         *      a line from the decomposition
+         */
+        BagType parseBagLine(std::string item);
+
+
+        /**
+         * Remove facts from a bag and relabel its variables.
+         */
+        void removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove);
     };
 }
 #endif //GPUSAT_PARSER_H

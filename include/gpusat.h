@@ -87,11 +87,12 @@ namespace gpusat {
              * The resulting formula is fact-free.
              *
              * @param formula: The sat formula.
+             * @param removed_facts: A vector to store the removed facts in.
              *
              * @returns: Pair of a result and weight correction. The weight correction
              * is needed to calculate the correct final results for weighted counting.
              */
-            static std::pair<PreprocessingResult, double> preprocessFormula(satformulaType& formula);
+            static std::pair<PreprocessingResult, double> preprocessFormula(satformulaType& formula, std::vector<int64_t>& removed_facts);
 
             /**
              * Count the models of `formula` with a given tree decomposition
