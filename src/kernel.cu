@@ -211,7 +211,7 @@ __global__ void solveJoin(
     }
     if (edge2 != nullptr) {
         edge2_solutions = solveIntroduce_(variables, *edge2, edgeVariables2, weights, id);
-    }
+    } 
 
     // weighted model count
     if (weights != 0) {
@@ -512,7 +512,7 @@ void solveJoinWrapper(
     std::visit([&](auto& solution) {
         auto solution_gpu = gpuClone(solution);
 
-        auto single_edge_join = [&](const CudaSolutionVariant& edge) {
+        auto single_edge1_join = [&](const CudaSolutionVariant& edge) {
             std::visit([&](const auto &edge_owner) {
                 auto edge_gpu = gpuClone(edge_owner);
 
@@ -528,8 +528,28 @@ void solveJoinWrapper(
                     exponent,
                     cfg
                 );
+                gpuErrchk(cudaDeviceSynchronize());
             }, edge);
-            gpuErrchk(cudaDeviceSynchronize());
+        };
+
+        auto single_edge2_join = [&](const CudaSolutionVariant& edge) {
+            std::visit([&](const auto &edge_owner) {
+                auto edge_gpu = gpuClone(edge_owner);
+
+                solveJoin<<<blocksPerGrid, threadsPerBlock>>>(
+                    solution_gpu.get(),
+                    (decltype(edge_gpu.get()))nullptr,
+                    edge_gpu.get(),
+                    variables,
+                    edgeVariables1,
+                    edgeVariables2,
+                    weights,
+                    value, 
+                    exponent,
+                    cfg
+                );
+                gpuErrchk(cudaDeviceSynchronize());
+            }, edge);
         };
 
         auto double_edge_join = [&](const CudaSolutionVariant& e1, const CudaSolutionVariant& e2) {
@@ -551,15 +571,15 @@ void solveJoinWrapper(
                         exponent,
                         cfg
                     );
+                    gpuErrchk(cudaDeviceSynchronize());
                 }, e2);
             }, e1);
-            gpuErrchk(cudaDeviceSynchronize());
         };
 
         if (edge1.has_value() && !edge2.has_value()) {
-            single_edge_join(edge1.value());
+            single_edge1_join(edge1.value());
         } else if (!edge1.has_value() && edge2.has_value()) {
-            single_edge_join(edge2.value());
+            single_edge2_join(edge2.value());
         } else {
             assert(edge1.has_value() && edge2.has_value());
             double_edge_join(edge1.value(), edge2.value());
@@ -606,6 +626,7 @@ void introduceForgetWrapper(
                 previous_value,
                 cfg
             );
+            gpuErrchk(cudaDeviceSynchronize());
         } else {
             std::visit([&](const auto& solsE) {
                 auto edge_gpu = gpuClone(solsE);
@@ -624,9 +645,9 @@ void introduceForgetWrapper(
                     previous_value,
                     cfg
                 );
+                gpuErrchk(cudaDeviceSynchronize());
             }, edge.value());
         }
-        gpuErrchk(cudaDeviceSynchronize());
         update(solsF, solution_gpu);
     }, solution_owner);
 }
