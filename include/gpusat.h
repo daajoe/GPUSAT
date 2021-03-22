@@ -67,8 +67,9 @@ namespace gpusat {
              * @param formula: The formula to decompose.
              * @param fitness: The fitness function to use.
              * @param iterations: Number of iterations to improve upon the decomposition.
+             * @param dumpDecomp: Dump the tree decomposition in td format and exit.
              */
-            static treedecType decompose(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction& fitness, size_t iterations);
+            static treedecType decompose(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction& fitness, size_t iterations, bool dumpDecomp);
 
             /**
              * Apply preprocessing steps to a tree decomposition to allow for more

@@ -5,6 +5,7 @@
 #endif
 
 #include <gpusat_types.h>
+#include <boost/multiprecision/cpp_bin_float.hpp>
 
 namespace gpusat {
 
@@ -47,6 +48,8 @@ namespace gpusat {
          */
         void solveProblem(const satformulaType &formula, BagType &node, BagType &pnode, nodeType lastNode);
 
+
+        static boost::multiprecision::cpp_bin_float_100 bagSum(BagType& bag);
     protected:
 
         /**

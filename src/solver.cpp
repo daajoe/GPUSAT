@@ -130,6 +130,26 @@ namespace gpusat {
     }
 
 
+    template<class... Ts> struct sum_visitor : Ts... { using Ts::operator()...; };
+    template<class... Ts> sum_visitor(Ts...) -> sum_visitor<Ts...>;
+
+    template<class T>
+    static boost::multiprecision::cpp_bin_float_100 solutionSum(T& sol) {
+        double sols = 0.0;
+        for (size_t i = sol.minId(); i < sol.maxId(); i++) {
+            sols = sols + std::max(sol.solutionCountFor(i), 0.0);
+        }
+        return sols;
+    }
+
+    boost::multiprecision::cpp_bin_float_100 Solver::bagSum(BagType& bag) {
+        boost::multiprecision::cpp_bin_float_100 sols = 0.0;
+        for (auto& solution : bag.solution) {
+            sols = sols + std::visit([](auto& sol) { return solutionSum(sol); }, solution);
+        }
+        return sols;
+    }
+
 
     void Solver::solveProblem(const satformulaType &formula, BagType& node, BagType& pnode, nodeType lastNode) {
 
@@ -669,9 +689,6 @@ namespace gpusat {
             }
 
             TRACE("satisfiable: %d", isSatisfiable(solution_gpu));
-            /*if (node.variables.size() == 0) {
-                std::cout << "satisfiable: " << isSatisfiable(solution_gpu) << std::endl;
-            }*/
 
             if (!isSatisfiable(solution_gpu)) {
                 if (node.solution.size() > 0) {

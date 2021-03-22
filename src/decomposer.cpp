@@ -6,6 +6,7 @@
 #include <htd/BucketEliminationTreeDecompositionAlgorithm.hpp>
 #include <htd/IterativeImprovementTreeDecompositionAlgorithm.hpp>
 #include <htd/GraphPreprocessor.hpp>
+#include <htd_io/TdFormatExporter.hpp>
 #include <vector>
 
 #include "decomposer.h"
@@ -82,8 +83,8 @@ namespace gpusat {
 
     void Decomposer::gpusat_formula_to_hypergraph(htd::Hypergraph& hypergraph, const satformulaType& formula) {
 
-        assert(formula.facts.size() == 0 && "Formula must be fact-propagated and relabeled!");
-        hypergraph.addVertices(formula.numVars);
+        //assert(formula.facts.size() == 0 && "Formula must be fact-propagated and relabeled!");
+        hypergraph.addVertices(formula.numVars + formula.facts.size());
 
         // Facts should be ignor-able, but they are added in the original
         /*
@@ -106,7 +107,7 @@ namespace gpusat {
         }
     }
 
-    treedecType Decomposer::computeDecomposition(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n) {
+    treedecType Decomposer::computeDecomposition(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n, bool dumpDecomp) {
 
         htd::LibraryInstance *htdManager = htd::createManagementInstance(htd::Id::FIRST);
         htd::Hypergraph hypergraph(htdManager);
@@ -119,6 +120,11 @@ namespace gpusat {
         algorithm->setIterationCount(n);
         htd::ITreeDecomposition *decomp = algorithm->computeDecomposition(hypergraph);
         std::cout << "Decomposition Width: " << decomp->maximumBagSize() << std::endl;
+        if (dumpDecomp) {
+            htd_io::TdFormatExporter exporter;
+            exporter.write(*decomp, hypergraph, std::cout);
+            exit(0);
+        }
         auto gpusat_decomp = htd_to_bags(*decomp, formula);
         gpusat_decomp.numVars = formula.numVars;
         delete algorithm;

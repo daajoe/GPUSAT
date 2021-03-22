@@ -20,10 +20,12 @@ namespace gpusat {
          *      the fitness function
          * @param n
          *      number of iterations for the fitness function
+         * @param dumpDecomp
+         *      dump the tree decomposition in td format and exit
          * @return
          *      the decomposition in td format
          */
-        static treedecType computeDecomposition(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n);
+        static treedecType computeDecomposition(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n, bool dumpDecomp);
 
     private:
         /**

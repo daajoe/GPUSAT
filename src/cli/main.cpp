@@ -40,7 +40,7 @@ int main(int argc, char *argv[]) {
     std::string decompDir;
     size_t combineWidth = 0;
     time_t seed = time(0);
-    bool weighted, noExp, trace, no_cache, unpinned;
+    bool weighted, noExp, trace, no_cache, unpinned, dumpDecomp;
     dataStructure solutionType = dataStructure::TREE;
     CLI::App app{};
     std::size_t numDecomps = 30;
@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
     app.add_flag("--weighted", weighted, "use weighted model count");
     app.add_flag("--unpinned", unpinned, "do not use pinned memory for solutions");
     app.add_flag("--noExp", noExp, "don't use extended exponents");
+    app.add_flag("--dumpDecomposition", dumpDecomp, "dump the decomposition and exit");
     app.add_flag("--trace", trace, "output a solver trace");
     app.add_flag("--no-cache", no_cache, "cache solution bags on GPU when possible");
     app.add_set("--dataStructure", type, {"array", "tree", "combined"}, "data structure for storing the solution")->set_default_str("combined");
@@ -105,26 +106,30 @@ int main(int argc, char *argv[]) {
 
         std::vector<int64_t> removed_facts;
 
-        auto pp_result = GPUSAT::preprocessFormula(formula, removed_facts);
+        if (!dumpDecomp) {
+            auto pp_result = GPUSAT::preprocessFormula(formula, removed_facts);
 
-        std::cout << "formula preprocessed: " << removed_facts.size() << " facts removed. " << formula.clause_offsets.size() << " clauses." << std::endl;
+            std::cout << "formula preprocessed: " << removed_facts.size() << " facts removed. " << formula.clause_offsets.size() << " clauses." << std::endl;
 
-        if (pp_result.first != PreprocessingResult::SUCCESS) {
-            time_total = getTime() - time_total;
-            std::cout << "\n{\n";
-            std::cout << "    \"Num Join\": " << 0;
-            std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
-            std::cout << "\n    ,\"max Table Size\": " << 0;
-            std::cout << "\n    ,\"Model Count\": " << 0;
-            std::cout << "\n    ,\"Time\":{";
-            std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
-            std::cout << "\n        ,\"Solving\": " << 0;
-            std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
-            std::cout << "\n    }";
-            std::cout << "\n}\n";
-            return 20;
+            if (pp_result.first != PreprocessingResult::SUCCESS) {
+                time_total = getTime() - time_total;
+                std::cout << "\n{\n";
+                std::cout << "    \"Num Join\": " << 0;
+                std::cout << "\n    ,\"Num Introduce Forget\": " << 0;
+                std::cout << "\n    ,\"max Table Size\": " << 0;
+                std::cout << "\n    ,\"Model Count\": " << 0;
+                std::cout << "\n    ,\"Time\":{";
+                std::cout << "\n        \"Decomposing\": " << ((float) time_decomposing) / 1000;
+                std::cout << "\n        ,\"Solving\": " << 0;
+                std::cout << "\n        ,\"Total\": " << ((float) time_total) / 1000;
+                std::cout << "\n    }";
+                std::cout << "\n}\n";
+                return 20;
+            }
+            weight_correction = pp_result.second;
+        } else {
+            std::cerr << "skipping formula preprocessing for dumping the decomposition." << std::endl;
         }
-        weight_correction = pp_result.second;
 
         time_decomposing = getTime();
         if (decompDir != "") {
@@ -143,7 +148,7 @@ int main(int argc, char *argv[]) {
                 fit = new WidthCutSetFitnessFunction();
             }
             std::cout << "num decomps: " << numDecomps << std::endl;
-            decomposition = GPUSAT::decompose(formula, *fit, numDecomps);
+            decomposition = GPUSAT::decompose(formula, *fit, numDecomps, dumpDecomp);
         }
         time_decomposing = getTime() - time_decomposing;
         std::cout << "decomp time: " << time_decomposing / 1000.0 << std::endl;
@@ -183,12 +188,6 @@ int main(int argc, char *argv[]) {
     time_solving = time_finish - time_solving;
     time_total = time_finish - time_total;
 
-    /*
-    std::cout << "\n{\n";
-    std::cout << "    \"Num Join\": " << sol->numJoin;
-    std::cout << "\n    ,\"Num Introduce Forget\": " << sol->numIntroduceForget;
-    std::cout << "\n    ,\"max Table Size\": " << sol->maxTableSize;
-    */
     std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << model_count;
 
     std::cout.precision(6);
