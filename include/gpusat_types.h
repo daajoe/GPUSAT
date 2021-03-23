@@ -618,7 +618,7 @@ namespace gpusat {
         int32_t exponent = 0;
         int64_t id = 0;
         std::vector<int64_t> variables;
-        std::vector<BagType> edges;
+        std::list<BagType> edges;
         std::vector<SolutionVariant> solution;
         // if all solutions fit in one bag, leave it on the GPU.
         // Solver functions assume this solution is equivalent

@@ -90,10 +90,11 @@ int main(int argc, char *argv[]) {
 
     satformulaType formula;
     treedecType decomposition;
-    time_t time_decomposing;
+    time_t time_decomposing, time_parsing;
     auto weight_correction = 1.0;
     {
 
+        time_parsing = getTime();
         CNFParser cnf_parser(cfg.solve_cfg.weighted);
         if (formulaDir != "") {
             std::ifstream fileIn(formulaDir);
@@ -101,6 +102,8 @@ int main(int argc, char *argv[]) {
         } else {
             formula = cnf_parser.parseSatFormula(std::cin);
         }
+        time_parsing = getTime() - time_parsing;
+        std::cout << "parse time: " << time_parsing / 1000.0 << std::endl;
 
         std::cout << "formula parsed: " << formula.facts.size() << " facts, " << formula.clause_offsets.size() << " clauses, " << formula.numVars << " variables." << std::endl;
 

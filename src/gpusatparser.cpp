@@ -191,12 +191,8 @@ namespace gpusat {
     }
 
     BagType extract_bag(int64_t target_id, std::vector<BagType>& bags) {
-        auto it = std::find_if(bags.begin(), bags.end(), [target_id](const BagType& b) { return b.id == target_id; });
-        assert(it != bags.end());
-        BagType bag;
-        std::swap(bag, *it);
-        bags.erase(it);
-        return std::move(bag);
+        assert(target_id < bags.size());
+        return std::move(bags[target_id]);
     }
 
     treedecType TDParser::parseTreeDecomp(std::istream& ss, std::vector<int64_t>& removed_facts) {
@@ -215,9 +211,11 @@ namespace gpusat {
                 } else if (type == 's') {
                     //start line
                     parseStartLine(ret, item, edges);
+                    bags.resize(ret.numb);
                 } else if (type == 'b') {
                     //bag line
-                    bags.push_back(parseBagLine(item));
+                    auto bag = std::move(parseBagLine(item));
+                    bags[bag.id] = std::move(bag);
                 } else {
                     //edge line
                     parseEdgeLine(item, edges);
@@ -254,17 +252,16 @@ namespace gpusat {
 
             // reserve the current size, so we do not have to reallocate
             // and the backlog pointers stay valid
-            current_bag->edges.reserve(edges[current_bag->id].size());
+            // --> Not needed anymore when using a linked list.
+            //current_bag->edges.reserve(edges[current_bag->id].size());
             removeFactsFromDecomposition(*current_bag, removed_facts);
 
             for (auto child_id : edges[current_bag->id]) {
                 child_id = child_id - 1;
-                auto bag = std::move(extract_bag(child_id, bags));
-                current_bag->edges.push_back(std::move(bag));
+                current_bag->edges.push_back(std::move(extract_bag(child_id, bags)));
                 backlog.push_back(&current_bag->edges.back());
             }
         }
-        assert(bags.size() == 0);
 
         return ret;
     }
@@ -330,6 +327,7 @@ namespace gpusat {
         getline(sline, i, ' '); //bag number
         long bnum = stoi(i);
         long a = 0;
+        /*
         int64_t match_count = 0;
         std::istringstream ss(item);
         std::string word;
@@ -340,6 +338,7 @@ namespace gpusat {
                 match_count++;
             }
         }
+        */
         bag.id = bnum - 1;
         while (getline(sline, i, ' ')) //vertices
         {

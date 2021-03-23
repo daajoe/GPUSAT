@@ -14,10 +14,12 @@ namespace gpusat {
         // try to merge child nodes
         while (changed) {
             changed = false;
+            auto a_it = decomp.edges.begin();
             for (size_t a = 0; a < decomp.edges.size() && !changed; a++) {
+                auto b_it = decomp.edges.begin();
                 for (size_t b = 0; b < decomp.edges.size() && !changed; b++) {
-                    auto& edge_a = decomp.edges[a];
-                    auto& edge_b = decomp.edges[b];
+                    auto& edge_a = *a_it;
+                    auto& edge_b = *b_it;
                     if (a != b &&
                             ((edge_a.variables.size() < combineWidth
                                 && edge_b.variables.size() < combineWidth)
@@ -42,11 +44,14 @@ namespace gpusat {
                                     std::make_move_iterator(edge_b.edges.begin()),
                                     std::make_move_iterator(edge_b.edges.end())
                             );
-                            decomp.edges.erase(decomp.edges.begin() + b);
-                            sort(edge_a.edges.begin(), edge_a.edges.end(), compTreedType);
+                            decomp.edges.erase(b_it);
+                            edge_a.edges.sort(compTreedType);
+                            // b_it is invalidated, but loop is eded because of changed = true
                         }
                     }
+                    std::advance(b_it, 1);
                 }
+                std::advance(a_it, 1);
             }
         }
 
@@ -58,7 +63,10 @@ namespace gpusat {
                 changed = false;
                 for (size_t i = 0; i < decomp.edges.size(); i++) {
                     std::vector<int64_t> v;
-                    auto& edge_i = decomp.edges[i];
+                    // FIXME: clean this up
+                    auto i_it = decomp.edges.begin();
+                    std::advance(i_it, i);
+                    auto& edge_i = *i_it;
                     std::set_union(
                             decomp.variables.begin(), decomp.variables.end(),
                             edge_i.variables.begin(), edge_i.variables.end(),
@@ -76,22 +84,22 @@ namespace gpusat {
                                 std::make_move_iterator(edge_i.edges.begin()),
                                 std::make_move_iterator(edge_i.edges.end())
                         );
-                        decomp.edges.erase(decomp.edges.begin() + i);
-                        std::sort(decomp.edges.begin(), decomp.edges.end(), compTreedType);
+                        decomp.edges.erase(i_it);
+                        decomp.edges.sort(compTreedType);
                     }
                 }
             }
         }
 
         // process child nodes
-        for (size_t i = 0; i < decomp.edges.size(); i++) {
-            preprocessDecomp((decomp.edges)[i], combineWidth);
+        for (auto& edge : decomp.edges) {
+            preprocessDecomp(edge, combineWidth);
         }
         //std::sort(decomp.variables.begin(), decomp.variables.end());
 
-        for (size_t i = 0; i < decomp.edges.size(); i++) {
+        for (auto edge_it = decomp.edges.begin(); edge_it != decomp.edges.end(); edge_it++)  {
             std::vector<int64_t> fVars;
-            auto& edge_i = decomp.edges[i];
+            auto& edge_i = *edge_it;
             std::set_intersection(
                     decomp.variables.begin(), decomp.variables.end(),
                     edge_i.variables.begin(), edge_i.variables.end(),
@@ -111,8 +119,8 @@ namespace gpusat {
                 std::sort(newEdge.variables.begin(), newEdge.variables.end(), compVars);
                 // move existing node to be child of newEdge,
                 // wich becomes decomp.edges[i]
-                newEdge.edges.push_back(std::move(decomp.edges[i]));
-                decomp.edges[i] = std::move(newEdge);
+                newEdge.edges.push_back(std::move(*edge_it));
+                *edge_it = std::move(newEdge);
             }
         }
 

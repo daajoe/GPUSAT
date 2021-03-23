@@ -188,20 +188,20 @@ namespace gpusat {
                 cNode.maxSize = 1;
                 solveIntroduceForget(formula, pnode, node, cNode, true, lastNode);
             } else if (node.edges.size() == 1) {
-                solveProblem(formula, node.edges[0], node, INTRODUCEFORGET);
+                solveProblem(formula, node.edges.front(), node, INTRODUCEFORGET);
                 if (isSat == 1) {
-                    BagType &cnode = node.edges[0];
+                    BagType &cnode = node.edges.front();
                     solveIntroduceForget(formula, pnode, node, cnode, false, lastNode);
                 }
             } else if (node.edges.size() > 1) {
-                solveProblem(formula, node.edges[0], node, JOIN);
+                solveProblem(formula, node.edges.front(), node, JOIN);
                 if (isSat <= 0) {
                     return;
                 }
 
-                for (size_t i = 1; i < node.edges.size(); i++) {
-                    BagType& edge1 = node.edges[0];
-                    BagType& edge2 = node.edges[i];
+                for (auto edge2_it = std::next(node.edges.begin()); edge2_it != node.edges.end(); edge2_it++) {
+                    BagType& edge1 = node.edges.front();
+                    BagType& edge2 = *edge2_it;
 
                     TRACE("combine solve(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
                         node.id, edge1.hash(), edge2.hash(), node.hash());
@@ -222,7 +222,8 @@ namespace gpusat {
                     BagType tmp;
                     tmp.variables = vt;
 
-                    if (i == node.edges.size() - 1) {
+                    // last edge
+                    if (std::next(edge2_it) == node.edges.end()) {
                         solveJoin(tmp, edge1, edge2, formula, INTRODUCEFORGET);
                         if (isSat <= 0) {
                             return;
@@ -231,11 +232,11 @@ namespace gpusat {
                         TRACE("combine intro/forget(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
                             node.id, edge1.hash(), edge2.hash(), node.hash());
 
-                        node.edges[0] = std::move(tmp);
-                        solveIntroduceForget(formula, pnode, node, node.edges[0], false, lastNode);
+                        node.edges.front() = std::move(tmp);
+                        solveIntroduceForget(formula, pnode, node, node.edges.front(), false, lastNode);
                     } else {
                         solveJoin(tmp, edge1, edge2, formula, JOIN);
-                        node.edges[0] = std::move(tmp);
+                        node.edges.front() = std::move(tmp);
                     }
                 }
             }
