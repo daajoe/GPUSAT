@@ -9,49 +9,70 @@
 
 namespace gpusat {
     void Preprocessor::preprocessDecomp(BagType& decomp, size_t combineWidth) {
-
         bool changed = true;
         // try to merge child nodes
+        std::vector<int64_t> variable_union;
+
+        // maximal size of joined variables
         while (changed) {
             changed = false;
-            auto a_it = decomp.edges.begin();
-            for (size_t a = 0; a < decomp.edges.size() && !changed; a++) {
-                auto b_it = decomp.edges.begin();
-                for (size_t b = 0; b < decomp.edges.size() && !changed; b++) {
+
+            for (auto a_it = decomp.edges.begin(); a_it != decomp.edges.end(); a_it++) {
+                for (auto b_it = decomp.edges.begin(); b_it != decomp.edges.end(); b_it++) {
                     auto& edge_a = *a_it;
                     auto& edge_b = *b_it;
-                    if (a != b &&
+                    if (a_it != b_it &&
                             ((edge_a.variables.size() < combineWidth
                                 && edge_b.variables.size() < combineWidth)
                              || edge_a.variables.size() == 0
                              || edge_b.variables.size() == 0
                              ) && decomp.edges.size() > 1) {
 
-                        std::vector<int64_t> v;
-                        std::set_union(
-                                edge_a.variables.begin(), edge_a.variables.end(),
-                                edge_b.variables.begin(), edge_b.variables.end(),
-                                back_inserter(v),
-                                compVars
-                        );
-                        if (v.size() < combineWidth || edge_a.variables.size() == 0 ||
+                        auto max_vars = edge_a.variables.size() + edge_b.variables.size();
+                        if (max_vars > variable_union.size()) {
+                            variable_union.resize(max_vars);
+                        }
+
+                        bool definitely_disjunct =
+                            edge_a.variables.size() == 0
+                         || edge_b.variables.size() == 0
+                         || (edge_a.variables.front() > edge_b.variables.back())
+                         || (edge_a.variables.back() < edge_b.variables.front());
+
+                        auto union_size = max_vars;
+                        if (!definitely_disjunct) {
+                            auto union_end = std::set_union(
+                                    edge_a.variables.begin(), edge_a.variables.end(),
+                                    edge_b.variables.begin(), edge_b.variables.end(),
+                                    variable_union.begin()
+                            );
+
+                            union_size = union_end - variable_union.begin();
+                        }
+
+                        if (union_size < combineWidth || edge_a.variables.size() == 0 ||
                             edge_b.variables.size() == 0) {
+
+                            auto union_end = std::set_union(
+                                    edge_a.variables.begin(), edge_a.variables.end(),
+                                    edge_b.variables.begin(), edge_b.variables.end(),
+                                    variable_union.begin()
+                            );
                             changed = true;
-                            edge_a.variables.assign(v.begin(), v.end());
+                            edge_a.variables.assign(variable_union.begin(), union_end);
 
                             edge_a.edges.insert(
                                     edge_a.edges.end(),
                                     std::make_move_iterator(edge_b.edges.begin()),
                                     std::make_move_iterator(edge_b.edges.end())
                             );
+                            // This is a linked list, so iterators stay valid.
                             decomp.edges.erase(b_it);
                             edge_a.edges.sort(compTreedType);
-                            // b_it is invalidated, but loop is eded because of changed = true
+                            break;
                         }
                     }
-                    std::advance(b_it, 1);
                 }
-                std::advance(a_it, 1);
             }
         }
 
@@ -142,18 +163,41 @@ namespace gpusat {
         }
     }
 
+    std::vector<int64_t> Preprocessor::buildRelabelMap(int64_t facts_and_vars, const std::vector<int64_t>& facts) {
+        std::vector<int64_t> relabel_map;
+        relabel_map.resize(facts_and_vars + 1);
+
+        auto current_fact = facts.begin();
+        for (auto it = relabel_map.begin(); it != relabel_map.end(); it++) {
+            int64_t index = it - relabel_map.begin();
+            while (current_fact != facts.end() && abs(*current_fact) < index) {
+                current_fact++;
+            }
+
+            int64_t facts_so_far = current_fact - facts.begin();
+            // this is the fact itself
+            if (abs(*current_fact) == index) {
+                *it = -1;
+            } else {
+                *it = facts_so_far;
+            }
+        }
+        return relabel_map;
+    }
+
     void Preprocessor::relabelFormula(satformulaType &formula) {
-        std::vector<int64_t> to_eliminate = formula.facts;
-        std::sort(to_eliminate.begin(), to_eliminate.end(), compVars);
-        // start from highest to lowest fact
-        std::reverse(to_eliminate.begin(), to_eliminate.end());
-        for (auto fact : to_eliminate) {
-            for (int i=0; i < formula.clause_bag.size(); i++) {
-                if (formula.clause_bag[i] > abs(fact)) {
-                    formula.clause_bag[i]--;
-                } else if (formula.clause_bag[i] < -abs(fact)) {
-                    formula.clause_bag[i]++;
-                }
+
+        std::sort(formula.facts.begin(), formula.facts.end(), compVars);
+        auto relabel_map = buildRelabelMap(formula.facts.size() + formula.numVars, formula.facts);
+
+        for (auto it=formula.clause_bag.begin(); it!=formula.clause_bag.end(); it++) {
+            // no facts here
+            assert(relabel_map[abs(*it)] > -1);
+
+            if (*it < 0) {
+                *it += relabel_map[abs(*it)];
+            } else {
+                *it -= relabel_map[*it];
             }
         }
         /*
@@ -168,7 +212,6 @@ namespace gpusat {
             }
         }
         */
-        formula.facts.clear();
     }
 
     void Preprocessor::preprocessFacts(satformulaType &formula, double &defaultWeight) {

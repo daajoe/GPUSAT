@@ -35,6 +35,10 @@ namespace gpusat {
         static void checkNoFactInDecomp(BagType& decomp, const std::vector<int64_t>& var);
 
         static void relabelFormula(satformulaType &formula);
+
+        /// build a map of variable renaming offsets for relabeling variables based on removed facts.
+        /// the fact vector must be sorted.
+        static std::vector<int64_t> buildRelabelMap(int64_t facts_and_vars, const std::vector<int64_t>& facts);
     };
 }
 #endif //GPUSAT_GPUSATPREPROCESSOR_H

@@ -25,10 +25,12 @@ namespace gpusat {
 
         double weight_correction = GPUSAT::default_variable_weight;
         Preprocessor::preprocessFacts(formula, weight_correction);
+        removed_facts.reserve(formula.facts.size());
         std::copy(formula.facts.begin(), formula.facts.end(), back_inserter(removed_facts));
         std::sort(removed_facts.begin(), removed_facts.end(), compVars);
         // We extract the facts before relabeling
         Preprocessor::relabelFormula(formula);
+        formula.facts.clear();
         if (formula.unsat) {
             return std::pair(PreprocessingResult::UNSATISFIABLE, GPUSAT::default_variable_weight);
         }

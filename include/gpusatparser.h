@@ -106,7 +106,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges);
+        void parseEdgeLine(std::string& item, std::vector<std::vector<int64_t>> &edges);
 
         /**
          * parses the start line from the tree decomposition
@@ -128,13 +128,14 @@ namespace gpusat {
          * @param item
          *      a line from the decomposition
          */
-        BagType parseBagLine(std::string item);
+        BagType parseBagLine(std::string& item);
 
 
         /**
          * Remove facts from a bag and relabel its variables.
          */
-        void removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove);
+
+        static void removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove, const std::vector<int64_t>& relabel_map);
     };
 }
 #endif //GPUSAT_PARSER_H

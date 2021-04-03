@@ -7,6 +7,7 @@
 #include <deque>
 
 #include "gpusatparser.h"
+#include "gpusatpreprocessor.h"
 
 namespace gpusat {
 
@@ -243,6 +244,9 @@ namespace gpusat {
             }
         }
 
+        std::sort(removed_facts.begin(), removed_facts.end(), compVars);
+        auto relabel_map = Preprocessor::buildRelabelMap(ret.numVars, removed_facts);
+
         assert(bags.size() == ret.numb);
         ret.root = extract_bag(0, bags);
         backlog.push_back(&ret.root);
@@ -254,7 +258,7 @@ namespace gpusat {
             // and the backlog pointers stay valid
             // --> Not needed anymore when using a linked list.
             //current_bag->edges.reserve(edges[current_bag->id].size());
-            removeFactsFromDecomposition(*current_bag, removed_facts);
+            removeFactsFromDecomposition(*current_bag, removed_facts, relabel_map);
 
             for (auto child_id : edges[current_bag->id]) {
                 child_id = child_id - 1;
@@ -266,31 +270,26 @@ namespace gpusat {
         return ret;
     }
 
-    void TDParser::removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove) {
+    void TDParser::removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove, const std::vector<int64_t>& relabel_map) {
         // to_remove, must be sorted w.r.t. compVars!
 
-        int64_t prev_var = 0;
         std::vector<int64_t> new_variables;
         // vars should be already sorted as well
         for (auto var : bag.variables) {
             assert(var > 0);
-            assert(var > prev_var);
-            prev_var = var;
 
-            bool is_fact = std::binary_search(to_remove.begin(), to_remove.end(), var, compVars);
+            int64_t offset = relabel_map[var];
+            bool is_fact = offset == -1;
             if (is_fact) {
                 continue;
             } else {
-                auto offset = std::lower_bound(to_remove.begin(), to_remove.end(), var, compVars) - to_remove.begin();
-
-                assert(var - offset <= 974);
                 new_variables.push_back(var - offset);
             }
         }
         bag.variables = std::move(new_variables);
     }
 
-    void TDParser::parseEdgeLine(std::string item, std::vector<std::vector<int64_t>> &edges) {
+    void TDParser::parseEdgeLine(std::string& item, std::vector<std::vector<int64_t>> &edges) {
         std::stringstream sline(item);
         std::string i;
         getline(sline, i, ' '); //start
@@ -299,8 +298,8 @@ namespace gpusat {
         int64_t end = stoi(i);
         edges[start - 1].push_back(end);
         edges[end - 1].push_back(start);
-        std::sort(edges[start-1].begin(), edges[start-1].end());
-        std::sort(edges[end-1].begin(), edges[end-1].end());
+        //std::sort(edges[start-1].begin(), edges[start-1].end());
+        //std::sort(edges[end-1].begin(), edges[end-1].end());
     }
 
     void TDParser::parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges) {
@@ -319,7 +318,7 @@ namespace gpusat {
         ret.numVars = stoi(i);
     }
 
-    BagType TDParser::parseBagLine(std::string item) {
+    BagType TDParser::parseBagLine(std::string& item) {
         BagType bag;
         std::stringstream sline(item);
         std::string i;
