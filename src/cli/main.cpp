@@ -191,7 +191,9 @@ int main(int argc, char *argv[]) {
     time_solving = time_finish - time_solving;
     time_total = time_finish - time_total;
 
-    std::cout << std::setprecision(20) << "\n    ,\"Model Count\": " << model_count;
+    std::cout << "\n{";
+
+    std::cout << std::setprecision(20) << "\n    \"Model Count\": " << model_count;
 
     std::cout.precision(6);
     std::cout << "\n    ,\"Time\":{";

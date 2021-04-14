@@ -26,11 +26,9 @@ namespace gpusat {
         for (int64_t var : variables) {
             hash_combine(h, var);
         }
-        /*
         for (const BagType& edge : edges) {
             hash_combine(h, edge.hash());
         }
-        */
         for (const auto& sol : solution) {
             hash_combine(h, std::visit([](const auto& s) -> size_t {return s.hash(); }, sol));
         }
@@ -135,7 +133,7 @@ namespace gpusat {
 
     template<class T>
     static boost::multiprecision::cpp_bin_float_100 solutionSum(T& sol) {
-        double sols = 0.0;
+        boost::multiprecision::cpp_bin_float_100 sols = 0.0;
         for (size_t i = sol.minId(); i < sol.maxId(); i++) {
             sols = sols + std::max(sol.solutionCountFor(i), 0.0);
         }
@@ -511,7 +509,7 @@ namespace gpusat {
 
     void Solver::solveIntroduceForget(const satformulaType &formula, BagType &pnode, BagType &node, BagType &cnode, bool leaf, nodeType nextNode) {
 
-        TRACE("\n\tpnode: %lu \n\tnode: %lu \n\tcnode: %lu", pnode.hash(), node.hash(), cnode.hash());
+        TRACE("\n\tpnode: %lu \n\tnode: %lu \n\tcnode: %lu\n\tid: %lu", pnode.hash(), node.hash(), cnode.hash(), node.id);
         if (node.variables.size() == 0) {
             std::cout << "node with 0 variables: " << node.id << std::endl;
         }

@@ -175,8 +175,9 @@ namespace gpusat {
             }
 
             int64_t facts_so_far = current_fact - facts.begin();
+            assert(facts_so_far <= facts.size());
             // this is the fact itself
-            if (abs(*current_fact) == index) {
+            if (current_fact != facts.end() && abs(*current_fact) == index) {
                 *it = -1;
             } else {
                 *it = facts_so_far;
