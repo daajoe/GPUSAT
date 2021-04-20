@@ -726,6 +726,7 @@ void meminit(TreeSolution<CudaMem>& sol, size_t from, size_t to) {
         // allocate CPU memory
         cpu.allocate();
 
+        gpuErrchk(cudaDeviceSynchronize());
         assert(gpu.hasData());
         // copy data structure
         gpuErrchk(cudaMemcpy(

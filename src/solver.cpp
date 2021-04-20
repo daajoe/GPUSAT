@@ -343,7 +343,7 @@ namespace gpusat {
             SolutionVariant tmp_solution = [&]() -> SolutionVariant {
                 switch (solutionType) {
                     case TREE: {
-                        auto tree_size = (maxId - minId) * 2 + numVars;
+                        auto tree_size = (maxId - minId + 1) * 2 + numVars;
                         return TreeSolution<CpuMem>(tree_size, minId, maxId, numVars);
                     }
                     case ARRAY: {
@@ -638,7 +638,7 @@ namespace gpusat {
                 solutionType,
                 sol_minId,
                 sol_maxId,
-                (sol_maxId - sol_minId) * 2 + node.variables.size(),
+                (sol_maxId - sol_minId + 1) * 2 + node.variables.size(),
                 node.variables.size()
             );
 
