@@ -470,6 +470,7 @@ namespace gpusat {
     struct CudaMem {
         void* malloc(size_t size) const {
             uint8_t* mem = nullptr;
+
             gpuErrchk(cudaMalloc(&mem, size));
             assert(mem != nullptr);
             return mem;
@@ -541,7 +542,14 @@ namespace gpusat {
             if (size == 0) {
                 return nullptr;
             }
-            uint8_t* mem = (uint8_t*)cuda_pinned_alloc_pool.allocate(size);
+            uint8_t* mem = nullptr;
+            try {
+                mem = (uint8_t*)cuda_pinned_alloc_pool.allocate(size);
+            } catch (std::bad_alloc) {
+                std::cerr << "out of main memory!" << std::endl;
+                cudaDeviceReset();
+                exit(5);
+            }
             gpuErrchk(cudaGetLastError());
             gpuErrchk(cudaDeviceSynchronize());
             return mem;
