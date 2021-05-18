@@ -198,11 +198,18 @@ namespace gpusat {
                 }
 
                 for (auto edge2_it = std::next(node.edges.begin()); edge2_it != node.edges.end(); edge2_it++) {
+                    if (node.edges.front().cached_solution.has_value()) {
+                        node.edges.front().solution.push_back(cpuCopy(node.edges.front().cached_solution.value()));
+                        node.edges.front().cached_solution = std::nullopt;
+                    }
+
                     BagType& edge1 = node.edges.front();
                     BagType& edge2 = *edge2_it;
 
                     TRACE("combine solve(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
                         node.id, edge1.hash(), edge2.hash(), node.hash());
+
+
                     solveProblem(formula, edge2, node, JOIN);
                     if (isSat <= 0) {
                         return;
