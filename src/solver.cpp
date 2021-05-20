@@ -156,6 +156,8 @@ namespace gpusat {
         if (isSat > 0) {
             if (node.edges.empty()) {
                 BagType cNode;
+                cNode.id = id_running;
+                id_running++;
 
                 double val = 1.0;
 
@@ -198,10 +200,6 @@ namespace gpusat {
                 }
 
                 for (auto edge2_it = std::next(node.edges.begin()); edge2_it != node.edges.end(); edge2_it++) {
-                    if (node.edges.front().cached_solution.has_value()) {
-                        node.edges.front().solution.push_back(cpuCopy(node.edges.front().cached_solution.value()));
-                        node.edges.front().cached_solution = std::nullopt;
-                    }
 
                     BagType& edge1 = node.edges.front();
                     BagType& edge2 = *edge2_it;
@@ -225,6 +223,8 @@ namespace gpusat {
                             back_inserter(vt));
 
                     BagType tmp;
+                    tmp.id = id_running;
+                    id_running++;
                     tmp.variables = vt;
 
                     // last edge
@@ -237,11 +237,23 @@ namespace gpusat {
                         TRACE("combine intro/forget(%ld). \n\tedge1: %lu \n\tedge2: %lu, \n\tnode: %lu",
                             node.id, edge1.hash(), edge2.hash(), node.hash());
 
+                        cached_nodes.erase(node.edges.front().id);
                         node.edges.front() = std::move(tmp);
                         solveIntroduceForget(formula, pnode, node, node.edges.front(), false, lastNode);
+                        // update cache pointers
+                        cached_nodes.erase(node.edges.front().id);
+                        if (node.edges.front().cached_solution.has_value()) {
+                            cached_nodes[node.edges.front().id] = &node.edges.front();
+                        }
                     } else {
                         solveJoin(tmp, edge1, edge2, formula, JOIN);
+                        cached_nodes.erase(node.edges.front().id);
                         node.edges.front() = std::move(tmp);
+                        // update cache pointers
+                        cached_nodes.erase(node.edges.front().id);
+                        if (node.edges.front().cached_solution.has_value()) {
+                            cached_nodes[node.edges.front().id] = &node.edges.front();
+                        }
                     }
                 }
             }
@@ -331,6 +343,27 @@ namespace gpusat {
 
         uint64_t maxSize = std::ceil((1l << (node.variables.size())) * 1.0 / bagSizeNode);
 
+        if (do_cache) {
+            // if we need multiple chunks or have no space left, write cache back
+            size_t unused_cache = cacheSize()
+                - (edge1.cached_solution.has_value() ? dataStructureSize(edge1.cached_solution.value()) : 0);
+                - (edge2.cached_solution.has_value() ? dataStructureSize(edge2.cached_solution.value()) : 0);
+            // not sure if this is exactly right, but it is prob. redundant w.r.t. maxSize > 1 anyway.
+            int64_t memory_left = memorySize - usedMemory - unused_cache * s - edge1.maxSize * s - edge2.maxSize * s - ((bagSizeNode + 1) * 2 + node.variables.size()) * s;
+            if (maxSize > 1 || memory_left < 0) {
+                for (auto& [key, value] : cached_nodes) {
+                    if (key != edge1.id && key != edge2.id) {
+                        assert(value->cached_solution.has_value());
+                        value->solution.push_back(cpuCopy(value->cached_solution.value()));
+                        value->cached_solution = std::nullopt;
+                    }
+                }
+                //std::cerr << "cache cleared! memory left: " << memory_left << std::endl;
+                // we can clear the map here, because cached cnode is consumed anyway.
+                cached_nodes.clear();
+            }
+        }
+
         node.solution.clear();
 
         CudaSolutionVariant solution_gpu(ArraySolution<CudaMem>(0, 0, 0));
@@ -379,6 +412,7 @@ namespace gpusat {
                         edge1.solution.push_back(cpuCopy(edge1.cached_solution.value()));
                     }
                     swap(edge1_solution, edge1.cached_solution);
+                    cached_nodes.erase(edge1.id);
                 } else if (b < edge1.solution.size()) {
                     assert(hasData(edge1.solution[b]));
                     edge1_solution = gpuOwner(edge1.solution[b]);
@@ -396,6 +430,7 @@ namespace gpusat {
                         edge2.solution.push_back(cpuCopy(edge2.cached_solution.value()));
                     }
                     swap(edge2_solution, edge2.cached_solution);
+                    cached_nodes.erase(edge2.id);
                 } else if (b < edge2.solution.size()) {
                     assert(hasData(edge2.solution[b]));
                     edge2_solution = gpuOwner(edge2.solution[b]);
@@ -501,10 +536,12 @@ namespace gpusat {
         // if only one solution bag was used, reuse
         // it in the next node
         if (node.solution.size() == 0 && cache_last_solution_bag && do_cache) {
+            cached_nodes[node.id] = &node;
             node.cached_solution = std::make_optional(std::move(solution_gpu));
         } else {
             node.solution.push_back(cpuCopy(solution_gpu));
             node.cached_solution = std::nullopt;
+            cached_nodes.erase(node.id);
         }
 
         TRACE("output hash: %lu", node.hash());
@@ -624,7 +661,24 @@ namespace gpusat {
 
         uint64_t maxSize = std::ceil((1ul << (node.variables.size())) * 1.0 / bagSizeForget);
 
-        //TRACE("used memory: %lu", usedMemory);
+        if (do_cache) {
+            // if we need multiple chunks or have no space left, write cache back
+            size_t unused_cache = cacheSize()
+                - (cnode.cached_solution.has_value() ? dataStructureSize(cnode.cached_solution.value()) : 0);
+            int64_t memory_left = memorySize - usedMemory - unused_cache * s - cnode.maxSize * s - ((bagSizeForget + 1) * 2 + node.variables.size()) * s;
+            if (maxSize > 1 || memory_left < 0) {
+                for (auto& [key, value] : cached_nodes) {
+                    if (key != cnode.id) {
+                        assert(value->cached_solution.has_value());
+                        value->solution.push_back(cpuCopy(value->cached_solution.value()));
+                        value->cached_solution = std::nullopt;
+                    }
+                }
+                //std::cerr << "cache cleared! memory left: " << memory_left << std::endl;
+                // we can clear the map here, because cached cnode is consumed anyway.
+                cached_nodes.clear();
+            }
+        }
 
         node.solution.clear();
 
@@ -661,6 +715,7 @@ namespace gpusat {
                     assert(cnode.solution.size() == 0);
                     assert(cnode.solutionBagCount() == 1);
                     std::swap(edge_solution, cnode.cached_solution);
+                    cached_nodes.erase(cnode.id);
                 }
 
                 if (!leaf && !edge_solution.has_value()) {
@@ -749,6 +804,7 @@ namespace gpusat {
                     // to the solutions IDs we have actually considered.
                     sol.setDataStructureSize(bagSizeForget);
                     cache_last_solution_bag = true;
+                    node.maxSize = std::max(node.maxSize, sol.dataStructureSize());
                 }
             }
         }
@@ -766,10 +822,12 @@ namespace gpusat {
         // if only one solution bag was used, reuse
         // it in the next node
         if (node.solution.size() == 0 && cache_last_solution_bag && do_cache) {
+            cached_nodes[node.id] = &node;
             node.cached_solution = std::make_optional(std::move(solution_gpu));
         } else {
             node.solution.push_back(cpuCopy(solution_gpu));
             node.cached_solution = std::nullopt;
+            cached_nodes.erase(node.id);
         }
 
         TRACE("output hash: %lu", node.hash());

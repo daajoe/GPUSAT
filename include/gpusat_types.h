@@ -573,8 +573,12 @@ namespace gpusat {
     typedef std::variant<TreeSolution<CpuMem>, ArraySolution<CpuMem>> SolutionVariant;
     typedef std::variant<TreeSolution<CudaMem>, ArraySolution<CudaMem>> CudaSolutionVariant;
 
-    inline int64_t dataStructureSize(const SolutionVariant& solution) {
-        return std::visit([](const auto& sol) -> int64_t { return sol.dataStructureSize(); }, solution);
+    inline size_t dataStructureSize(const SolutionVariant& solution) {
+        return std::visit([](const auto& sol) -> size_t { return sol.dataStructureSize(); }, solution);
+    }
+
+    inline size_t dataStructureSize(const CudaSolutionVariant& solution) {
+        return std::visit([](const auto& sol) -> size_t { return sol.dataStructureSize(); }, solution);
     }
 
     inline void freeData(SolutionVariant& solution) {

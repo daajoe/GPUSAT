@@ -24,7 +24,7 @@ file(GLOB_RECURSE gpusat_HEADERS "include/*.h")
 set(COMMON_FLAGS -Wextra -Wall -Werror)
 
 add_library(gpusat_kernel STATIC "src/kernel.cu")
-target_compile_options(gpusat_kernel PRIVATE -arch=sm_70)
+target_compile_options(gpusat_kernel PRIVATE -arch=sm_75)
 target_compile_options(gpusat_kernel PRIVATE -std=c++17 --expt-relaxed-constexpr)
 target_include_directories(gpusat_kernel PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_include_directories(gpusat_kernel PRIVATE include/)

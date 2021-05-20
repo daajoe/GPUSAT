@@ -5,6 +5,7 @@
 #endif
 
 #include <gpusat_types.h>
+#include <map>
 #include <boost/multiprecision/cpp_bin_float.hpp>
 
 namespace gpusat {
@@ -28,6 +29,18 @@ namespace gpusat {
         dataStructure solutionType;
         const bool do_trace = false;
         const bool do_cache = true;
+        size_t id_running = 0x100000000;
+
+        std::map<int64_t, BagType*> cached_nodes;
+
+        size_t cacheSize() {
+            size_t s = 0;
+            for (const auto& [key, value] : cached_nodes) {
+                assert(value->cached_solution.has_value());
+                s += dataStructureSize(value->cached_solution.value());
+            }
+            return s;
+        }
 
         /**
          *
