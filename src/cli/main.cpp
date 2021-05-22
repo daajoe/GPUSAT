@@ -172,12 +172,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cerr << "before pp: " << decomposition.root.hash() << std::endl;
-
     auto time_pp = getTime();
     auto pp_result = GPUSAT::preprocessDecomp(decomposition, combineWidth);
     std::cout << "pp time: " << (getTime() - time_pp) / 1000.0 << std::endl;
-    std::cerr << "after pp: " << decomposition.root.hash() << std::endl;
 
     std::cout << "decomposition preprocessed: " << formula.facts.size() << " " << formula.clause_offsets.size() << " " << formula.clause_bag.size() << std::endl;
 
