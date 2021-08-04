@@ -1,29 +1,21 @@
-# gpusat
+# GPUSAT3
 
 A #SAT solver based on dynamic programming running on the GPU.
+Version 3 contains new additional improvements and is based on the CUDA framework.
 
 ## Dependencies
 
 * htd 1.2.0 - https://github.com/mabseher/htd (build with cmake option -DBUILD_SHARED_LIBS=OFF)
-* OpenCL 1.2
+* CUDA 10.2
 * cmake 3.2+
 * gcc 7+
 * Boost Multiprecision
-
-### Tested with
-
-* htd 1.2.0
-* ocl-icd-opencl-dev 2.2.11-1ubuntu1
-* AMD APP SDK 3.0/CUDA Toolkit 9.1
-* cmake 3.9.1
-* gcc 7.2.0
-* Boost Multiprecision 1.66
 
 ## How to Build
 
 The following commands can be used to build `GPUSAT`
 ```
-git clone https://github.com/Budddy/GPUSAT
+git clone https://github.com/vroland/GPUSAT
 cd GPUSAT
 mkdir build && cd build
 cmake ..
