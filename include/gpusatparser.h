@@ -1,9 +1,13 @@
 #ifndef GPUSAT_PARSER_H
 #define GPUSAT_PARSER_H
 
+#define GPU_HOST_ATTR
+
 #include <queue>
-#include <types.h>
 #include <unordered_map>
+
+
+#include <gpusat_types.h>
 
 namespace gpusat {
     class CNFParser {
@@ -25,7 +29,7 @@ namespace gpusat {
          * @return
          *      the sat formula
          */
-        satformulaType parseSatFormula(std::string formula);
+        satformulaType parseSatFormula(std::istream& formula);
 
     private:
         bool wmc;
@@ -50,7 +54,7 @@ namespace gpusat {
          * @param weights
          *      map containing the weights for each literal
          */
-        void parseWeightLine(std::string item, std::unordered_map<cl_long, cl_double> &weights);
+        void parseWeightLine(std::string item, std::unordered_map<int64_t, double> &weights);
 
         /**
          * parses a clause line of the sat formula
@@ -62,7 +66,7 @@ namespace gpusat {
          * @param clause
          *      the clauses
          */
-        void parseClauseLine(satformulaType &ret, std::string &item, std::vector<cl_long> *clause);
+        void parseClauseLine(satformulaType &ret, std::string &item);
 
         /**
          * parses a solution line (not present in cnf format but some preprocessors use it)
@@ -82,12 +86,15 @@ namespace gpusat {
          *
          * @param graph
          *      the string representation of the tree decomposition
+         * @param removed_facts
+         *      Sorted list of facts that have been removed during preprocessing.
+         *      Remove them from nodes and relabel variables accordingly.
          * @return
          *      the tree decomposition
          */
-        treedecType parseTreeDecomp(std::string graph, satformulaType &formula);
-
-        cl_double defaultWeight = 1.0;
+        // IF NEEDED, implement construct a decomposition from the string,
+        // then use htd_to_bags from decomposer.
+        treedecType parseTreeDecomp(std::istream& graph, std::vector<int64_t>& removed_facts);
 
     private:
 
@@ -99,7 +106,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseEdgeLine(std::string item, std::vector<std::vector<cl_long>> &edges);
+        void parseEdgeLine(std::string& item, std::vector<std::vector<int64_t>> &edges);
 
         /**
          * parses the start line from the tree decomposition
@@ -111,7 +118,7 @@ namespace gpusat {
          * @param edges
          *      queue containing all edges
          */
-        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<cl_long>> &edges);
+        void parseStartLine(treedecType &ret, std::string &item, std::vector<std::vector<int64_t>> &edges);
 
         /**
          * parses a pag from the tree decomposition
@@ -121,7 +128,14 @@ namespace gpusat {
          * @param item
          *      a line from the decomposition
          */
-        void parseBagLine(treedecType &ret, std::string item);
+        BagType parseBagLine(std::string& item);
+
+
+        /**
+         * Remove facts from a bag and relabel its variables.
+         */
+
+        static void removeFactsFromDecomposition(BagType& bag, std::vector<int64_t>& to_remove, const std::vector<int64_t>& relabel_map);
     };
 }
 #endif //GPUSAT_PARSER_H

@@ -3,33 +3,73 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
-#include <gpusatparser.h>
-#include <gpusatpreprocessor.h>
+
+#include "gpusatparser.h"
+#include "gpusatpreprocessor.h"
 
 namespace gpusat {
-    void Preprocessor::preprocessDecomp(bagType *decomp, cl_long combineWidth) {
-
+    void Preprocessor::preprocessDecomp(BagType& decomp, size_t combineWidth) {
         bool changed = true;
         // try to merge child nodes
+        std::vector<int64_t> variable_union;
+
+        // maximal size of joined variables
         while (changed) {
             changed = false;
-            for (long a = 0; a < decomp->edges.size() && !changed; a++) {
-                for (long b = 0; b < decomp->edges.size() && !changed; b++) {
-                    if (a != b && ((decomp->edges[a]->variables.size() < combineWidth && decomp->edges[b]->variables.size() < combineWidth) || decomp->edges[a]->variables.size() == 0 || decomp->edges[b]->variables.size() == 0) && decomp->edges.size() > 1) {
-                        std::vector<cl_long> v;
-                        std::set_union(decomp->edges[a]->variables.begin(), decomp->edges[a]->variables.end(), decomp->edges[b]->variables.begin(), decomp->edges[b]->variables.end(), back_inserter(v));
-                        if (v.size() < combineWidth || decomp->edges[a]->variables.size() == 0 ||
-                            decomp->edges[b]->variables.size() == 0) {
-                            changed = true;
-                            cl_long cid = decomp->edges[b]->id;
-                            decomp->edges[a]->variables.assign(v.begin(), v.end());
 
-                            std::vector<bagType *> v_;
-                            std::set_union(decomp->edges[a]->edges.begin(), decomp->edges[a]->edges.end(), decomp->edges[b]->edges.begin(), decomp->edges[b]->edges.end(), back_inserter(v_), compTreedType);
-                            decomp->edges[a]->edges.assign(v_.begin(), v_.end());
-                            if (b < decomp->edges.size()) {
-                                decomp->edges.erase(decomp->edges.begin() + b);
-                            }
+            for (auto a_it = decomp.edges.begin(); a_it != decomp.edges.end(); a_it++) {
+                for (auto b_it = decomp.edges.begin(); b_it != decomp.edges.end(); b_it++) {
+                    auto& edge_a = *a_it;
+                    auto& edge_b = *b_it;
+                    if (a_it != b_it &&
+                            ((edge_a.variables.size() < combineWidth
+                                && edge_b.variables.size() < combineWidth)
+                             || edge_a.variables.size() == 0
+                             || edge_b.variables.size() == 0
+                             ) && decomp.edges.size() > 1) {
+
+                        auto max_vars = edge_a.variables.size() + edge_b.variables.size();
+                        if (max_vars > variable_union.size()) {
+                            variable_union.resize(max_vars);
+                        }
+
+                        bool definitely_disjunct =
+                            edge_a.variables.size() == 0
+                         || edge_b.variables.size() == 0
+                         || (edge_a.variables.front() > edge_b.variables.back())
+                         || (edge_a.variables.back() < edge_b.variables.front());
+
+                        auto union_size = max_vars;
+                        if (!definitely_disjunct) {
+                            auto union_end = std::set_union(
+                                    edge_a.variables.begin(), edge_a.variables.end(),
+                                    edge_b.variables.begin(), edge_b.variables.end(),
+                                    variable_union.begin()
+                            );
+
+                            union_size = union_end - variable_union.begin();
+                        }
+
+                        if (union_size < combineWidth || edge_a.variables.size() == 0 ||
+                            edge_b.variables.size() == 0) {
+
+                            auto union_end = std::set_union(
+                                    edge_a.variables.begin(), edge_a.variables.end(),
+                                    edge_b.variables.begin(), edge_b.variables.end(),
+                                    variable_union.begin()
+                            );
+                            changed = true;
+                            edge_a.variables.assign(variable_union.begin(), union_end);
+
+                            edge_a.edges.insert(
+                                    edge_a.edges.end(),
+                                    std::make_move_iterator(edge_b.edges.begin()),
+                                    std::make_move_iterator(edge_b.edges.end())
+                            );
+                            // This is a linked list, so iterators stay valid.
+                            decomp.edges.erase(b_it);
+                            edge_a.edges.sort(compTreedType);
+                            break;
                         }
                     }
                 }
@@ -38,148 +78,269 @@ namespace gpusat {
 
         changed = true;
         // try to merge with child nodes
-        if (decomp->variables.size() < combineWidth || decomp->variables.size() == 0) {
+        if (decomp.variables.size() < combineWidth || decomp.variables.size() == 0) {
+
             while (changed) {
                 changed = false;
-                for (long i = 0; i < decomp->edges.size(); i++) {
-                    std::vector<cl_long> v;
-                    std::set_union(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), back_inserter(v));
-                    if (v.size() < combineWidth || decomp->variables.size() == 0 || decomp->edges[i]->variables.size() == 0) {
-                        changed = true;
-                        cl_long cid = decomp->edges[i]->id;
-                        decomp->variables.assign(v.begin(), v.end());
+                for (size_t i = 0; i < decomp.edges.size(); i++) {
+                    std::vector<int64_t> v;
+                    // FIXME: clean this up
+                    auto i_it = decomp.edges.begin();
+                    std::advance(i_it, i);
+                    auto& edge_i = *i_it;
+                    std::set_union(
+                            decomp.variables.begin(), decomp.variables.end(),
+                            edge_i.variables.begin(), edge_i.variables.end(),
+                            back_inserter(v),
+                            compVars
+                    );
 
-                        std::vector<bagType *> v_;
-                        std::set_union(decomp->edges.begin(), decomp->edges.end(), decomp->edges[i]->edges.begin(), decomp->edges[i]->edges.end(), back_inserter(v_), compTreedType);
-                        decomp->edges.resize(0);
-                        for (long asdf = 0, x = 0; x < v_.size(); asdf++, x++) {
-                            bagType *&sdggg = v_[asdf];
-                            if (v_[asdf]->id == cid) {
-                                x++;
-                            }
-                            if (x < v_.size()) {
-                                decomp->edges.push_back(v_[x]);
-                            }
-                        }
+
+                    if (v.size() < combineWidth || decomp.variables.size() == 0 || edge_i.variables.size() == 0) {
+                        changed = true;
+                        decomp.variables.assign(v.begin(), v.end());
+
+                        decomp.edges.insert(
+                                decomp.edges.end(),
+                                std::make_move_iterator(edge_i.edges.begin()),
+                                std::make_move_iterator(edge_i.edges.end())
+                        );
+                        decomp.edges.erase(i_it);
+                        decomp.edges.sort(compTreedType);
                     }
                 }
             }
         }
 
         // process child nodes
-        for (long i = 0; i < decomp->edges.size(); i++) {
-            preprocessDecomp((decomp->edges)[i], combineWidth);
+        for (auto& edge : decomp.edges) {
+            preprocessDecomp(edge, combineWidth);
         }
-        //std::sort(decomp->variables.begin(), decomp->variables.end());
+        //std::sort(decomp.variables.begin(), decomp.variables.end());
 
-        for (long i = 0; i < decomp->edges.size(); i++) {
-            std::vector<cl_long> fVars;
-            std::set_intersection(decomp->variables.begin(), decomp->variables.end(), decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), std::back_inserter(fVars));
-            unsigned long long int numForgetVars = (decomp->edges[i]->variables.size() - fVars.size());
+        for (auto edge_it = decomp.edges.begin(); edge_it != decomp.edges.end(); edge_it++)  {
+            std::vector<int64_t> fVars;
+            auto& edge_i = *edge_it;
+            std::set_intersection(
+                    decomp.variables.begin(), decomp.variables.end(),
+                    edge_i.variables.begin(), edge_i.variables.end(),
+                    std::back_inserter(fVars),
+                    compVars);
+            unsigned long long int numForgetVars = (edge_i.variables.size() - fVars.size());
             if (numForgetVars > 8) {
-                bagType *newEdge = new bagType;
-                if (newEdge == NULL || errno == ENOMEM) {
-                    std::cerr << "\nOut of Memory\n";
-                    exit(0);
-                }
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.end());
+                auto newEdge = BagType();
+                newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.end());
                 fVars.resize(0);
-                std::set_difference(decomp->edges[i]->variables.begin(), decomp->edges[i]->variables.end(), decomp->variables.begin(), decomp->variables.end(), std::back_inserter(fVars));
-                newEdge->variables.insert(newEdge->variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
-                newEdge->edges.push_back(decomp->edges[i]);
-                decomp->edges[i] = newEdge;
-                std::sort(newEdge->variables.begin(), newEdge->variables.end());
+                std::set_difference(
+                        edge_i.variables.begin(), edge_i.variables.end(),
+                        decomp.variables.begin(), decomp.variables.end(),
+                        std::back_inserter(fVars),
+                        compVars);
+                newEdge.variables.insert(newEdge.variables.end(), fVars.begin(), fVars.begin() + numForgetVars - 8);
+                std::sort(newEdge.variables.begin(), newEdge.variables.end(), compVars);
+                // move existing node to be child of newEdge,
+                // wich becomes decomp.edges[i]
+                newEdge.edges.push_back(std::move(*edge_it));
+                *edge_it = std::move(newEdge);
             }
         }
 
-        if (decomp->variables.size() > 61) {
+        if (decomp.variables.size() > 61) {
             // can't solve problems with width > 60
             std::cout << "\nERROR: width > 60";
             exit(0);
         }
-
     }
 
-    void Preprocessor::preprocessFacts(treedecType &decomp, satformulaType &formula, cl_double &defaultWeight) {
-        for (cl_long i = 0; i < formula.facts.size(); i++) {
-            cl_long fact = formula.facts[i];
-            for (cl_long a = 0; a < formula.clauses.size(); a++) {
-                std::vector<cl_long>::iterator elem = std::lower_bound(formula.clauses[a].begin(), formula.clauses[a].end(), fact, compVars);
-                if (elem != formula.clauses[a].end()) {
-                    if (*elem == (fact)) {
-                        //remove clause from formula
-                        formula.clauses.erase(formula.clauses.begin() + a);
-                        a--;
-                    } else if (*elem == (-fact)) {
-                        if (formula.clauses[a].size() == 1) {
-                            //found contradiction
+
+    void Preprocessor::checkNoFactInDecomp(BagType& decomp, const std::vector<int64_t>& facts) {
+        for (auto fact : facts) {
+            auto elem = std::lower_bound( decomp.variables.begin(), decomp.variables.end(), fact, compVars );
+            assert(elem != decomp.variables.end() && "Fact in decomposition!");
+        }
+        for (auto& child : decomp.edges) {
+            checkNoFactInDecomp(child, facts);
+        }
+    }
+
+    std::vector<int64_t> Preprocessor::buildRelabelMap(int64_t facts_and_vars, const std::vector<int64_t>& facts) {
+        std::vector<int64_t> relabel_map;
+        relabel_map.resize(facts_and_vars + 1);
+
+        auto current_fact = facts.begin();
+        for (auto it = relabel_map.begin(); it != relabel_map.end(); it++) {
+            int64_t index = it - relabel_map.begin();
+            while (current_fact != facts.end() && abs(*current_fact) < index) {
+                current_fact++;
+            }
+
+            int64_t facts_so_far = current_fact - facts.begin();
+            assert(facts_so_far <= facts.size());
+            // this is the fact itself
+            if (current_fact != facts.end() && abs(*current_fact) == index) {
+                *it = -1;
+            } else {
+                *it = facts_so_far;
+            }
+        }
+        return relabel_map;
+    }
+
+    void Preprocessor::relabelFormula(satformulaType &formula) {
+
+        std::sort(formula.facts.begin(), formula.facts.end(), compVars);
+        auto relabel_map = buildRelabelMap(formula.facts.size() + formula.numVars, formula.facts);
+
+        for (auto it=formula.clause_bag.begin(); it!=formula.clause_bag.end(); it++) {
+            // no facts here
+            assert(relabel_map[abs(*it)] > -1);
+
+            if (*it < 0) {
+                *it += relabel_map[abs(*it)];
+            } else {
+                *it -= relabel_map[*it];
+            }
+        }
+        /*
+        std::cout << "p cnf " << formula.numVars << " " << formula.clause_offsets.size() << std::endl;
+        for (auto lit : formula.facts) {
+            std::cout << " " << lit << " " << 0 << std::endl;
+        }
+        for (auto lit : formula.clause_bag) {
+            std::cout << " " << lit;
+            if (lit == 0) {
+                std::cout << std::endl;
+            }
+        }
+        */
+    }
+
+    void Preprocessor::preprocessFacts(satformulaType &formula, double &defaultWeight) {
+        std::vector<int64_t> intersection;
+        std::vector<int64_t> new_facts;
+        std::vector<int64_t> sorted_clausevars = formula.clause_bag;
+        std::sort(sorted_clausevars.begin(), sorted_clausevars.end(), compVars);
+        std::set_intersection(
+            formula.facts.begin(),
+            formula.facts.end(),
+            sorted_clausevars.begin(),
+            sorted_clausevars.end(),
+            back_inserter(intersection),
+            compVars
+        );
+        if (intersection.size() == 0) {
+            std::cerr << "preprocessing unnecessary." << std::endl;
+            return;
+        }
+
+        /*
+        for (auto fact : formula.facts) {
+            std::cout << " " << fact;
+        }
+        */
+        std::cout << std::endl;
+
+        std::cerr << "WARNING: fact pp was re-implemented, WMC untested!" << std::endl;
+        std::vector<int64_t> new_clause_bag;
+        std::vector<size_t> new_offsets;
+
+        if (formula.variableWeights != nullptr) {
+            for (auto fact : formula.facts) {
+                if (fact < 0) {
+                    defaultWeight *= formula.variableWeights[std::abs(fact) * 2 + 1];
+                } else {
+                    defaultWeight *= formula.variableWeights[std::abs(fact) * 2];
+                }
+            }
+        }
+
+        bool facts_changed = false;
+
+        size_t old_clause_idx = 0;
+        size_t old_clause_lits = 0;
+        size_t current_clause_lits = 0;
+        bool skip_clause = false;
+        for (auto lit : formula.clause_bag) {
+            if (lit == 0) {
+                // non-empty clause
+                if (current_clause_lits > 0) {
+                    if (current_clause_lits == 1) {
+                        new_facts.push_back(new_clause_bag.back());
+                        new_clause_bag.pop_back();
+                    } else {
+                        new_clause_bag.push_back(0);
+                        new_offsets.push_back(new_clause_bag.size() - current_clause_lits - 1);
+                    }
+                }
+                old_clause_lits = 0;
+                current_clause_lits = 0;
+                skip_clause = false;
+                old_clause_idx++;
+                continue;
+            }
+
+            if (skip_clause) {
+                continue;
+            }
+
+            old_clause_lits++;
+
+            bool skip_lit = false;
+            for (auto fact : intersection) {
+                // there is a fact describing this literal
+                if (abs(lit) == abs(fact)) {
+                    auto size = clause_size(formula, old_clause_idx);
+                    size_t remaining = size - old_clause_lits;
+                    skip_lit = true;
+
+                    // fact solves clause
+                    if (lit == fact) {
+                        skip_clause = true;
+                        new_clause_bag.erase(new_clause_bag.end() - current_clause_lits , new_clause_bag.end());
+                        current_clause_lits = 0;
+
+                    // fact does not solve clause
+                    } else if (lit != fact) {
+                        // this is a contradiction
+                        if (current_clause_lits == 0 && remaining == 0) {
                             formula.unsat = true;
                             return;
-                        } else {
-                            //erase variable from clause
-                            formula.clauses[a].erase(elem);
-                            if (formula.clauses[a].size() == 1 && std::find(formula.facts.begin() + i, formula.facts.end(), formula.clauses[a][0]) == formula.facts.end() && std::find(formula.facts.begin() + i, formula.facts.end(), -formula.clauses[a][0]) == formula.facts.end()) {
-                                formula.facts.push_back(formula.clauses[a][0]);
-                            }
                         }
-                    }
-                }
-            }
-            for (long j = i; j < formula.facts.size(); ++j) {
-                if (std::abs(formula.facts[j]) > std::abs(fact)) {
-                    if (formula.facts[j] > 0) {
-                        formula.facts[j]--;
-                    } else if (formula.facts[j] < 0) {
-                        formula.facts[j]++;
-                    }
-                }
-            }
-            relableDecomp(&decomp.bags[0], std::abs(fact));
-            decomp.numVars--;
-            if (formula.variableWeights != nullptr) {
-                //make product of removed variable weights
-                if (fact < 0) {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2 + 1];
-                } else {
-                    defaultWeight = defaultWeight * formula.variableWeights[std::abs(fact) * 2];
-                }
-                formula.numWeights -= 2;
-                for (long j = std::abs(fact); j < formula.numVars; ++j) {
-                    formula.variableWeights[j * 2] = formula.variableWeights[(j + 1) * 2];
-                    formula.variableWeights[j * 2 + 1] = formula.variableWeights[(j + 1) * 2 + 1];
-                }
-            }
-            relableFormula(formula, std::abs(fact));
-            formula.numVars--;
-        }
-    }
 
+                        // the other literal must be true
+                        // } else if (current_clause_lits == 1 && remaining == 0) {
+                        //     formula.facts.push_back(new_clause_bag.back());
+                        //     facts_changed = true;
+                        //     new_clause_bag.pop_back();
+                        //     skip_lit = true;
+                        // literal cannot satisfy clause -> leave out
+                    }
+                    break;
+                }
+            }
 
-    void Preprocessor::relableDecomp(bagType *decomp, cl_long id) {
-        for (long i = 0; i < decomp->variables.size(); i++) {
-            if (decomp->variables[i] > id) {
-                decomp->variables[i]--;
-            } else if (decomp->variables[i] == id) {
-                decomp->variables.erase(decomp->variables.begin() + i);
-                i--;
+            if (!skip_lit) {
+                new_clause_bag.push_back(lit);
+                current_clause_lits++;
             }
         }
-        for (long j = 0; j < decomp->edges.size(); ++j) {
-            relableDecomp(decomp->edges[j], id);
-        }
-    }
 
-    void Preprocessor::relableFormula(satformulaType &formula, cl_long id) {
-        for (long i = 0; i < formula.clauses.size(); i++) {
-            for (long j = 0; j < formula.clauses[i].size(); ++j) {
-                if (std::abs(formula.clauses[i][j]) > id) {
-                    if (formula.clauses[i][j] > 0) {
-                        formula.clauses[i][j]--;
-                    } else if (formula.clauses[i][j] < 0) {
-                        formula.clauses[i][j]++;
-                    }
+        std::cout << "old clauses: " << formula.clause_offsets.size() << " new clauses: " << new_offsets.size() << std::endl;
+        formula.clause_bag = std::move(new_clause_bag);
+        formula.clause_offsets = std::move(new_offsets);
+
+        if (!new_facts.empty()) {
+            for (auto fact : new_facts) {
+                auto it = std::lower_bound( formula.facts.begin(), formula.facts.end(), fact, compVars );
+                if (abs(*it) != abs(fact)) {
+                    formula.facts.insert( it, fact );
+                    formula.numVars--;
+                } else if (*it == -fact) {
+                    formula.unsat = true;
+                    return;
                 }
             }
+            preprocessFacts(formula, defaultWeight);
         }
     }
 }

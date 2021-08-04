@@ -6,6 +6,8 @@
 #include <htd/Helpers.hpp>
 #include <htd/ITreeDecompositionFitnessFunction.hpp>
 
+#include <gpusat_types.h>
+
 namespace gpusat {
     class Decomposer {
     public:
@@ -18,31 +20,24 @@ namespace gpusat {
          *      the fitness function
          * @param n
          *      number of iterations for the fitness function
+         * @param dumpDecomp
+         *      dump the tree decomposition in td format and exit
          * @return
          *      the decomposition in td format
          */
-        static std::string computeDecomposition(std::string formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n);
+        static treedecType computeDecomposition(const satformulaType& formula, htd::ITreeDecompositionFitnessFunction *fitness, size_t n, bool dumpDecomp);
 
     private:
         /**
-         * parses the problem line from the cnf formula
-         *
-         * @param line
-         *      the problem line
-         * @param hypergraph
-         *      the graph to generate the decomposition from
+         * Build a tree of bags (treedecType) from a tree decomposition.
          */
-        static void parseProblemLine(std::string line, htd::Hypergraph &hypergraph);
+        static treedecType htd_to_bags(const htd::ITreeDecomposition& decomposition, const struct satformulaType& formula);
+
 
         /**
-         * parses a clause line from the cnf formula
-         *
-         * @param line
-         *      the clause line
-         * @param hypergraph
-         *      the graph to generate the decomposition from
+         * Build a hypergraph for passing to HTD from a given formula.
          */
-        static void parseClauseLine(std::string line, htd::Hypergraph &hypergraph);
+        static void gpusat_formula_to_hypergraph(htd::Hypergraph& hypergraph, const satformulaType& formula);
     };
 }
 #endif //GPUSAT_DECOMPOSER_H
