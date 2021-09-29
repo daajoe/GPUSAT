@@ -14,9 +14,16 @@ namespace gpusat {
 
         ~NumJoinFitnessFunction() = default;
 
-        htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override;
+        htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override {
+            return new htd::FitnessEvaluation(2,
+                    -decomposition.joinNodeCount(),
+                    -(double) (decomposition.maximumBagSize())
+            );
+        };
 
-        NumJoinFitnessFunction *clone(void) const override;
+        NumJoinFitnessFunction *clone(void) const override {
+            return new NumJoinFitnessFunction();
+        }
     };
 }
 

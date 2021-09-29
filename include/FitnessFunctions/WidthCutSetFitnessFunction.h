@@ -2,6 +2,8 @@
 #define GPUSAT_WIDTHCUTSETFITNESSFUNCTION_H
 
 #include <htd/ITreeDecompositionFitnessFunction.hpp>
+#include <unordered_set>
+#include <algorithm>
 
 namespace gpusat {
     /**
@@ -14,11 +16,41 @@ namespace gpusat {
 
         ~WidthCutSetFitnessFunction() = default;
 
-        htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override;
+        htd::FitnessEvaluation *fitness(const htd::IMultiHypergraph &graph, const htd::ITreeDecomposition &decomposition) const override {
+            return new htd::FitnessEvaluation(2,
+                    -(double) (decomposition.maximumBagSize()),
+                    -getMaxCutSetSize(decomposition)
+            );
+        }
 
-        double getMaxCutSetSize(const htd::ITreeDecomposition &decomposition) const;
+        double getMaxCutSetSize(const htd::ITreeDecomposition &decomposition) const {
+            double sizes = 0;
+            for (auto a:decomposition.vertices()) {
+                std::vector<htd::vertex_t> currentNodes = decomposition.bagContent(a);
+                std::vector<htd::vertex_t> cNodes;
+                for (htd::vertex_t childVertex : decomposition.children(a)) {
+                    const std::vector<htd::vertex_t> &childNodes = decomposition.bagContent(childVertex);
+                    for (htd::vertex_t n:childNodes) {
+                        cNodes.push_back(n);
+                    }
+                }
 
-        WidthCutSetFitnessFunction *clone(void) const override;
+                std::sort(currentNodes.begin(), currentNodes.end());
+                std::sort(cNodes.begin(), cNodes.end());
+                std::vector<htd::vertex_t> v;
+                std::set_intersection(
+                        currentNodes.begin(), currentNodes.end(),
+                        cNodes.begin(), cNodes.end(),
+                        back_inserter(v)
+                );
+                sizes = std::max((double) v.size(), sizes);
+            }
+            return sizes;
+        };
+
+        WidthCutSetFitnessFunction *clone(void) const override {;
+            return new WidthCutSetFitnessFunction();
+        }
     };
 }
 
